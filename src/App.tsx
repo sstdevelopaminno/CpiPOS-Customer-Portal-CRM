@@ -713,22 +713,208 @@ function StaffView({ context, branchId }: { context: PortalContext; branchId: st
   </>;
 }
 
+function billingStatusLabel(status:string){
+  return ({
+    paid:"ชำระแล้ว",pending:"รอชำระ/ตรวจสอบ",under_review:"กำลังตรวจสอบ",
+    open:"รอชำระ",due:"รอชำระ",overdue:"เกินกำหนด",cancelled:"ยกเลิก",
+    active:"ใช้งาน",trial:"ทดลองใช้งาน",locked:"ระงับใช้งาน"
+  } as Record<string,string>)[status]??status;
+}
+
+function PackagePaymentModal({
+  info,cycle,onClose,onSaved
+}:{
+  info:PackageInfo;
+  cycle:PackageInfo["billingCycles"][number]|null;
+  onClose:()=>void;
+  onSaved:()=>Promise<void>;
+}){
+  const [slip,setSlip]=useState<File|null>(null);
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState("");
+  const contract=info.contract;
+  const expected=cycle?Math.max(0,Number(cycle.amount_due)-Number(cycle.amount_paid)):Number(contract?.amount_per_cycle??0);
+  const packageId=contract?.package_id??"";
+
+  async function submit(event:React.FormEvent){
+    event.preventDefault();
+    if(!slip||!packageId)return;
+    setBusy(true);setError("");
+    try{
+      await submitPackagePayment({
+        tenantId:(window as unknown as {__tenantId?:string}).__tenantId??"",
+        billingCycleId:cycle?.id??null,
+        packageId,
+        billingInterval:contract?.billing_interval??"monthly",
+        expectedAmount:expected,
+        slip
+      });
+      await onSaved();
+      onClose();
+    }catch(err){setError(err instanceof Error?err.message:"ส่งหลักฐานการชำระไม่สำเร็จ");}
+    finally{setBusy(false);}
+  }
+
+  return <Modal title="ชำระค่าบริการแพ็กเกจ" subtitle="ส่งหลักฐานให้ฝ่าย IT ตรวจสอบเงินเข้าก่อนอัปเดตสิทธิ์" onClose={onClose}>
+    <form className="entityForm" onSubmit={submit}>
+      {error?<ErrorPanel message={error}/>:null}
+      <div className="paymentSummary">
+        <div><span>แพ็กเกจ</span><strong>{contract?.package_name||contract?.package_code||"CpiPOS"}</strong></div>
+        <div><span>ยอดที่ต้องชำระ</span><strong>{money.format(expected)}</strong></div>
+        {cycle?<div><span>รอบบิล</span><strong>{dateOnly.format(new Date(cycle.period_start))} – {dateOnly.format(new Date(cycle.period_end))}</strong></div>:null}
+      </div>
+      <div className="issuerBox">
+        <strong>{info.issuer?.billing_legal_name_th||"บัญชีรับชำระค่าบริการ CpiPOS"}</strong>
+        <span>{info.issuer?.billing_bank_name||"ธนาคาร"} · {info.issuer?.billing_bank_account_name||"บัญชีบริษัท"}</span>
+        <b>{info.issuer?.billing_bank_account_number||info.issuer?.billing_promptpay_id||"กรุณาติดต่อฝ่าย Support"}</b>
+      </div>
+      <div className="formGrid singleColumn">
+        <label><span>แนบสลิปการโอน</span><input type="file" accept="image/jpeg,image/png,image/webp" onChange={e=>setSlip(e.target.files?.[0]??null)} required/><small>รองรับ JPG, PNG และ WebP ไม่เกิน 4 MB</small></label>
+      </div>
+      <div className="modalActions"><button type="button" className="secondaryButton" onClick={onClose}>ยกเลิก</button><button className="primaryAction" disabled={busy||!slip||expected<=0}>{busy?<LoaderCircle className="spin" size={17}/>:<CreditCard size={17}/>}ส่งหลักฐานชำระเงิน</button></div>
+    </form>
+  </Modal>;
+}
+
 function PackageView({ context }: { context: PortalContext }) {
-  const [info, setInfo] = useState<PackageInfo | null>(null);
-  const [loading, setLoading] = useState(true);
-  useEffect(()=>{loadPackage(context.tenantId,context.role).then(setInfo).finally(()=>setLoading(false));},[context.tenantId,context.role]);
-  if(loading)return <div className="loadingPanel"><LoaderCircle className="spin"/>กำลังโหลดแพ็กเกจ...</div>;
+  const [info,setInfo]=useState<PackageInfo|null>(null);
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState("");
+  const [paying,setPaying]=useState<PackageInfo["billingCycles"][number]|null|undefined>(undefined);
+
+  const refresh=useCallback(async()=>{
+    setLoading(true);setError("");
+    try{
+      const data=await loadPackage(context.tenantId,context.role);
+      setInfo(data);
+      (window as unknown as {__tenantId?:string}).__tenantId=context.tenantId;
+    }catch{setError("ไม่สามารถโหลดข้อมูลแพ็กเกจได้");}
+    finally{setLoading(false);}
+  },[context.tenantId,context.role]);
+  useEffect(()=>{void refresh();},[refresh]);
+  if(loading&&!info)return <div className="loadingPanel"><LoaderCircle className="spin"/>กำลังโหลดแพ็กเกจ...</div>;
+
   const expiry=info?.runtime?.expires_at||info?.contract?.ended_at;
+  const daysRemaining=expiry?Math.ceil((new Date(expiry).getTime()-Date.now())/86400000):null;
+  const openRequest=info?.requests.find(row=>["pending","under_review"].includes(row.status));
+  const dueCycles=(info?.billingCycles??[]).filter(cycle=>cycle.status!=="paid"&&Number(cycle.amount_due)>Number(cycle.amount_paid));
+  const canUpcoming=Boolean(context.role==="owner"&&!openRequest&&!dueCycles.length&&info?.contract?.package_id&&Number(info.contract.amount_per_cycle)>0&&daysRemaining!==null&&daysRemaining<=7);
+  const status=info?.runtime?.lifecycle_status||info?.contract?.status||"—";
+  const interval=info?.contract?.billing_interval==="yearly"?"รายปี":info?.contract?.billing_interval==="monthly"?"รายเดือน":info?.contract?.billing_interval||"—";
+
   return <>
-    <div className="pageHeading"><div><p className="eyebrow">PACKAGE & BILLING</p><h2>แพ็กเกจและสิทธิ์</h2><p>ตรวจสอบสถานะสิทธิ์การใช้งานของร้าน</p></div></div>
-    <section className="packageHero">
-      <div><span>สถานะปัจจุบัน</span><strong>{info?.runtime?.lifecycle_status||info?.contract?.status||"—"}</strong><small>{info?.runtime?.access_locked?"การใช้งานถูกจำกัด":"ระบบพร้อมใช้งาน"}</small></div>
-      <div><span>รอบชำระ</span><strong>{info?.contract?.billing_interval||"—"}</strong><small>Auto renew: {info?.contract?.auto_renew?"เปิด":"ปิด"}</small></div>
-      <div><span>หมดอายุ</span><strong>{expiry?dateOnly.format(new Date(expiry)):"—"}</strong><small>{info?.runtime?.lock_reason||"ไม่มีข้อจำกัด"}</small></div>
+    <div className="pageHeading"><div><p className="eyebrow">PACKAGE & BILLING</p><h2>แพ็กเกจและการชำระเงิน</h2><p>สถานะสิทธิ์ รอบบิล และรายการชำระเชื่อมกับระบบ POS/IT ชุดเดียวกัน</p></div><button className="ghostButton" onClick={()=>void refresh()}><RefreshCw size={18}/>รีเฟรช</button></div>
+    {error?<ErrorPanel message={error}/>:null}
+    <section className="packageHero packageHeroFive">
+      <div><span>แพ็กเกจ</span><strong>{info?.contract?.package_name||info?.contract?.package_code||"—"}</strong><small>{info?.contract?.package_code||"แพ็กเกจปัจจุบัน"}</small></div>
+      <div><span>สถานะ</span><strong>{billingStatusLabel(status)}</strong><small>{info?.runtime?.access_locked?"การใช้งานถูกจำกัด":"ระบบพร้อมใช้งาน"}</small></div>
+      <div><span>รอบชำระ</span><strong>{interval}</strong><small>Auto renew: {info?.contract?.auto_renew?"เปิด":"ปิด"}</small></div>
+      <div><span>หมดอายุ</span><strong>{expiry?dateOnly.format(new Date(expiry)):"—"}</strong><small>{daysRemaining===null?"ไม่กำหนด":daysRemaining<0?`เกินกำหนด ${Math.abs(daysRemaining)} วัน`:`เหลือ ${daysRemaining} วัน`}</small></div>
       <div><span>ค่าบริการต่อรอบ</span><strong>{info?.contract?.amount_per_cycle==null?"—":money.format(Number(info.contract.amount_per_cycle))}</strong><small>{info?.contract?.currency||"THB"}</small></div>
     </section>
-    {context.role==="owner"?<article className="panel tablePanel"><div className="panelHeader"><div><p className="eyebrow">BILLING HISTORY</p><h3>รอบบิลล่าสุด</h3></div></div>{info?.billingCycles.length?<div className="tableWrap"><table><thead><tr><th>ช่วงรอบบิล</th><th>สถานะ</th><th className="right">ยอดเรียกเก็บ</th><th className="right">ชำระแล้ว</th></tr></thead><tbody>{info.billingCycles.map((cycle,index)=><tr key={`${cycle.period_start}-${index}`}><td>{dateOnly.format(new Date(cycle.period_start))} – {dateOnly.format(new Date(cycle.period_end))}</td><td><span className={cycle.status==="paid"?"status status-completed":"status"}>{cycle.status}</span></td><td className="right">{money.format(Number(cycle.amount_due))}</td><td className="right">{money.format(Number(cycle.amount_paid))}</td></tr>)}</tbody></table></div>:<Empty>ยังไม่มีประวัติรอบบิลที่แสดงได้</Empty>}</article>:<div className="infoBox">ผู้จัดการสามารถดูสถานะแพ็กเกจได้ แต่ประวัติการชำระเงินสงวนสำหรับ Owner</div>}
-    <div className="auditNote">สิทธิ์แพ็กเกจและสัญญาเป็นข้อมูลการค้า จึงแก้ไขจาก Customer Portal ไม่ได้ และต้องจัดการจากฝ่าย IT/สัญญาเพื่อป้องกันการเปลี่ยนสิทธิ์โดยไม่ตั้งใจ</div>
+
+    {openRequest?<div className="billingAlert"><Clock3 size={20}/><div><strong>รายการกำลังรอตรวจสอบ</strong><span>{billingStatusLabel(openRequest.status)} · {openRequest.package_name||info?.contract?.package_name||"แพ็กเกจ"} · ส่งเมื่อ {dateTime.format(new Date(openRequest.submitted_at))}</span></div></div>:null}
+    {canUpcoming?<div className="billingAlert warning"><CreditCard size={20}/><div><strong>ใกล้ถึงรอบชำระค่าบริการ</strong><span>ยอด {money.format(Number(info?.contract?.amount_per_cycle??0))} · กรุณาชำระและส่งสลิปเพื่อให้ IT ตรวจสอบ</span></div><button className="primaryAction" onClick={()=>setPaying(null)}>ชำระเงิน</button></div>:null}
+
+    {context.role==="owner"?<article className="panel tablePanel"><div className="panelHeader"><div><p className="eyebrow">BILLING HISTORY</p><h3>รายการรอบบิล</h3></div></div>{info?.billingCycles.length?<div className="tableWrap boundedTable"><table><thead><tr><th>ช่วงรอบบิล</th><th>สถานะ</th><th className="right">ยอดเรียกเก็บ</th><th className="right">ชำระแล้ว</th><th className="right">คงค้าง</th><th></th></tr></thead><tbody>{info.billingCycles.map(cycle=>{const outstanding=Math.max(0,Number(cycle.amount_due)-Number(cycle.amount_paid));const payable=cycle.status!=="paid"&&outstanding>0&&!openRequest;return <tr key={cycle.id}><td>{dateOnly.format(new Date(cycle.period_start))} – {dateOnly.format(new Date(cycle.period_end))}</td><td><span className={cycle.status==="paid"?"status status-completed":"status status-pending"}>{billingStatusLabel(cycle.status)}</span></td><td className="right">{money.format(Number(cycle.amount_due))}</td><td className="right">{money.format(Number(cycle.amount_paid))}</td><td className="right"><strong>{money.format(outstanding)}</strong></td><td className="right">{payable?<button className="tableAction payAction" onClick={()=>setPaying(cycle)}><CreditCard size={15}/>ชำระเงิน</button>:null}</td></tr>;})}</tbody></table></div>:<Empty>ยังไม่มีประวัติรอบบิลที่แสดงได้</Empty>}</article>:<div className="infoBox">Manager ดูสถานะแพ็กเกจได้ ส่วนการชำระเงินและประวัติหลักฐานสงวนสำหรับ Owner</div>}
+
+    {context.role==="owner"&&info?.requests.length?<article className="panel tablePanel"><div className="panelHeader"><div><p className="eyebrow">PAYMENT REQUESTS</p><h3>สถานะการชำระและคำขอ</h3></div></div><div className="tableWrap"><table><thead><tr><th>วันที่ส่ง</th><th>แพ็กเกจ</th><th>ประเภท</th><th>สถานะ</th><th>หลักฐาน</th></tr></thead><tbody>{info.requests.map(row=><tr key={row.id}><td>{dateTime.format(new Date(row.submitted_at))}</td><td>{row.package_name||"—"}</td><td>{row.request_type}</td><td><span className={["pending","under_review"].includes(row.status)?"status status-pending":"status"}>{billingStatusLabel(row.status)}</span></td><td>{row.has_evidence?"ส่งแล้ว":"—"}</td></tr>)}</tbody></table></div></article>:null}
+    <div className="auditNote">CRM ส่งเฉพาะคำขอและหลักฐานไปยัง billing control plane เดิม การอนุมัติเงินจริง การออกใบเสร็จ และการเปลี่ยนสิทธิ์ยังดำเนินการโดย POS/IT ตามขั้นตอนเดิม</div>
+    {paying!==undefined&&info?<PackagePaymentModal info={info} cycle={paying} onClose={()=>setPaying(undefined)} onSaved={refresh}/>:null}
+  </>;
+}
+
+type MoreItem={key:string;label:string;desc:string;feature:string;target?:PortalView;icon:React.ReactNode};
+const moreItems:MoreItem[]=[
+  {key:"more.sales_summary",label:"สรุปยอดขาย",desc:"ยอดขาย ภาษี และภาพรวมการดำเนินงาน",feature:"advanced_sales_reports",target:"dashboard",icon:<TrendingUp/>},
+  {key:"more.receipts",label:"ใบเสร็จย้อนหลัง",desc:"ค้นหาและตรวจสอบรายการขายย้อนหลัง",feature:"receipt_reprint_history",target:"sales",icon:<ReceiptText/>},
+  {key:"more.tables",label:"จัดการโต๊ะ",desc:"โต๊ะ โซน และผังร้านสำหรับโหมดนั่งโต๊ะ",feature:"table_management",icon:<Table2/>},
+  {key:"more.kitchen_manage",label:"จัดการครัว",desc:"โซนครัว เส้นทางอาหาร และสถานะ KDS",feature:"kitchen_printing",icon:<ChefHat/>},
+  {key:"more.stock",label:"จัดการสินค้า",desc:"สินค้า วัตถุดิบ ราคา และสต๊อก",feature:"stock_management",target:"products",icon:<Boxes/>},
+  {key:"more.buffet",label:"ตั้งค่าราคาบุฟเฟ่",desc:"ข้อมูลราคาบุฟเฟ่ที่ใช้ร่วมกับ POS",feature:"table_management",icon:<Banknote/>},
+  {key:"more.members",label:"สมาชิก",desc:"ข้อมูลสมาชิกหน้าร้าน",feature:"core_pos_sales",icon:<UsersRound/>},
+  {key:"more.tax_invoices",label:"ออกใบกำกับภาษี",desc:"ข้อมูลใบกำกับภาษีจากรายการขาย",feature:"core_pos_sales",target:"sales",icon:<FileText/>},
+  {key:"more.product_sales",label:"รายการขายสินค้า",desc:"รายการสินค้าที่ขายและสินค้าขายดี",feature:"advanced_sales_reports",target:"sales",icon:<History/>},
+  {key:"more.ai_documents",label:"เก็บไฟล์เอกสาร",desc:"เอกสารและรายงานจาก CpiPOS AI",feature:"cpipos_ai",icon:<FileText/>}
+];
+
+function MoreView({context,branchId,onNavigate}:{context:PortalContext;branchId:string|null;onNavigate:(view:PortalView)=>void}){
+  const [state,setState]=useState<FeatureState|null>(null);
+  const [error,setError]=useState("");
+  useEffect(()=>{loadFeatureState(context.tenantId,branchId).then(setState).catch(()=>setError("ไม่สามารถตรวจสอบสิทธิ์เมนูเพิ่มเติมได้"));},[context.tenantId,branchId]);
+  const enabled=(item:MoreItem)=>{
+    const menu=state?.menu_policy?.[item.key]!==false;
+    const base=state?.package_features?.[item.feature]??false;
+    const override=state?.feature_overrides?.[item.feature];
+    return menu&&(override===undefined?base:override);
+  };
+  return <>
+    <div className="pageHeading"><div><p className="eyebrow">MORE</p><h2>เพิ่มเติม</h2><p>เมนูชุดเดียวกับ POS โดยตรวจสิทธิ์แพ็กเกจและนโยบายจาก IT ก่อนแสดงการใช้งาน</p></div></div>
+    {error?<ErrorPanel message={error}/>:null}
+    <div className="moduleGrid">{moreItems.map(item=>{const allowed=state?enabled(item):false;return <button key={item.key} className={`moduleCard ${allowed?"":"locked"}`} disabled={!allowed||!item.target} onClick={()=>item.target&&onNavigate(item.target)}><span className="moduleIcon">{item.icon}</span><div><strong>{item.label}</strong><span>{item.desc}</span><small>{!state?"กำลังตรวจสิทธิ์...":!allowed?"ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด":item.target?"พร้อมใช้งานใน CRM":"เชื่อมสิทธิ์แล้ว · โมดูลข้อมูล POS"}</small></div><ChevronRight size={18}/></button>;})}</div>
+    <div className="auditNote">เมนูที่ยังไม่มีหน้าจัดการเฉพาะใน CRM จะยังไม่เขียนข้อมูลลง POS โดยตรง เพื่อรักษา transaction และกติกาเดิมของ POS/IT</div>
+  </>;
+}
+
+const settingsCatalog=[
+  ["settings.store","ข้อมูลร้านค้า/บริษัท","ข้อมูลชื่อร้าน โลโก้ ที่อยู่ และการติดต่อ","core_pos_sales","store"],
+  ["settings.branches","สาขา","สาขาและสถานะการเปิดใช้งาน","branch_management","branches"],
+  ["settings.devices","เครื่องแคชเชียร์","อุปกรณ์ POS และสถานะออนไลน์","mobile_device_enrollment","devices"],
+  ["settings.printers","เครื่องพิมพ์","การตั้งค่าเครื่องพิมพ์ของ POS","core_pos_sales","printers"],
+  ["settings.activity","ตรวจสอบพฤติกรรมการใช้งาน","ประวัติการทำงานและ Audit","core_pos_sales","activity"],
+  ["settings.payments","ตั้งค่าชำระเงิน","บัญชีธนาคารและ QR ของร้าน","core_pos_sales","payments"],
+  ["settings.inet_nops","INET QR","การเชื่อมต่อช่องทางรับชำระ INET","inet_nops_qr","inet"],
+  ["settings.taxes","ตั้งค่าภาษี","VAT และการคำนวณภาษี","core_pos_sales","taxes"],
+  ["settings.notifications","การแจ้งเตือน","QR โต๊ะ เสียงแจ้งเตือน และครัว","qr_table_ordering","notifications"],
+  ["settings.support","ศูนย์ช่วยเหลือ","Support และการติดต่อฝ่ายระบบ","core_pos_sales","support"],
+  ["settings.push_notifications","การแจ้งเตือนอุปกรณ์","Push notification ของเครื่อง POS","core_pos_sales","push"],
+  ["settings.users","ผู้ใช้งาน","พนักงาน สิทธิ์ และ PIN","user_management","users"],
+  ["settings.language","เปลี่ยนภาษา","ภาษาแสดงผลของ POS","core_pos_sales","language"],
+  ["settings.placement","สลับแถบเมนูหลัก","ตำแหน่งเมนูต่อเครื่อง POS","core_pos_sales","placement"],
+  ["settings.display","จอลูกค้า","Customer Display","customer_facing_display","display"],
+  ["settings.order_kitchen","ออเดอร์และครัว","การส่งออเดอร์และการแจ้งเตือนครัว","kitchen_printing","orderKitchen"],
+  ["settings.table_qr","QR โต๊ะ","การรับออเดอร์ผ่าน QR โต๊ะ","qr_table_ordering","tableQr"]
+] as const;
+
+function SettingsView({context,branchId,onNavigate}:{context:PortalContext;branchId:string|null;onNavigate:(view:PortalView)=>void}){
+  const [snapshot,setSnapshot]=useState<SettingsSnapshot|null>(null);
+  const [features,setFeatures]=useState<FeatureState|null>(null);
+  const [error,setError]=useState("");
+  useEffect(()=>{Promise.all([loadSettingsSnapshot(context.tenantId,branchId),loadFeatureState(context.tenantId,branchId)]).then(([s,f])=>{setSnapshot(s);setFeatures(f);}).catch(()=>setError("ไม่สามารถโหลดการตั้งค่าร้านได้"));},[context.tenantId,branchId]);
+  const allowed=(key:string,feature:string)=>{
+    if(features?.menu_policy?.[key]===false)return false;
+    const base=features?.package_features?.[feature]??false;
+    const override=features?.feature_overrides?.[feature];
+    return override===undefined?base:override;
+  };
+  const detail=(kind:string)=>{
+    if(!snapshot)return "กำลังโหลดข้อมูล...";
+    if(kind==="store")return snapshot.store?.display_name||snapshot.store?.name||"ร้านค้า";
+    if(kind==="branches")return snapshot.branches.length+" สาขา";
+    if(kind==="devices")return snapshot.devices.length+" เครื่อง";
+    if(kind==="payments")return snapshot.payment_accounts.length+" บัญชี";
+    if(kind==="taxes")return snapshot.tax_settings.filter(x=>x.is_enabled).length+" สาขาเปิดภาษี";
+    if(kind==="notifications")return snapshot.notifications.length+" สาขา";
+    if(kind==="users")return "จัดการจากเมนูพนักงาน";
+    return "เชื่อมกับการตั้งค่า POS";
+  };
+  return <>
+    <div className="pageHeading"><div><p className="eyebrow">SETTINGS</p><h2>ตั้งค่า</h2><p>โครงเมนูตาม POS และใช้สิทธิ์จากแพ็กเกจ + นโยบาย IT ชุดเดียวกัน</p></div></div>
+    {error?<ErrorPanel message={error}/>:null}
+    {snapshot?<section className="settingsOverview">
+      <div><Store size={20}/><span>ร้าน</span><strong>{snapshot.store?.display_name||snapshot.store?.name||"—"}</strong></div>
+      <div><Building2 size={20}/><span>สาขา</span><strong>{snapshot.branches.length}</strong></div>
+      <div><MonitorSmartphone size={20}/><span>อุปกรณ์</span><strong>{snapshot.devices.length}</strong></div>
+      <div><CreditCard size={20}/><span>บัญชีรับเงิน</span><strong>{snapshot.payment_accounts.length}</strong></div>
+    </section>:null}
+    <div className="moduleGrid settingsGrid">{settingsCatalog.map(([key,label,desc,feature,kind])=>{const isAllowed=features?allowed(key,feature):false;const target=kind==="users"?"staff" as PortalView:undefined;return <button key={key} className={`moduleCard ${isAllowed?"":"locked"}`} disabled={!isAllowed||(!target&&["printers","activity","inet","support","push","language","placement","display","orderKitchen","tableQr"].includes(kind))} onClick={()=>target&&onNavigate(target)}><span className="moduleIcon">{kind==="devices"?<MonitorSmartphone/>:kind==="payments"?<CreditCard/>:kind==="notifications"?<Bell/>:kind==="printers"?<Printer/>:kind==="branches"?<Building2/>:kind==="users"?<UsersRound/>:<Settings/>}</span><div><strong>{label}</strong><span>{desc}</span><small>{!features?"กำลังตรวจสิทธิ์...":!isAllowed?"ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด":detail(kind)}</small></div><ChevronRight size={18}/></button>;})}</div>
+    {snapshot?<article className="panel settingsDataPanel"><div className="panelHeader"><div><p className="eyebrow">CONNECTED POS SETTINGS</p><h3>ข้อมูลที่เชื่อมอยู่</h3></div></div><div className="settingsDataGrid">
+      <div><strong>ข้อมูลร้าน</strong><span>{snapshot.store?.company_address||"ยังไม่ได้ระบุที่อยู่"}</span><span>{snapshot.store?.contact_phone||snapshot.store?.owner_phone||"—"}</span></div>
+      <div><strong>สาขา</strong>{snapshot.branches.slice(0,5).map(b=><span key={b.id}>{b.name} · {b.is_active?"ใช้งาน":"ปิด"}</span>)}</div>
+      <div><strong>อุปกรณ์</strong>{snapshot.devices.slice(0,5).map(d=><span key={d.id}>{d.device_name||d.device_code||"POS"} · {d.status||"—"}</span>)}</div>
+      <div><strong>บัญชีรับชำระของร้าน</strong>{snapshot.payment_accounts.slice(0,5).map(a=><span key={a.id}>{a.bank_name||"บัญชี"} · ••••{String(a.account_number||"").slice(-4)}</span>)}</div>
+    </div></article>:null}
+    <div className="auditNote">ค่าที่เป็น local ต่อเครื่อง เช่น ภาษา/ตำแหน่งแถบเมนู และฮาร์ดแวร์เครื่องพิมพ์ ยังไม่ถูกเขียนจาก CRM เพื่อไม่ให้เปลี่ยนการทำงานของเครื่อง POS โดยไม่ตั้งใจ</div>
   </>;
 }
 
@@ -736,9 +922,11 @@ const nav: Array<{ id: PortalView; label: string; icon: React.ReactNode }> = [
   { id:"dashboard",label:"ภาพรวม",icon:<LayoutDashboard size={21}/> },
   { id:"sales",label:"ยอดขาย",icon:<ReceiptText size={21}/> },
   { id:"products",label:"สินค้า",icon:<Boxes size={21}/> },
-  { id:"stock",label:"สต๊อก",icon:<Warehouse size={21}/> },
+  { id:"stock",label:"วัตถุดิบ",icon:<Warehouse size={21}/> },
   { id:"staff",label:"พนักงาน",icon:<UsersRound size={21}/> },
-  { id:"package",label:"แพ็กเกจ",icon:<PackageCheck size={21}/> }
+  { id:"package",label:"แพ็กเกจ",icon:<PackageCheck size={21}/> },
+  { id:"more",label:"เพิ่มเติม",icon:<MoreHorizontal size={21}/> },
+  { id:"settings",label:"ตั้งค่า",icon:<Settings size={21}/> }
 ];
 
 export default function App() {
@@ -827,7 +1015,7 @@ export default function App() {
   if(checking)return <div className="bootScreen"><img className="bootLogo" src="/cpipos-logo.png" alt="CpiPOS"/><LoaderCircle className="spin"/><span>กำลังเตรียมข้อมูลร้าน...</span></div>;
   if(!context)return <Login onSuccess={restore} canInstall={Boolean(installPrompt)&&!standalone} onInstall={installApp}/>;
 
-  const showFilters=view!=="package";
+  const showFilters=!["package","more"].includes(view);
   const showPeriod=view==="dashboard"||view==="sales";
   const canInstall=Boolean(installPrompt)&&!standalone;
 
@@ -865,6 +1053,8 @@ export default function App() {
       {view==="stock"?<StockView context={context} branchId={branchId||null}/>:null}
       {view==="staff"?<StaffView context={context} branchId={branchId||null}/>:null}
       {view==="package"?<PackageView context={context}/>:null}
+      {view==="more"?<MoreView context={context} branchId={branchId||null} onNavigate={chooseView}/>:null}
+      {view==="settings"?<SettingsView context={context} branchId={branchId||null} onNavigate={chooseView}/>:null}
 
       <footer>ข้อมูลและสิทธิ์ถูกจำกัดตามบัญชี {context.role==="owner"?"Owner":"Manager"} · {context.branches.length} สาขาที่เข้าถึงได้</footer>
     </main>
