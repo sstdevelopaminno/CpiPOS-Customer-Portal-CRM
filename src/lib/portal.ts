@@ -216,6 +216,18 @@ export interface FeatureState {
   menu_policy: Record<string, boolean>;
 }
 
+export interface MoreSnapshot {
+  tables_count:number;
+  kitchen_zones_count:number;
+  kitchen_rules_count:number;
+  members_count:number;
+  tax_invoices_count:number;
+  ai_documents_count:number;
+  printers_count:number;
+  display_pairings_count:number;
+  audit_count:number;
+}
+
 export interface SettingsSnapshot {
   store: {
     id: string;
@@ -669,6 +681,14 @@ export async function loadFeatureState(tenantId: string, branchId: string | null
     feature_overrides: (value.feature_overrides??{}) as Record<string,boolean>,
     menu_policy: (value.menu_policy??{}) as Record<string,boolean>
   };
+}
+
+export async function loadMoreSnapshot(tenantId:string,branchId:string|null):Promise<MoreSnapshot>{
+  const {data,error}=await supabase.rpc("customer_portal_more_snapshot",{
+    p_tenant_id:tenantId,p_branch_id:branchId
+  });
+  if(error)throw error;
+  return data as unknown as MoreSnapshot;
 }
 
 export async function loadSettingsSnapshot(tenantId: string, branchId: string | null): Promise<SettingsSnapshot> {
