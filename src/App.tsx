@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  Banknote, Boxes, ChevronRight, CircleAlert, Clock3, LayoutDashboard, LoaderCircle,
+  Banknote, Boxes, ChevronRight, CircleAlert, Clock3, Download, LayoutDashboard, LoaderCircle,
   LogOut, PackageCheck, ReceiptText, RefreshCw, ShieldCheck, Store, TrendingUp,
-  UserRoundCheck, Warehouse
+  UserRoundCheck, Warehouse, WifiOff
 } from "lucide-react";
 import {
   loadDashboard, loadPackage, loadPortalContext, loadProducts, loadSales, loadStock,
@@ -21,7 +21,20 @@ function statusLabel(status: string) {
   return ({ completed: "สำเร็จ", cancelled: "ยกเลิก", queued: "รอดำเนินการ", draft: "ฉบับร่าง" } as Record<string,string>)[status] ?? status;
 }
 
-function Login({ onSuccess }: { onSuccess: () => Promise<void> }) {
+type InstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+};
+
+function Login({
+  onSuccess,
+  canInstall,
+  onInstall
+}: {
+  onSuccess: () => Promise<void>;
+  canInstall: boolean;
+  onInstall: () => Promise<void>;
+}) {
   const [storeCode, setStoreCode] = useState("");
   const [employeeCode, setEmployeeCode] = useState("");
   const [busy, setBusy] = useState(false);
@@ -52,6 +65,7 @@ function Login({ onSuccess }: { onSuccess: () => Promise<void> }) {
         {error ? <div className="errorBox"><CircleAlert size={18}/>{error}</div> : null}
         <button className="primaryButton" disabled={busy}>{busy?<LoaderCircle className="spin" size={19}/>:null}{busy?"กำลังตรวจสอบ...":"เข้าสู่ระบบ"}</button>
       </form>
+      {canInstall ? <button type="button" className="installButton" onClick={() => void onInstall()}><Download size={17}/>ติดตั้ง CpiPOS เป็นเว็บแอป</button> : null}
       <p className="securityCopy">สำหรับบัญชีเจ้าของร้านและผู้จัดการเท่านั้น</p>
     </section>
   </main>;
@@ -145,20 +159,46 @@ export default function App(){
   const [checking,setChecking]=useState(true);
   const [view,setView]=useState<PortalView>("dashboard");
   const [fatal,setFatal]=useState("");
+  const [installPrompt,setInstallPrompt]=useState<InstallPromptEvent|null>(null);
+  const [online,setOnline]=useState(()=>navigator.onLine);
+  const [standalone,setStandalone]=useState(()=>window.matchMedia("(display-mode: standalone)").matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone));
   const restore=useCallback(async()=>{setFatal("");try{setContext(await loadPortalContext());}catch(err){const m=err instanceof Error?err.message:"";if(m!=="not_authenticated")setFatal("ไม่สามารถตรวจสอบสิทธิ์ Customer Portal ได้");setContext(null);}finally{setChecking(false);}},[]);
   useEffect(()=>{void restore();const{data}=supabase.auth.onAuthStateChange(event=>{if(event==="SIGNED_OUT")setContext(null);});return()=>data.subscription.unsubscribe();},[restore]);
+  useEffect(()=>{
+    const beforeInstall=(event:Event)=>{const promptEvent=event as InstallPromptEvent;promptEvent.preventDefault();setInstallPrompt(promptEvent);};
+    const installed=()=>{setInstallPrompt(null);setStandalone(true);};
+    const goOnline=()=>setOnline(true);
+    const goOffline=()=>setOnline(false);
+    window.addEventListener("beforeinstallprompt",beforeInstall);
+    window.addEventListener("appinstalled",installed);
+    window.addEventListener("online",goOnline);
+    window.addEventListener("offline",goOffline);
+    return()=>{
+      window.removeEventListener("beforeinstallprompt",beforeInstall);
+      window.removeEventListener("appinstalled",installed);
+      window.removeEventListener("online",goOnline);
+      window.removeEventListener("offline",goOffline);
+    };
+  },[]);
+  const installApp=useCallback(async()=>{
+    if(!installPrompt)return;
+    await installPrompt.prompt();
+    const choice=await installPrompt.userChoice;
+    if(choice.outcome==="accepted")setInstallPrompt(null);
+  },[installPrompt]);
   if(checking)return <div className="bootScreen"><img className="bootLogo" src="/cpipos-logo.png" alt="CpiPOS"/><LoaderCircle className="spin"/><span>กำลังเตรียมข้อมูลร้าน...</span></div>;
-  if(!context)return <Login onSuccess={restore}/>;
+  if(!context)return <Login onSuccess={restore} canInstall={Boolean(installPrompt)&&!standalone} onInstall={installApp}/>;
   return <div className="appShell">
     <aside className="sidebar">
       <div className="brandBlock"><img className="brandLogo" src="/cpipos-logo.png" alt="CpiPOS"/><div><strong>CpiPOS</strong><span>Customer Portal</span></div></div>
       <div className="storeCard"><div className="storeAvatar">{context.logoUrl?<img src={context.logoUrl} alt=""/>:<Store size={21}/>}</div><div><strong>{context.tenantName}</strong><span>ร้าน {context.tenantCode}</span></div></div>
       <nav>{nav.map(i=><button key={i.id} className={view===i.id?"active":""} onClick={()=>setView(i.id)}>{i.icon}<span>{i.label}</span><ChevronRight size={16}/></button>)}</nav>
-      <div className="sidebarBottom"><div className="roleBadge"><ShieldCheck size={16}/><span>{context.role==="owner"?"Owner":"Manager"}</span></div><button className="logoutButton" onClick={()=>void logoutPortal()}><LogOut size={17}/>ออกจากระบบ</button></div>
+      <div className="sidebarBottom">{installPrompt&&!standalone?<button className="sidebarInstallButton" onClick={()=>void installApp()}><Download size={16}/>ติดตั้งเว็บแอป</button>:null}<div className="roleBadge"><ShieldCheck size={16}/><span>{context.role==="owner"?"Owner":"Manager"}</span></div><button className="logoutButton" onClick={()=>void logoutPortal()}><LogOut size={17}/>ออกจากระบบ</button></div>
     </aside>
     <main className="content">
-      <header className="mobileHeader"><div className="brandBlock"><img className="brandLogo" src="/cpipos-logo.png" alt="CpiPOS"/><div><strong>CpiPOS</strong><span>{context.tenantName}</span></div></div><button className="iconButton" onClick={()=>void logoutPortal()}><LogOut size={18}/></button></header>
+      <header className="mobileHeader"><div className="brandBlock"><img className="brandLogo" src="/cpipos-logo.png" alt="CpiPOS"/><div><strong>CpiPOS</strong><span>{context.tenantName}</span></div></div><div className="mobileHeaderActions">{installPrompt&&!standalone?<button className="iconButton" aria-label="ติดตั้งเว็บแอป" onClick={()=>void installApp()}><Download size={18}/></button>:null}<button className="iconButton" aria-label="ออกจากระบบ" onClick={()=>void logoutPortal()}><LogOut size={18}/></button></div></header>
       <div className="mobileNav">{nav.map(i=><button key={i.id} className={view===i.id?"active":""} onClick={()=>setView(i.id)}>{i.icon}<span>{i.label}</span></button>)}</div>
+      {!online?<div className="offlineBanner"><WifiOff size={17}/><span>ออฟไลน์ — เปิดดูหน้าแอปได้ แต่ข้อมูลร้านจะอัปเดตเมื่อเชื่อมต่ออินเทอร์เน็ตอีกครั้ง</span></div>:null}
       {fatal?<div className="errorBox">{fatal}</div>:null}
       {view==="dashboard"?<DashboardView context={context}/>:null}
       {view==="sales"?<SalesView context={context}/>:null}
