@@ -219,6 +219,8 @@ function explainMutationError(message?: string) {
   if (value.includes("ingredient_in_use_by_recipe")) return "ลบไม่ได้ เนื่องจากวัตถุดิบถูกใช้ในสูตรสินค้า";
   if (value.includes("ingredient_has_stock_history")) return "ลบไม่ได้ เนื่องจากวัตถุดิบมีประวัติการเคลื่อนไหวสต๊อก";
   if (value.includes("manager_cannot")) return "สิทธิ์ Manager ไม่สามารถแก้ไขหรือมอบสิทธิ์ระดับ Owner/Manager ได้";
+  if (value.includes("invalid_order_notes")) return "หมายเหตุรายการขายต้องไม่เกิน 1,000 ตัวอักษร";
+  if (value.includes("invalid_customer_name")) return "ชื่อลูกค้าต้องไม่เกิน 180 ตัวอักษร";
   if (value.includes("customer_portal_forbidden")) return "บัญชีนี้ไม่มีสิทธิ์ดำเนินการในสาขาที่เลือก";
   return value || "ไม่สามารถบันทึกข้อมูลได้";
 }
@@ -264,6 +266,17 @@ export async function loadPortalContext(): Promise<PortalContext> {
   const { data: sessionData } = await supabase.auth.getSession();
   const user = sessionData.session?.user;
   if (!user) throw new Error("not_authenticated");
+
+  const { data: profile, error: profileError } = await supabase
+    .from("users_profiles")
+    .select("is_active,archived_at")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (profileError) throw profileError;
+  if (!profile?.is_active || profile.archived_at) {
+    await logoutPortal();
+    throw new Error("portal_account_inactive");
+  }
 
   const { data: roles, error: rolesError } = await supabase
     .from("user_branch_roles")
@@ -336,20 +349,48 @@ export async function loadDashboard(tenantId: string, branchId: string | null, r
   return { summary: summary as DashboardSummary, recentOrders: (orders ?? []) as unknown as OrderRow[] };
 }
 
-export async function loadSales(tenantId: string, branchId: string | null, range: ReportRange, anchor: string) {
+export async function loadSales(
+  tenantId: string,
+  branchId: string | null,
+  range: ReportRange,
+  anchor: string,
+  page = 0,
+  pageSize = 100
+) {
   const { from, to } = getReportWindow(range, anchor);
-  let query = supabase
+  const safePage = Math.max(0, page);
+  const safePageSize = Math.min(200, Math.max(25, pageSize));
+  const offset = safePage * safePageSize;
+
+  let salesQuery = supabase
     .from("orders")
-    .select(orderSelect)
+    .select(orderSelect, { count: "exact" })
     .eq("tenant_id", tenantId)
     .gte("created_at", from)
     .lt("created_at", to)
-    .order("created_at", { ascending: false })
-    .limit(1000);
-  if (branchId) query = query.eq("branch_id", branchId);
-  const { data, error } = await query;
-  if (error) throw error;
-  return (data ?? []) as unknown as OrderRow[];
+    .order("created_at", { ascending: false });
+
+  if (branchId) salesQuery = salesQuery.eq("branch_id", branchId);
+
+  const [salesResult, summaryResult] = await Promise.all([
+    salesQuery.range(offset, offset + safePageSize - 1),
+    supabase.rpc("customer_portal_dashboard_v2", {
+      p_tenant_id: tenantId,
+      p_branch_id: branchId,
+      p_from: from,
+      p_to: to
+    })
+  ]);
+
+  if (salesResult.error) throw salesResult.error;
+  if (summaryResult.error) throw summaryResult.error;
+
+  const summary = summaryResult.data as DashboardSummary;
+  return {
+    rows: (salesResult.data ?? []) as unknown as OrderRow[],
+    total: salesResult.count ?? 0,
+    salesTotal: Number(summary?.sales_total ?? 0)
+  };
 }
 
 export async function loadOrderItems(orderId: string) {
