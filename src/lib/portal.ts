@@ -9,3 +9,5 @@ export * from "./api/staff";
 export * from "./api/billing";
 export * from "./api/more";
 export * from "./api/settings";
+export * from "./api/pos-admin";
+export * from "../types/pos-admin";

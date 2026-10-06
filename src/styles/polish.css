@@ -394,3 +394,37 @@ tbody tr:hover{background:#f8fbfe}
 .linkedModuleBody .modalActions{margin:0 -20px -20px;padding:14px 20px}
 @media(max-width:1024px){.moduleGrid.posMenuGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:680px){.moduleGrid.posMenuGrid{grid-template-columns:1fr}.moduleCard.posMenuCard{min-height:96px;padding:13px}.moduleCard.posMenuCard .moduleIcon{width:40px;height:40px}}
+
+
+/* POS admin CRUD workspaces */
+.adminModuleHeader{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:2px 0 18px}
+.adminModuleTitle{display:flex;align-items:flex-start;gap:12px;min-width:0}
+.adminModuleTitle h2{margin:2px 0 4px;font-size:29px;line-height:1.18;color:#123b61}
+.adminModuleTitle p{margin:0;color:#71869a;font-size:12px}
+.adminModuleTools{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.adminModuleTools select{min-width:210px;height:42px;border:1px solid #cbd9e6;border-radius:11px;background:#fff;padding:0 34px 0 12px;color:#234c70;font-weight:700}
+.adminKpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.adminKpis>div{display:grid;gap:4px;padding:14px 16px;border:1px solid #dce6f0;border-radius:13px;background:#fff}
+.adminKpis span{font-size:10px;color:#7d91a4}.adminKpis strong{font-size:21px;color:#123f68}
+.adminPanel{margin-bottom:14px}.adminPanel table{min-width:760px}
+.zoneColor{display:inline-block;width:16px;height:16px;margin-right:7px;border:1px solid rgba(0,0,0,.1);border-radius:50%;vertical-align:-3px}
+.miniToggle{min-width:54px;height:30px;border:1px solid #d1dde7;border-radius:999px;background:#f5f7fa;color:#718397;font-size:10px;font-weight:900}
+.miniToggle.on{border-color:#b9e3cf;background:#e9f8f0;color:#16704d}
+.adminCheckGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:7px;padding:10px;border:1px solid #dce6f0;border-radius:11px;background:#f9fbfd;max-height:180px;overflow:auto}
+.adminCheckGrid label{display:flex;align-items:center;gap:7px;font-size:11px;color:#45637e}
+.fieldLabel{display:block;font-size:11px;font-weight:800;color:#5e758b}
+.adminActionRow{display:flex;justify-content:flex-end;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.buffetAdminGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.buffetAdminCard{display:grid;gap:13px;padding:17px;border:1px solid #dce6f0;border-radius:15px;background:#fff;box-shadow:var(--shadow-sm)}
+.buffetAdminCard h3{margin:2px 0;font-size:16px;color:#143e64}.buffetAdminCard p{margin:0;font-size:10px;color:#8294a5}
+.buffetAdminCard>strong{font-size:25px;color:#126db4}
+.buffetMeta{display:flex;justify-content:space-between;gap:10px;padding-top:9px;border-top:1px solid #edf2f6;font-size:10px;color:#6f8497}
+@media(max-width:1024px){.buffetAdminGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:680px){
+  .adminModuleHeader{align-items:stretch;flex-direction:column}
+  .adminModuleTitle h2{font-size:25px}
+  .adminModuleTools{display:grid;grid-template-columns:1fr 1fr}
+  .adminModuleTools select{min-width:0;width:100%}
+  .adminKpis,.buffetAdminGrid{grid-template-columns:1fr}
+  .adminCheckGrid{grid-template-columns:1fr}
+}
