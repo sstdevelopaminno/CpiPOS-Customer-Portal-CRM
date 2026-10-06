@@ -383,6 +383,14 @@ declare
   v_active_branches integer;
   v_current_branch_active boolean;
   v_requested_branch_active boolean;
+  v_feature_state jsonb;
+  v_required_feature text;
+  v_required_menu text;
+  v_package_feature boolean;
+  v_override_feature boolean;
+  v_feature_allowed boolean;
+  v_menu_allowed boolean;
+  v_qr_mode text;
 begin
   select
     bool_or(ubr.role::text='owner'),
@@ -401,6 +409,42 @@ begin
 
   if not coalesce(v_allowed,false) then
     raise exception using errcode='42501',message='customer_portal_forbidden';
+  end if;
+
+  v_required_feature:=case p_action
+    when 'update_store' then 'core_pos_sales'
+    when 'save_branch' then 'branch_management'
+    when 'save_payment_account' then 'core_pos_sales'
+    when 'save_tax' then 'core_pos_sales'
+    when 'save_notifications' then 'qr_table_ordering'
+    else null
+  end;
+
+  v_required_menu:=case p_action
+    when 'update_store' then 'settings.store'
+    when 'save_branch' then 'settings.branches'
+    when 'save_payment_account' then 'settings.payments'
+    when 'save_tax' then 'settings.taxes'
+    when 'save_notifications' then 'settings.notifications'
+    else null
+  end;
+
+  if v_required_feature is null or v_required_menu is null then
+    raise exception using errcode='22023',message='unsupported_setting_action';
+  end if;
+
+  v_feature_state:=public.customer_portal_feature_state(p_tenant_id,p_branch_id);
+  v_package_feature:=coalesce((v_feature_state->'package_features'->>v_required_feature)::boolean,false);
+  if (v_feature_state->'feature_overrides') ? v_required_feature then
+    v_override_feature:=(v_feature_state->'feature_overrides'->>v_required_feature)::boolean;
+  else
+    v_override_feature:=null;
+  end if;
+  v_feature_allowed:=coalesce(v_override_feature,v_package_feature,false);
+  v_menu_allowed:=coalesce((v_feature_state->'menu_policy'->>v_required_menu)::boolean,true);
+
+  if not v_feature_allowed or not v_menu_allowed then
+    raise exception using errcode='42501',message='setting_policy_forbidden';
   end if;
 
   if p_action='update_store' then
@@ -518,11 +562,15 @@ begin
     if btrim(coalesce(p_payload->>'bank_name',''))='' or btrim(coalesce(p_payload->>'account_name',''))='' then
       raise exception using errcode='22023',message='invalid_payment_account';
     end if;
-    if coalesce(nullif(p_payload->>'qr_mode',''),'promptpay_link')='promptpay_link'
+    v_qr_mode:=coalesce(nullif(p_payload->>'qr_mode',''),'promptpay_link');
+    if v_qr_mode not in ('promptpay_link','qr_image') then
+      raise exception using errcode='22023',message='invalid_qr_mode';
+    end if;
+    if v_qr_mode='promptpay_link'
        and regexp_replace(coalesce(p_payload->>'promptpay_phone',''),'[^0-9]','','g')='' then
       raise exception using errcode='22023',message='promptpay_required';
     end if;
-    if coalesce(nullif(p_payload->>'qr_mode',''),'promptpay_link')='qr_image'
+    if v_qr_mode='qr_image'
        and btrim(coalesce(p_payload->>'qr_image_url',''))='' then
       raise exception using errcode='22023',message='qr_image_required';
     end if;
@@ -555,7 +603,7 @@ begin
         case when regexp_replace(coalesce(p_payload->>'promptpay_phone',''),'[^0-9]','','g')=''
           then null else 'https://promptpay.io/'||regexp_replace(coalesce(p_payload->>'promptpay_phone',''),'[^0-9]','','g') end,
         nullif(btrim(coalesce(p_payload->>'qr_image_url','')),''),
-        coalesce(nullif(p_payload->>'qr_mode',''),'promptpay_link'),
+        v_qr_mode,
         coalesce((p_payload->>'applies_to_all_branches')::boolean,false),
         coalesce((p_payload->>'is_active')::boolean,true),
         v_actor
@@ -570,7 +618,7 @@ begin
           promptpay_payload=case when regexp_replace(coalesce(p_payload->>'promptpay_phone',''),'[^0-9]','','g')=''
             then null else 'https://promptpay.io/'||regexp_replace(coalesce(p_payload->>'promptpay_phone',''),'[^0-9]','','g') end,
           qr_image_url=nullif(btrim(coalesce(p_payload->>'qr_image_url','')),''),
-          qr_mode=coalesce(nullif(p_payload->>'qr_mode',''),'promptpay_link'),
+          qr_mode=v_qr_mode,
           applies_to_all_branches=coalesce((p_payload->>'applies_to_all_branches')::boolean,false),
           is_active=coalesce((p_payload->>'is_active')::boolean,true),
           updated_at=now()
