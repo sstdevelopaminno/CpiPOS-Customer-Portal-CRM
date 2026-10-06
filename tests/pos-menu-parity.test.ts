@@ -20,6 +20,9 @@ describe("POS menu parity",()=>{
       "/preview/pos/product-sales"
     ]);
     expect(POS_MORE_MENU_ITEMS.some(item=>item.key==="more.ai_documents")).toBe(false);
+    expect(Object.fromEntries(POS_MORE_MENU_ITEMS.filter(item=>item.adminModule).map(item=>[item.key,item.adminModule]))).toEqual({
+      "more.tables":"tables","more.kitchen_manage":"kitchen","more.buffet":"buffet","more.members":"members"
+    });
   });
 
   it("matches the Settings menu set from POS main including injected QR menus",()=>{
@@ -28,5 +31,6 @@ describe("POS menu parity",()=>{
       "users","language","placement","display","orderKitchen","tableQr"
     ]);
     expect(POS_SETTINGS_MENU_ITEMS.some(item=>["support","push"].includes(item.kind))).toBe(false);
+    expect(POS_SETTINGS_MENU_ITEMS.find(item=>item.kind==="devices")?.adminModule).toBe("devices");
   });
 });

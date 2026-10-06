@@ -1,4 +1,5 @@
 import type { MoreSnapshot, PortalView } from "../types/portal";
+import type { PosAdminModule } from "../types/pos-admin";
 
 export const POS_MENU_SOURCE = {
   repository: "sstdevelopaminno/CpIPOS",
@@ -22,6 +23,7 @@ export interface PosMoreMenuItem {
   icon: PosMenuIcon;
   target?: PortalView;
   countKey?: keyof MoreSnapshot;
+  adminModule?: PosAdminModule;
 }
 
 export interface PosSettingsMenuItem {
@@ -34,16 +36,17 @@ export interface PosSettingsMenuItem {
   icon: PosMenuIcon;
   target?: PortalView;
   editorKind?: PosSettingsEditorKind;
+  adminModule?: PosAdminModule;
 }
 
 export const POS_MORE_MENU_ITEMS: readonly PosMoreMenuItem[] = [
   { key:"more.sales_summary", posHref:"/preview/pos/sales-summary", label:"สรุปยอดขาย", desc:"ดูยอดขาย ภาษี เงินสด/โอน และรายงานประจำกะ", feature:"advanced_sales_reports", icon:"summary", target:"dashboard" },
   { key:"more.receipts", posHref:"/preview/pos/receipts", label:"ใบเสร็จย้อนหลัง", desc:"ค้นหาใบเสร็จและสั่งพิมพ์ย้อนหลัง 58mm", feature:"receipt_reprint_history", icon:"receipt", target:"sales" },
-  { key:"more.tables", posHref:"/preview/pos/tables", label:"จัดการโต๊ะ", desc:"จัดการโต๊ะ โซน และผังร้านสำหรับโหมดนั่งโต๊ะ", feature:"table_management", icon:"tables", countKey:"tables_count" },
-  { key:"more.kitchen_manage", posHref:"/preview/pos/kitchen/manage", label:"จัดการครัว", desc:"ตั้งค่าโซนครัว เส้นทางหมวดหมู่อาหาร และจอ KDS", feature:"kitchen_printing", icon:"kitchen", countKey:"kitchen_zones_count" },
+  { key:"more.tables", posHref:"/preview/pos/tables", label:"จัดการโต๊ะ", desc:"จัดการโต๊ะ โซน และผังร้านสำหรับโหมดนั่งโต๊ะ", feature:"table_management", icon:"tables", countKey:"tables_count", adminModule:"tables" },
+  { key:"more.kitchen_manage", posHref:"/preview/pos/kitchen/manage", label:"จัดการครัว", desc:"ตั้งค่าโซนครัว เส้นทางหมวดหมู่อาหาร และจอ KDS", feature:"kitchen_printing", icon:"kitchen", countKey:"kitchen_zones_count", adminModule:"kitchen" },
   { key:"more.stock", posHref:"/preview/pos/stock", label:"จัดการสินค้า", desc:"สินค้า สต็อก วัตถุดิบ ราคา และหมวดหมู่", feature:"stock_management", icon:"stock", target:"products" },
-  { key:"more.buffet", posHref:"/preview/pos/buffet-pricing", label:"ตั้งค่าราคาบุฟเฟ่", desc:"กำหนดราคาบุฟเฟ่รายท่านและแบบชุดสำหรับหน้าขาย", feature:"table_management", icon:"buffet" },
-  { key:"more.members", posHref:"/preview/pos/members", label:"สมาชิก", desc:"ค้นหาและจัดการข้อมูลสมาชิกหน้าร้าน", feature:"core_pos_sales", icon:"members", countKey:"members_count" },
+  { key:"more.buffet", posHref:"/preview/pos/buffet-pricing", label:"ตั้งค่าราคาบุฟเฟ่", desc:"กำหนดราคาบุฟเฟ่รายท่านและแบบชุดสำหรับหน้าขาย", feature:"table_management", icon:"buffet", adminModule:"buffet" },
+  { key:"more.members", posHref:"/preview/pos/members", label:"สมาชิก", desc:"ค้นหาและจัดการข้อมูลสมาชิกหน้าร้าน", feature:"core_pos_sales", icon:"members", countKey:"members_count", adminModule:"members" },
   { key:"more.tax_invoices", posHref:"/preview/pos/tax-invoices", label:"ออกใบกำกับภาษี", desc:"ทะเบียนผู้เสียภาษี ค้นบิลย้อนหลัง และพิมพ์ใบกำกับภาษี 58/80mm", feature:"core_pos_sales", icon:"tax", target:"sales", countKey:"tax_invoices_count" },
   { key:"more.product_sales", posHref:"/preview/pos/product-sales", label:"รายการขายสินค้า", desc:"ดูสินค้าที่ขาย วันที่ ราคา จำนวน และสถานะสินค้าขายดี", feature:"advanced_sales_reports", icon:"sales", target:"sales" }
 ];
@@ -51,7 +54,7 @@ export const POS_MORE_MENU_ITEMS: readonly PosMoreMenuItem[] = [
 export const POS_SETTINGS_MENU_ITEMS: readonly PosSettingsMenuItem[] = [
   { key:"settings.store", posHref:"/preview/pos/settings", label:"ข้อมูลร้านค้า/บริษัท", desc:"รหัสร้าน ชื่อแสดงผล โลโก้ ที่อยู่ และเบอร์ติดต่อ", feature:"core_pos_sales", kind:"store", icon:"store", editorKind:"store" },
   { key:"settings.branches", posHref:"/preview/pos/settings", label:"สาขา", desc:"เปิดสาขา เพิ่ม แก้ไข และจัดการสถานะสาขา", feature:"branch_management", kind:"branches", icon:"branch", editorKind:"branches" },
-  { key:"settings.devices", posHref:"/preview/pos/settings", label:"เพิ่มเครื่องแคชเชียร์", desc:"ผูกเครื่อง POS กับสาขา นโยบายล็อกอิน ขอบเขตผู้ใช้ และกะ", feature:"mobile_device_enrollment", kind:"devices", icon:"terminal" },
+  { key:"settings.devices", posHref:"/preview/pos/settings", label:"เพิ่มเครื่องแคชเชียร์", desc:"ผูกเครื่อง POS กับสาขา นโยบายล็อกอิน ขอบเขตผู้ใช้ และกะ", feature:"mobile_device_enrollment", kind:"devices", icon:"terminal", adminModule:"devices" },
   { key:"settings.printers", posHref:"/preview/pos/settings", label:"ตั้งค่าเครื่องพิมพ์", desc:"ใบเสร็จ Print Agent เครื่องพิมพ์ประจำสาขา และลิ้นชักเก็บเงิน", feature:"core_pos_sales", kind:"printers", icon:"printer" },
   { key:"settings.activity", posHref:"/preview/pos/settings", label:"ตรวจสอบพฤติกรรมการใช้งาน", desc:"ติดตามผู้ใช้งาน เมนู เวลา PIN และรายการอนุมัติ", feature:"core_pos_sales", kind:"activity", icon:"activity" },
   { key:"settings.payments", posHref:"/preview/pos/settings", label:"ตั้งค่าชำระเงิน", desc:"บัญชีธนาคาร PromptPay QR และสถานะการใช้งาน", feature:"core_pos_sales", kind:"payments", icon:"payment", editorKind:"payments" },

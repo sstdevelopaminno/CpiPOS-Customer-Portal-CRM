@@ -20,6 +20,10 @@ After this foundation is merged, the next UI iteration can map the POS main/subm
 
 ## POS menu parity source
 
-The Customer Portal **เพิ่มเติม** and **ตั้งค่า** catalogs mirror `sstdevelopaminno/CpIPOS` branch `main` at commit `37aeb6dbb7f20486c073d782f6d5fb2f437a86e0`. The parity contract is centralized in `src/config/pos-menu-catalog.ts` and protected by `tests/pos-menu-parity.test.ts`. Device-local or transaction-sensitive POS modules remain read-only/informational in Customer Portal until a dedicated safe control-plane API exists.
+The Customer Portal **เพิ่มเติม** and **ตั้งค่า** catalogs mirror `sstdevelopaminno/CpIPOS` branch `main` at commit `37aeb6dbb7f20486c073d782f6d5fb2f437a86e0`. The parity contract is centralized in `src/config/pos-menu-catalog.ts` and protected by `tests/pos-menu-parity.test.ts`. Customer Portal uses the same CpiPOS-001 data and package/IT feature policy as POS. Writable POS administration is exposed only through dedicated server-side RPC control-plane functions.
 
-Linked-only menu cards remain clickable for visibility and status review, but they do not perform device-local or transaction-sensitive writes.
+Writable parity is enabled for tables/zones, members, kitchen zones/KDS/routing, buffet pricing, and cashier devices. Printer physical discovery/connections, Customer Display secret pairing, and device-local language/menu placement remain linked/read-only until their safe control-plane actions are implemented.
+
+## POS administration control-plane
+
+Migration `customer_portal_pos_admin_crud_parity` adds authenticated Owner/Manager RPCs for shared POS back-office data. Every mutation is tenant/branch scoped, package-feature gated, IT menu-policy gated, and audit logged. Cashier-device provisioning also honors contract quota and revokes active POS sessions when device identity changes or a device is removed.
