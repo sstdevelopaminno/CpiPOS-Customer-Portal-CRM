@@ -295,6 +295,8 @@ function explainMutationError(message?: string) {
   if (value.includes("ingredient_in_use_by_recipe")) return "ลบไม่ได้ เนื่องจากวัตถุดิบถูกใช้ในสูตรสินค้า";
   if (value.includes("ingredient_has_stock_history")) return "ลบไม่ได้ เนื่องจากวัตถุดิบมีประวัติการเคลื่อนไหวสต๊อก";
   if (value.includes("manager_cannot")) return "สิทธิ์ Manager ไม่สามารถแก้ไขหรือมอบสิทธิ์ระดับ Owner/Manager ได้";
+  if (value.includes("cross_tenant_user_edit_forbidden")) return "ผู้ใช้นี้เชื่อมกับร้านอื่นอยู่ จึงไม่สามารถเปลี่ยนข้อมูลหรือ PIN จากร้านนี้ได้";
+  if (value.includes("invalid_pin")) return "PIN ต้องเป็นตัวเลข 4–12 หลัก";
   if (value.includes("invalid_order_notes")) return "หมายเหตุรายการขายต้องไม่เกิน 1,000 ตัวอักษร";
   if (value.includes("invalid_customer_name")) return "ชื่อลูกค้าต้องไม่เกิน 180 ตัวอักษร";
   if (value.includes("customer_portal_forbidden")) return "บัญชีนี้ไม่มีสิทธิ์ดำเนินการในสาขาที่เลือก";
@@ -623,7 +625,7 @@ export async function createStaff(tenantId: string, draft: StaffDraft) {
 
 export async function updateStaff(tenantId: string, draft: StaffDraft) {
   if (!draft.user_id) throw new Error("ไม่พบพนักงานที่ต้องการแก้ไข");
-  const { error } = await supabase.rpc("customer_portal_update_staff", {
+  const { error } = await supabase.rpc("customer_portal_update_staff_v2", {
     p_tenant_id: tenantId,
     p_branch_id: draft.branch_id,
     p_user_id: draft.user_id,
@@ -632,24 +634,10 @@ export async function updateStaff(tenantId: string, draft: StaffDraft) {
     p_position_title: draft.position_title,
     p_branch_role: draft.branch_role,
     p_permission_role: draft.permission_role,
-    p_is_active: draft.is_active
+    p_is_active: draft.is_active,
+    p_pin: draft.pin?.trim() || null
   });
   if (error) throw new Error(explainMutationError(error.message));
-
-  if (draft.pin) {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData.session?.access_token;
-    if (!token) throw new Error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่");
-    const response = await fetch(`${supabaseUrl}/functions/v1/customer-portal-staff-admin`, {
-      method: "POST",
-      headers: {"content-type":"application/json",apikey:supabaseKey,authorization:`Bearer ${token}`},
-      body: JSON.stringify({
-        action:"set_pin",tenant_id:tenantId,branch_id:draft.branch_id,
-        user_id:draft.user_id,pin:draft.pin
-      })
-    });
-    if (!response.ok) throw new Error("ไม่สามารถตั้ง PIN พนักงานได้");
-  }
 }
 
 export async function loadPackage(tenantId: string, _role: PortalRole): Promise<PackageInfo> {
