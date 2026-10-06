@@ -17,3 +17,7 @@ Never expose service-role/admin credentials under `src/`. Tenant/branch authoriz
 ## Next UI phase
 
 After this foundation is merged, the next UI iteration can map the POS main/submenu catalog into Customer Portal, especially the **เพิ่มเติม** and **ตั้งค่า** sections, without growing App.tsx or coupling menu UI to data-access code.
+
+## POS menu parity source
+
+The Customer Portal **เพิ่มเติม** and **ตั้งค่า** catalogs mirror `sstdevelopaminno/CpIPOS` branch `main` at commit `37aeb6dbb7f20486c073d782f6d5fb2f437a86e0`. The parity contract is centralized in `src/config/pos-menu-catalog.ts` and protected by `tests/pos-menu-parity.test.ts`. Device-local or transaction-sensitive POS modules remain read-only/informational in Customer Portal until a dedicated safe control-plane API exists.
