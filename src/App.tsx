@@ -1,19 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Banknote, Boxes, CalendarDays, ChevronLeft, ChevronRight, CircleAlert, Clock3,
-  Download, Eye, LayoutDashboard, LoaderCircle, LogOut, Menu, PackageCheck,
-  PanelLeftClose, PanelLeftOpen, Pencil, Plus, ReceiptText, RefreshCw, Save,
-  Search, ShieldCheck, Store, Trash2, TrendingUp, UserRoundCheck, UsersRound,
-  Warehouse, WifiOff, X
+  Banknote, Bell, Boxes, Building2, CalendarDays, ChefHat, ChevronLeft, ChevronRight,
+  CircleAlert, Clock3, CreditCard, Download, Eye, FileText, History, LayoutDashboard,
+  LoaderCircle, LogOut, Menu, MonitorSmartphone, MoreHorizontal, PackageCheck,
+  PanelLeftClose, PanelLeftOpen, Pencil, Plus, Printer, ReceiptText, RefreshCw, Save,
+  Search, Settings, ShieldCheck, Store, Table2, Trash2, TrendingUp, UserRoundCheck,
+  UsersRound, Warehouse, WifiOff, X
 } from "lucide-react";
 import {
-  cancelOrder, createStaff, deleteProduct, deleteStock, loadDashboard, loadOrderItems,
-  loadPackage, loadPortalContext, loadProducts, loadSales, loadStaff, loadStock,
-  loginWithStoreEmployeeCode, logoutPortal, reportRangeLabel, saveProduct, saveStock,
-  todayInputValue, updateOrder, updateStaff, type DashboardSummary, type OrderItemRow,
-  type OrderRow, type PackageInfo, type PortalContext, type PortalView, type ProductDraft,
-  type ProductRow, type ReportRange, type StaffDraft, type StaffRow, type StockDraft,
-  type StockRow
+  cancelOrder, createStaff, deleteProduct, deleteStock, loadDashboard, loadFeatureState,
+  loadMoreSnapshot, loadOrderItems, loadPackage, loadPortalContext, loadProducts, loadSales, loadSettingsSnapshot,
+  loadStaff, loadStock, loginWithStoreEmployeeCode, logoutPortal, reportRangeLabel, saveProduct,
+  saveSetting, saveStock, submitPackagePayment, todayInputValue, updateOrder, updateStaff,
+  type DashboardSummary, type FeatureState, type MoreSnapshot, type OrderItemRow, type OrderRow, type PackageInfo,
+  type PortalContext, type PortalView, type ProductDraft, type ProductRow, type ReportRange,
+  type SettingsSnapshot, type StaffDraft, type StaffRow, type StockDraft, type StockRow
 } from "./lib/portal";
 import { supabase } from "./lib/supabase";
 
@@ -21,6 +22,12 @@ const money = new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB
 const number = new Intl.NumberFormat("th-TH", { maximumFractionDigits: 2 });
 const dateTime = new Intl.DateTimeFormat("th-TH", { dateStyle: "medium", timeStyle: "short" });
 const dateOnly = new Intl.DateTimeFormat("th-TH", { dateStyle: "medium" });
+
+function formatCurrency(value:number,currency:string|null|undefined){
+  const code=String(currency||"THB").toUpperCase();
+  try{return new Intl.NumberFormat("th-TH",{style:"currency",currency:code,maximumFractionDigits:2}).format(Number(value)||0);}
+  catch{return `${number.format(Number(value)||0)} ${code}`;}
+}
 
 function amount(order: OrderRow) {
   return Number(order.grand_total ?? order.total_amount ?? 0);
@@ -109,6 +116,21 @@ function Empty({ children }: { children: React.ReactNode }) {
 
 function ErrorPanel({ message }: { message: string }) {
   return <div className="errorPanel"><CircleAlert size={19}/><span>{message}</span></div>;
+}
+
+function Pagination({page,pageCount,onPageChange,disabled=false}:{page:number;pageCount:number;onPageChange:(page:number)=>void;disabled?:boolean}) {
+  if(pageCount<=1)return null;
+  const current=page+1;
+  const pages:Array<number|string>=[];
+  const add=(value:number|string)=>{if(pages[pages.length-1]!==value)pages.push(value);};
+  const candidates=new Set([1,pageCount,current-2,current-1,current,current+1,current+2].filter(value=>typeof value==="number"&&value>=1&&value<=pageCount) as number[]);
+  let last=0;
+  [...candidates].sort((a,b)=>a-b).forEach(value=>{if(last&&value-last>1)add("…");add(value);last=value;});
+  return <div className="paginationBar">
+    <button className="secondaryButton" disabled={page<=0||disabled} onClick={()=>onPageChange(Math.max(0,page-1))}><ChevronLeft size={17}/>ก่อนหน้า</button>
+    <div className="pageNumbers">{pages.map((item,index)=>item==="…"?<span key={"ellipsis-"+index}>…</span>:<button key={item} disabled={disabled} className={Number(item)===current?"active":""} onClick={()=>onPageChange(Number(item)-1)}>{item}</button>)}</div>
+    <button className="secondaryButton" disabled={page+1>=pageCount||disabled} onClick={()=>onPageChange(Math.min(pageCount-1,page+1))}>ถัดไป<ChevronRight size={17}/></button>
+  </div>;
 }
 
 function Modal({
@@ -202,7 +224,7 @@ function DashboardView({ context, branchId, range, anchor }: { context: PortalCo
 
   return <>
     <div className="pageHeading">
-      <div><p className="eyebrow">SALES OVERVIEW</p><h2>ภาพรวม {periodLabel}</h2><p>ยอดขายและสถานะการดำเนินงานตามสาขาและช่วงเวลาที่เลือก</p></div>
+      <div><p className="eyebrow">SALES OVERVIEW</p><h2>ภาพรวม</h2><p>ยอดขายและสถานะการดำเนินงานตามสาขาและช่วงเวลาที่เลือก</p></div>
       <button className="ghostButton" onClick={()=>void refresh()}><RefreshCw size={18}/>รีเฟรช</button>
     </div>
     {error ? <ErrorPanel message={error}/> : null}
@@ -216,7 +238,7 @@ function DashboardView({ context, branchId, range, anchor }: { context: PortalCo
     <section className="splitGrid">
       <article className="panel">
         <div className="panelHeader"><div><p className="eyebrow">RECENT SALES</p><h3>บิลล่าสุด</h3></div></div>
-        {orders.length ? <div className="rows">{orders.map(order=><div className="dataRow" key={order.id}><div><strong>{order.order_no||"รายการขาย"}</strong><span>{dateTime.format(new Date(order.created_at))}</span></div><div className="rowAmount"><strong>{money.format(amount(order))}</strong><span>{order.order_type||order.channel||"POS"}</span></div></div>)}</div> : <Empty>ยังไม่มีรายการขายในช่วงเวลานี้</Empty>}
+        {orders.length ? <div className="rows dashboardScroll">{orders.map(order=><div className="dataRow" key={order.id}><div><strong>{order.order_no||"รายการขาย"}</strong><span>{dateTime.format(new Date(order.created_at))}</span></div><div className="rowAmount"><strong>{money.format(amount(order))}</strong><span>{order.order_type||order.channel||"POS"}</span></div></div>)}</div> : <Empty>ยังไม่มีรายการขายในช่วงเวลานี้</Empty>}
       </article>
       <article className="panel">
         <div className="panelHeader"><div><p className="eyebrow">STORE HEALTH</p><h3>สถานะร้าน</h3></div></div>
@@ -229,8 +251,8 @@ function DashboardView({ context, branchId, range, anchor }: { context: PortalCo
     </section>
 
     <article className="panel topProductsPanel">
-      <div className="panelHeader"><div><p className="eyebrow">TOP PRODUCTS</p><h3>สินค้าขายดี · {periodLabel}</h3></div></div>
-      {topProducts.length ? <div className="topProductsList">{topProducts.map((item,index)=>{
+      <div className="panelHeader"><div><p className="eyebrow">TOP PRODUCTS</p><h3>สินค้าขายดี</h3></div></div>
+      {topProducts.length ? <div className="topProductsList dashboardScroll">{topProducts.map((item,index)=>{
         const width=Math.max(8,(Number(item.sales_total||0)/maxTopSale)*100);
         return <div className="topProductRow" key={item.name+"-"+index}>
           <div className="topProductRank">{index+1}</div>
@@ -333,7 +355,7 @@ function SalesView({ context, branchId, range, anchor }: { context: PortalContex
   const [page,setPage]=useState(0);
   const [totalCount,setTotalCount]=useState(0);
   const [salesTotal,setSalesTotal]=useState(0);
-  const pageSize=100;
+  const pageSize=20;
   const requestIdRef=useRef(0);
 
   useEffect(()=>{setPage(0);},[context.tenantId,branchId,range,anchor]);
@@ -371,7 +393,7 @@ function SalesView({ context, branchId, range, anchor }: { context: PortalContex
 
   return <>
     <div className="pageHeading">
-      <div><p className="eyebrow">SALES</p><h2>รายการขาย · {reportRangeLabel(range,anchor)}</h2><p>ดูรายวัน รายเดือน หรือรายปี พร้อมแก้ข้อมูลประกอบและยกเลิกบิลแบบคืนสต๊อก</p></div>
+      <div><p className="eyebrow">SALES</p><h2>รายการขาย</h2><p>ดูรายวัน รายเดือน หรือรายปี พร้อมแก้ข้อมูลประกอบและยกเลิกบิลแบบคืนสต๊อก</p></div>
       <div className="headingStat"><span>ยอดขายรวมช่วงนี้</span><strong>{money.format(salesTotal)}</strong></div>
     </div>
     <div className="toolbar"><label className="searchBox"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="ค้นหาในหน้าปัจจุบัน..."/></label><span className="toolbarCount">{pageLabel}</span></div>
@@ -381,11 +403,7 @@ function SalesView({ context, branchId, range, anchor }: { context: PortalContex
       <div className="tableWrap"><table><thead><tr><th>เลขที่บิล</th><th>เวลา</th><th>สาขา</th><th>สถานะ</th><th className="right">ยอดรวม</th><th></th></tr></thead><tbody>
         {filtered.map(row=><tr key={row.id}><td><strong>{row.order_no||"—"}</strong></td><td>{dateTime.format(new Date(row.created_at))}</td><td>{branchMap.get(row.branch_id)||"—"}</td><td><span className={`status status-${row.status}`}>{statusLabel(row.status)}</span></td><td className="right"><strong>{money.format(amount(row))}</strong></td><td className="right"><button className="tableAction" onClick={()=>setSelectedOrder(row)}><Eye size={16}/>ดู/จัดการ</button></td></tr>)}
       </tbody></table></div>:<Empty>ยังไม่มีข้อมูลรายการขายในช่วงเวลานี้</Empty>}
-      {totalCount>pageSize?<div className="paginationBar">
-        <button className="secondaryButton" disabled={page<=0||loading} onClick={()=>setPage(value=>Math.max(0,value-1))}><ChevronLeft size={17}/>ก่อนหน้า</button>
-        <span>หน้า {page+1} / {pageCount}</span>
-        <button className="secondaryButton" disabled={page+1>=pageCount||loading} onClick={()=>setPage(value=>Math.min(pageCount-1,value+1))}>ถัดไป<ChevronRight size={17}/></button>
-      </div>:null}
+      <Pagination page={page} pageCount={pageCount} onPageChange={setPage} disabled={loading}/>
     </article>
     <div className="auditNote">รายการขายใหม่สร้างจาก POS เพื่อรักษา payment/shift/stock transaction ให้ถูกต้อง; Customer Portal รองรับแก้ไขข้อมูลประกอบและยกเลิกบิลอย่างปลอดภัย</div>
     {selectedOrder?<OrderDetailModal order={selectedOrder} context={context} onClose={()=>setSelectedOrder(null)} onChanged={refresh}/>:null}
@@ -450,6 +468,8 @@ function ProductsView({ context, branchId }: { context: PortalContext; branchId:
   const [query,setQuery]=useState("");
   const [editing,setEditing]=useState<ProductRow|null|undefined>(undefined);
   const [error,setError]=useState("");
+  const [page,setPage]=useState(0);
+  const pageSize=20;
 
   const refresh=useCallback(async()=>{
     setLoading(true);setError("");
@@ -459,11 +479,15 @@ function ProductsView({ context, branchId }: { context: PortalContext; branchId:
   },[context.tenantId,branchId]);
 
   useEffect(()=>{void refresh();},[refresh]);
+  useEffect(()=>{setPage(0);},[branchId,query]);
 
   const filtered=rows.filter(row=>{
     const q=query.trim().toLowerCase();
     return !q||[row.sku,row.name,row.category].some(value=>String(value??"").toLowerCase().includes(q));
   });
+  const pageCount=Math.max(1,Math.ceil(filtered.length/pageSize));
+  useEffect(()=>{if(page>=pageCount)setPage(Math.max(0,pageCount-1));},[page,pageCount]);
+  const visible=filtered.slice(page*pageSize,(page+1)*pageSize);
 
   async function remove(row:ProductRow){
     if(!window.confirm(`ลบสินค้า “${row.name}” ? สินค้าจะถูก soft-delete และเก็บประวัติไว้`))return;
@@ -472,21 +496,26 @@ function ProductsView({ context, branchId }: { context: PortalContext; branchId:
   }
 
   return <>
-    <div className="pageHeading"><div><p className="eyebrow">PRODUCTS</p><h2>สินค้า</h2><p>รูปสินค้า รหัสสินค้า ราคา สถานะ และจำนวนพร้อมขายจากสูตรวัตถุดิบ</p></div><button className="primaryAction" onClick={()=>setEditing(null)}><Plus size={18}/>เพิ่มสินค้า</button></div>
+    <div className="pageHeading"><div><p className="eyebrow">PRODUCTS</p><h2>สินค้า</h2><p>ตรวจสอบรหัสสินค้า รูป ราคา จำนวนพร้อมขาย สาขา และสถานะในตารางเดียว</p></div><button className="primaryAction" onClick={()=>setEditing(null)}><Plus size={18}/>เพิ่มสินค้า</button></div>
     <div className="toolbar"><label className="searchBox"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="ค้นหา SKU ชื่อสินค้า หมวดหมู่..."/></label><span className="toolbarCount">{filtered.length} รายการ</span></div>
     {error?<ErrorPanel message={error}/>:null}
-    <article className="panel productPanel">{loading?<div className="loadingPanel"><LoaderCircle className="spin"/>กำลังโหลดสินค้า...</div>:filtered.length?
-      <div className="productGrid">{filtered.map(row=><article className="productCard" key={row.id}>
-        <div className="productImage">{row.image_url?<img src={row.image_url} alt={row.name} loading="lazy"/>:<Boxes size={30}/>}<span className={row.is_active?"activeDot":"inactiveDot"}/></div>
-        <div className="productBody">
-          <div className="productCode">{row.sku}</div>
-          <h3>{row.name}</h3>
-          <p>{row.category}</p>
-          <div className="productStats"><div><span>ราคา</span><strong>{money.format(Number(row.price))}</strong></div><div><span>จำนวน</span><strong>{row.available_quantity==null?"—":number.format(Number(row.available_quantity))}</strong></div></div>
-          <div className="productMeta"><span>{branchName(context,row.branch_id)}</span><span>{row.recipe_count>0?`สูตร ${row.recipe_count}`:"ไม่มีสูตร"}</span></div>
-          <div className="cardActions"><button onClick={()=>setEditing(row)}><Pencil size={16}/>แก้ไข</button><button className="dangerText" onClick={()=>void remove(row)}><Trash2 size={16}/>ลบ</button></div>
-        </div>
-      </article>)}</div>:<Empty>ยังไม่มีสินค้า</Empty>}</article>
+    <article className="panel tablePanel productTablePanel">{loading?<div className="loadingPanel"><LoaderCircle className="spin"/>กำลังโหลดสินค้า...</div>:visible.length?
+      <div className="tableWrap boundedTable"><table className="productTable"><thead><tr><th>รูป</th><th>รหัสสินค้า</th><th>ชื่อสินค้า</th><th>หมวดหมู่</th><th>สาขา</th><th className="right">ราคา</th><th className="right">จำนวน</th><th>หน่วย</th><th>สถานะ</th><th></th></tr></thead><tbody>
+        {visible.map(row=><tr key={row.id}>
+          <td><div className="tableThumb">{row.image_url?<img src={row.image_url} alt={row.name} loading="lazy"/>:<Boxes size={19}/>}</div></td>
+          <td><strong className="monoCode">{row.sku}</strong></td>
+          <td><strong>{row.name}</strong></td>
+          <td>{row.category||"—"}</td>
+          <td>{branchName(context,row.branch_id)}</td>
+          <td className="right"><strong>{money.format(Number(row.price))}</strong></td>
+          <td className="right">{row.available_quantity==null?"—":number.format(Number(row.available_quantity))}</td>
+          <td>{row.sell_unit||"unit"}</td>
+          <td><span className={row.is_active?"status status-completed":"status status-cancelled"}>{row.is_active?"เปิดขาย":"ปิดขาย"}</span></td>
+          <td className="right"><div className="inlineActions"><button className="tableAction" onClick={()=>setEditing(row)}><Pencil size={15}/>แก้ไข</button><button className="tableAction dangerText" onClick={()=>void remove(row)}><Trash2 size={15}/>ลบ</button></div></td>
+        </tr>)}
+      </tbody></table></div>:<Empty>ยังไม่มีสินค้า</Empty>}
+      <Pagination page={page} pageCount={pageCount} onPageChange={setPage} disabled={loading}/>
+    </article>
     {editing!==undefined?<ProductForm context={context} initial={editing} defaultBranch={branchId??""} onClose={()=>setEditing(undefined)} onSaved={refresh}/>:null}
   </>;
 }
@@ -530,37 +559,66 @@ function StockForm({
   </Modal>;
 }
 
+function stockDisplay(row:StockRow){
+  const match=row.name.match(/^STOCK:([^:]+):(.+)$/i);
+  return {
+    code:match?.[1]??("ING-"+row.id.slice(0,8).toUpperCase()),
+    name:match?.[2]??row.name
+  };
+}
+
 function StockView({ context, branchId }: { context: PortalContext; branchId: string | null }) {
   const [rows, setRows] = useState<StockRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [query,setQuery]=useState("");
   const [editing,setEditing]=useState<StockRow|null|undefined>(undefined);
   const [error,setError]=useState("");
+  const [page,setPage]=useState(0);
+  const pageSize=20;
 
   const refresh=useCallback(async()=>{
     setLoading(true);setError("");
     try{setRows(await loadStock(context.tenantId,branchId));}
-    catch{setError("ไม่สามารถโหลดสต๊อกได้");}
+    catch{setError("ไม่สามารถโหลดข้อมูลวัตถุดิบได้");}
     finally{setLoading(false);}
   },[context.tenantId,branchId]);
   useEffect(()=>{void refresh();},[refresh]);
+  useEffect(()=>{setPage(0);},[branchId,query]);
 
-  const filtered=rows.filter(row=>!query.trim()||row.name.toLowerCase().includes(query.trim().toLowerCase()));
+  const filtered=rows.filter(row=>{
+    const q=query.trim().toLowerCase();
+    const display=stockDisplay(row);
+    return !q||display.name.toLowerCase().includes(q)||display.code.toLowerCase().includes(q);
+  });
+  const pageCount=Math.max(1,Math.ceil(filtered.length/pageSize));
+  useEffect(()=>{if(page>=pageCount)setPage(Math.max(0,pageCount-1));},[page,pageCount]);
+  const visible=filtered.slice(page*pageSize,(page+1)*pageSize);
 
   async function remove(row:StockRow){
-    if(!window.confirm(`ลบวัตถุดิบ “${row.name}” ? หากมีสูตรหรือประวัติสต๊อก ระบบจะไม่อนุญาตให้ลบ`))return;
+    const display=stockDisplay(row);
+    if(!window.confirm(`ลบวัตถุดิบ “${display.name}” ? หากมีสูตรหรือประวัติสต๊อก ระบบจะไม่อนุญาตให้ลบ`))return;
     try{await deleteStock(context.tenantId,row);await refresh();}
     catch(err){setError(err instanceof Error?err.message:"ลบวัตถุดิบไม่สำเร็จ");}
   }
 
   return <>
-    <div className="pageHeading"><div><p className="eyebrow">INVENTORY</p><h2>วัตถุดิบและสต๊อก</h2><p>ดูจำนวนคงเหลือ จุดสั่งซื้อ ต้นทุน และปรับสต๊อกพร้อมบันทึก movement</p></div><button className="primaryAction" onClick={()=>setEditing(null)}><Plus size={18}/>เพิ่มวัตถุดิบ</button></div>
-    <div className="toolbar"><label className="searchBox"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="ค้นหาวัตถุดิบ..."/></label><span className="toolbarCount">{filtered.length} รายการ</span></div>
+    <div className="pageHeading"><div><p className="eyebrow">INVENTORY</p><h2>วัตถุดิบ</h2><p>ตรวจสอบรหัส ชื่อ สาขา หน่วย คงเหลือ จุดสั่งซื้อ ต้นทุนเฉลี่ย และสถานะ</p></div><button className="primaryAction" onClick={()=>setEditing(null)}><Plus size={18}/>เพิ่มวัตถุดิบ</button></div>
+    <div className="toolbar"><label className="searchBox"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="ค้นหารหัสหรือชื่อวัตถุดิบ..."/></label><span className="toolbarCount">{filtered.length} รายการ</span></div>
     {error?<ErrorPanel message={error}/>:null}
-    <article className="panel tablePanel">{loading?<div className="loadingPanel"><LoaderCircle className="spin"/>กำลังโหลดสต๊อก...</div>:filtered.length?
-      <div className="tableWrap"><table><thead><tr><th>วัตถุดิบ</th><th>สาขา</th><th>หน่วย</th><th className="right">คงเหลือ</th><th className="right">จุดสั่งซื้อ</th><th className="right">ต้นทุนเฉลี่ย</th><th>สถานะ</th><th></th></tr></thead><tbody>
-        {filtered.map(row=>{const low=Number(row.quantity_on_hand)<=Number(row.reorder_level);return <tr key={row.id}><td><strong>{row.name}</strong></td><td>{branchName(context,row.branch_id)}</td><td>{row.base_unit}</td><td className="right">{number.format(Number(row.quantity_on_hand))}</td><td className="right">{number.format(Number(row.reorder_level))}</td><td className="right">{money.format(Number(row.avg_unit_cost))}</td><td><span className={low?"status status-cancelled":"status status-completed"}>{low?"ควรสั่งเพิ่ม":"ปกติ"}</span></td><td className="right"><div className="inlineActions"><button className="tableAction" onClick={()=>setEditing(row)}><Pencil size={15}/>แก้ไข</button><button className="tableAction dangerText" onClick={()=>void remove(row)}><Trash2 size={15}/>ลบ</button></div></td></tr>;})}
-      </tbody></table></div>:<Empty>ยังไม่มีข้อมูลวัตถุดิบ</Empty>}</article>
+    <article className="panel tablePanel">{loading?<div className="loadingPanel"><LoaderCircle className="spin"/>กำลังโหลดวัตถุดิบ...</div>:visible.length?
+      <div className="tableWrap boundedTable"><table><thead><tr><th>รหัสสินค้า</th><th>ชื่อสินค้า</th><th>สาขา</th><th>หน่วย</th><th className="right">คงเหลือ</th><th className="right">จุดสั่งซื้อ</th><th className="right">ต้นทุนเฉลี่ย</th><th>สถานะ</th><th></th></tr></thead><tbody>
+        {visible.map(row=>{const low=Number(row.quantity_on_hand)<=Number(row.reorder_level);const display=stockDisplay(row);return <tr key={row.id}>
+          <td><strong className="monoCode">{display.code}</strong></td><td><strong>{display.name}</strong></td>
+          <td>{branchName(context,row.branch_id)}</td><td>{row.base_unit}</td>
+          <td className="right">{number.format(Number(row.quantity_on_hand))}</td>
+          <td className="right">{number.format(Number(row.reorder_level))}</td>
+          <td className="right">{money.format(Number(row.avg_unit_cost))}</td>
+          <td><span className={low?"status status-cancelled":"status status-completed"}>{low?"ควรสั่งเพิ่ม":"ปกติ"}</span></td>
+          <td className="right"><div className="inlineActions"><button className="tableAction" onClick={()=>setEditing(row)}><Pencil size={15}/>แก้ไข</button><button className="tableAction dangerText" onClick={()=>void remove(row)}><Trash2 size={15}/>ลบ</button></div></td>
+        </tr>;})}
+      </tbody></table></div>:<Empty>ยังไม่มีข้อมูลวัตถุดิบ</Empty>}
+      <Pagination page={page} pageCount={pageCount} onPageChange={setPage} disabled={loading}/>
+    </article>
     {editing!==undefined?<StockForm context={context} initial={editing} defaultBranch={branchId??""} onClose={()=>setEditing(undefined)} onSaved={refresh}/>:null}
   </>;
 }
@@ -578,7 +636,8 @@ function StaffForm({
     position_title:initial?.position_title??"",
     permission_role:initial?.permission_role??"pos_user",
     branch_role:initial?.branch_role??"staff",
-    is_active:initial?.is_active??true
+    is_active:initial?.is_active??true,
+    pin:""
   }));
   const [busy,setBusy]=useState(false);const[error,setError]=useState("");
   const roleOptions=context.role==="owner"?["owner","manager","staff","kitchen"]:["staff","kitchen"];
@@ -588,7 +647,8 @@ function StaffForm({
     try{
       if(initial)await updateStaff(context.tenantId,draft);
       else await createStaff(context.tenantId,draft);
-      await onSaved();onClose();
+      await onSaved();
+      onClose();
     }catch(err){setError(err instanceof Error?err.message:"บันทึกพนักงานไม่สำเร็จ");}
     finally{setBusy(false);}
   }
@@ -603,6 +663,7 @@ function StaffForm({
         <label><span>ตำแหน่ง</span><input value={draft.position_title} onChange={e=>setDraft({...draft,position_title:e.target.value})}/></label>
         <label><span>บทบาทสาขา</span><select value={draft.branch_role} onChange={e=>setDraft({...draft,branch_role:e.target.value})}>{roleOptions.map(role=><option key={role} value={role}>{role}</option>)}</select></label>
         <label><span>Permission profile</span><input value={draft.permission_role} onChange={e=>setDraft({...draft,permission_role:e.target.value})}/></label>
+        <label className="span2"><span>รหัส PIN</span><input type="password" inputMode="numeric" autoComplete="new-password" value={draft.pin??""} onChange={e=>setDraft({...draft,pin:e.target.value.replace(/\D/g,"").slice(0,12)})} minLength={draft.pin?4:undefined} maxLength={12} placeholder={initial?"4–12 หลัก · เว้นว่างหากไม่เปลี่ยน":"4–12 หลัก (ไม่บังคับ)"}/><small>PIN ถูกเข้ารหัสฝั่งระบบและไม่สามารถเปิดดูย้อนหลังได้</small></label>
         {initial?<label className="switchField span2"><input type="checkbox" checked={draft.is_active} onChange={e=>setDraft({...draft,is_active:e.target.checked})}/><span>เปิดใช้งานบัญชี</span></label>:null}
       </div>
       <div className="modalActions"><button type="button" className="secondaryButton" onClick={onClose}>ยกเลิก</button><button className="primaryAction" disabled={busy}><Save size={17}/>{busy?"กำลังบันทึก...":"บันทึกพนักงาน"}</button></div>
@@ -616,6 +677,8 @@ function StaffView({ context, branchId }: { context: PortalContext; branchId: st
   const [query,setQuery]=useState("");
   const [editing,setEditing]=useState<StaffRow|null|undefined>(undefined);
   const [error,setError]=useState("");
+  const [page,setPage]=useState(0);
+  const pageSize=20;
 
   const refresh=useCallback(async()=>{
     setLoading(true);setError("");
@@ -624,11 +687,15 @@ function StaffView({ context, branchId }: { context: PortalContext; branchId: st
     finally{setLoading(false);}
   },[context.tenantId,branchId]);
   useEffect(()=>{void refresh();},[refresh]);
+  useEffect(()=>{setPage(0);},[branchId,query]);
 
   const filtered=rows.filter(row=>{
     const q=query.trim().toLowerCase();
     return !q||[row.full_name,row.position_title,row.branch_name,row.branch_role,row.employee_code].some(value=>String(value??"").toLowerCase().includes(q));
   });
+  const pageCount=Math.max(1,Math.ceil(filtered.length/pageSize));
+  useEffect(()=>{if(page>=pageCount)setPage(Math.max(0,pageCount-1));},[page,pageCount]);
+  const visible=filtered.slice(page*pageSize,(page+1)*pageSize);
 
   async function deactivate(row:StaffRow){
     if(!window.confirm(`ปิดใช้งาน “${row.full_name}” ? ประวัติรายการเดิมจะยังคงอยู่`))return;
@@ -643,33 +710,423 @@ function StaffView({ context, branchId }: { context: PortalContext; branchId: st
   }
 
   return <>
-    <div className="pageHeading"><div><p className="eyebrow">TEAM</p><h2>พนักงาน</h2><p>เพิ่ม แก้ไข ปิดใช้งาน และกำหนดบทบาทตามสิทธิ์ Owner/Manager</p></div><button className="primaryAction" onClick={()=>setEditing(null)}><Plus size={18}/>เพิ่มพนักงาน</button></div>
+    <div className="pageHeading"><div><p className="eyebrow">TEAM</p><h2>พนักงาน</h2><p>เพิ่ม แก้ไข PIN ปิดใช้งาน และกำหนดบทบาทตามสิทธิ์ Owner/Manager</p></div><button className="primaryAction" onClick={()=>setEditing(null)}><Plus size={18}/>เพิ่มพนักงาน</button></div>
     <div className="toolbar"><label className="searchBox"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="ค้นหาชื่อ รหัสพนักงาน ตำแหน่ง..."/></label><span className="toolbarCount">{filtered.length} รายการ</span></div>
     {error?<ErrorPanel message={error}/>:null}
-    <article className="panel tablePanel">{loading?<div className="loadingPanel"><LoaderCircle className="spin"/>กำลังโหลดข้อมูลพนักงาน...</div>:filtered.length?
-      <div className="tableWrap"><table><thead><tr><th>ชื่อ</th><th>สาขา</th><th>ตำแหน่ง</th><th>บทบาท</th><th>รหัส</th><th>สถานะ</th><th></th></tr></thead><tbody>
-        {filtered.map((row,index)=>{const canEdit=context.role==="owner"||!["owner","manager"].includes(row.branch_role);return <tr key={`${row.user_id}-${row.branch_id}-${index}`}><td><strong>{row.full_name}</strong></td><td>{row.branch_name}</td><td>{row.position_title||"—"}</td><td>{row.branch_role}</td><td><span className="maskedCode">{maskEmployeeCode(row.employee_code)}</span></td><td><span className={row.is_active?"status status-completed":"status status-cancelled"}>{row.is_active?"ใช้งาน":"ปิดใช้งาน"}</span></td><td className="right">{canEdit?<div className="inlineActions"><button className="tableAction" onClick={()=>setEditing(row)}><Pencil size={15}/>แก้ไข</button>{row.is_active?<button className="tableAction dangerText" onClick={()=>void deactivate(row)}><Trash2 size={15}/>ปิดใช้</button>:null}</div>:<span className="mutedSmall">Owner เท่านั้น</span>}</td></tr>;})}
-      </tbody></table></div>:<Empty>ยังไม่มีข้อมูลพนักงานในสาขาที่เลือก</Empty>}</article>
+    <article className="panel tablePanel">{loading?<div className="loadingPanel"><LoaderCircle className="spin"/>กำลังโหลดข้อมูลพนักงาน...</div>:visible.length?
+      <div className="tableWrap boundedTable"><table><thead><tr><th>ชื่อ</th><th>สาขา</th><th>ตำแหน่ง</th><th>บทบาท</th><th>รหัสพนักงาน</th><th>สถานะ</th><th></th></tr></thead><tbody>
+        {visible.map((row,index)=>{const canEdit=context.role==="owner"||!["owner","manager"].includes(row.branch_role);return <tr key={`${row.user_id}-${row.branch_id}-${index}`}><td><strong>{row.full_name}</strong></td><td>{row.branch_name}</td><td>{row.position_title||"—"}</td><td>{row.branch_role}</td><td><span className="maskedCode">{maskEmployeeCode(row.employee_code)}</span></td><td><span className={row.is_active?"status status-completed":"status status-cancelled"}>{row.is_active?"ใช้งาน":"ปิดใช้งาน"}</span></td><td className="right">{canEdit?<div className="inlineActions"><button className="tableAction" onClick={()=>setEditing(row)}><Pencil size={15}/>แก้ไข</button>{row.is_active?<button className="tableAction dangerText" onClick={()=>void deactivate(row)}><Trash2 size={15}/>ปิดใช้</button>:null}</div>:<span className="mutedSmall">Owner เท่านั้น</span>}</td></tr>;})}
+      </tbody></table></div>:<Empty>ยังไม่มีข้อมูลพนักงานในสาขาที่เลือก</Empty>}
+      <Pagination page={page} pageCount={pageCount} onPageChange={setPage} disabled={loading}/>
+    </article>
     {editing!==undefined?<StaffForm context={context} initial={editing} defaultBranch={branchId??""} onClose={()=>setEditing(undefined)} onSaved={refresh}/>:null}
   </>;
 }
 
+function billingStatusLabel(status:string){
+  return ({
+    paid:"ชำระแล้ว",pending:"รอชำระ/ตรวจสอบ",under_review:"กำลังตรวจสอบ",
+    open:"รอชำระ",due:"รอชำระ",overdue:"เกินกำหนด",cancelled:"ยกเลิก",
+    active:"ใช้งาน",trial:"ทดลองใช้งาน",locked:"ระงับใช้งาน"
+  } as Record<string,string>)[status]??status;
+}
+const PAYABLE_BILLING_STATUSES=new Set(["open","due","overdue","pending"]);
+
+function PackagePaymentModal({
+  tenantId,info,cycle,onClose,onSaved
+}:{
+  tenantId:string;
+  info:PackageInfo;
+  cycle:PackageInfo["billingCycles"][number]|null;
+  onClose:()=>void;
+  onSaved:()=>Promise<void>;
+}){
+  const [slip,setSlip]=useState<File|null>(null);
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState("");
+  const contract=info.contract;
+  const billingCurrency=contract?.currency||"THB";
+  const expected=cycle?Math.max(0,Number(cycle.amount_due)-Number(cycle.amount_paid)):Number(contract?.amount_per_cycle??0);
+  const packageId=contract?.package_id??"";
+
+  async function submit(event:React.FormEvent){
+    event.preventDefault();
+    if(!slip||!packageId)return;
+    setBusy(true);setError("");
+    try{
+      await submitPackagePayment({
+        tenantId,
+        billingCycleId:cycle?.id??null,
+        packageId,
+        billingInterval:contract?.billing_interval??"monthly",
+        expectedAmount:expected,
+        slip
+      });
+      await onSaved();
+      onClose();
+    }catch(err){setError(err instanceof Error?err.message:"ส่งหลักฐานการชำระไม่สำเร็จ");}
+    finally{setBusy(false);}
+  }
+
+  return <Modal title="ชำระค่าบริการแพ็กเกจ" subtitle="ส่งหลักฐานให้ฝ่าย IT ตรวจสอบเงินเข้าก่อนอัปเดตสิทธิ์" onClose={onClose}>
+    <form className="entityForm" onSubmit={submit}>
+      {error?<ErrorPanel message={error}/>:null}
+      <div className="paymentSummary">
+        <div><span>แพ็กเกจ</span><strong>{contract?.package_name||contract?.package_code||"CpiPOS"}</strong></div>
+        <div><span>ยอดที่ต้องชำระ</span><strong>{formatCurrency(expected,billingCurrency)}</strong></div>
+        {cycle?<div><span>รอบบิล</span><strong>{dateOnly.format(new Date(cycle.period_start))} – {dateOnly.format(new Date(cycle.period_end))}</strong></div>:null}
+      </div>
+      <div className="issuerBox">
+        <strong>{info.issuer?.billing_legal_name_th||"บัญชีรับชำระค่าบริการ CpiPOS"}</strong>
+        <span>{info.issuer?.billing_bank_name||"ธนาคาร"} · {info.issuer?.billing_bank_account_name||"บัญชีบริษัท"}</span>
+        <b>{info.issuer?.billing_bank_account_number||info.issuer?.billing_promptpay_id||"กรุณาติดต่อฝ่าย Support"}</b>
+      </div>
+      <div className="formGrid singleColumn">
+        <label><span>แนบสลิปการโอน</span><input type="file" accept="image/jpeg,image/png,image/webp" onChange={e=>setSlip(e.target.files?.[0]??null)} required/><small>รองรับ JPG, PNG และ WebP ไม่เกิน 4 MB</small></label>
+      </div>
+      <div className="modalActions"><button type="button" className="secondaryButton" onClick={onClose}>ยกเลิก</button><button className="primaryAction" disabled={busy||!slip||expected<=0}>{busy?<LoaderCircle className="spin" size={17}/>:<CreditCard size={17}/>}ส่งหลักฐานชำระเงิน</button></div>
+    </form>
+  </Modal>;
+}
+
 function PackageView({ context }: { context: PortalContext }) {
-  const [info, setInfo] = useState<PackageInfo | null>(null);
-  const [loading, setLoading] = useState(true);
-  useEffect(()=>{loadPackage(context.tenantId,context.role).then(setInfo).finally(()=>setLoading(false));},[context.tenantId,context.role]);
-  if(loading)return <div className="loadingPanel"><LoaderCircle className="spin"/>กำลังโหลดแพ็กเกจ...</div>;
+  const [info,setInfo]=useState<PackageInfo|null>(null);
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState("");
+  const [paying,setPaying]=useState<PackageInfo["billingCycles"][number]|null|undefined>(undefined);
+
+  const refresh=useCallback(async()=>{
+    setLoading(true);setError("");
+    try{
+      const data=await loadPackage(context.tenantId,context.role);
+      setInfo(data);
+    }catch{setError("ไม่สามารถโหลดข้อมูลแพ็กเกจได้");}
+    finally{setLoading(false);}
+  },[context.tenantId,context.role]);
+  useEffect(()=>{void refresh();},[refresh]);
+  if(loading&&!info)return <div className="loadingPanel"><LoaderCircle className="spin"/>กำลังโหลดแพ็กเกจ...</div>;
+
   const expiry=info?.runtime?.expires_at||info?.contract?.ended_at;
+  const daysRemaining=expiry?Math.ceil((new Date(expiry).getTime()-Date.now())/86400000):null;
+  const openRequest=info?.requests.find(row=>["pending","under_review"].includes(row.status));
+  const dueCycles=(info?.billingCycles??[]).filter(cycle=>PAYABLE_BILLING_STATUSES.has(cycle.status)&&Number(cycle.amount_due)>Number(cycle.amount_paid));
+  const canUpcoming=Boolean(context.role==="owner"&&!openRequest&&!dueCycles.length&&info?.contract?.package_id&&Number(info.contract.amount_per_cycle)>0&&daysRemaining!==null&&daysRemaining<=7);
+  const status=info?.runtime?.lifecycle_status||info?.contract?.status||"—";
+  const interval=info?.contract?.billing_interval==="yearly"?"รายปี":info?.contract?.billing_interval==="monthly"?"รายเดือน":info?.contract?.billing_interval||"—";
+  const billingCurrency=info?.contract?.currency||"THB";
+
   return <>
-    <div className="pageHeading"><div><p className="eyebrow">PACKAGE & BILLING</p><h2>แพ็กเกจและสิทธิ์</h2><p>ตรวจสอบสถานะสิทธิ์การใช้งานของร้าน</p></div></div>
-    <section className="packageHero">
-      <div><span>สถานะปัจจุบัน</span><strong>{info?.runtime?.lifecycle_status||info?.contract?.status||"—"}</strong><small>{info?.runtime?.access_locked?"การใช้งานถูกจำกัด":"ระบบพร้อมใช้งาน"}</small></div>
-      <div><span>รอบชำระ</span><strong>{info?.contract?.billing_interval||"—"}</strong><small>Auto renew: {info?.contract?.auto_renew?"เปิด":"ปิด"}</small></div>
-      <div><span>หมดอายุ</span><strong>{expiry?dateOnly.format(new Date(expiry)):"—"}</strong><small>{info?.runtime?.lock_reason||"ไม่มีข้อจำกัด"}</small></div>
-      <div><span>ค่าบริการต่อรอบ</span><strong>{info?.contract?.amount_per_cycle==null?"—":money.format(Number(info.contract.amount_per_cycle))}</strong><small>{info?.contract?.currency||"THB"}</small></div>
+    <div className="pageHeading"><div><p className="eyebrow">PACKAGE & BILLING</p><h2>แพ็กเกจและการชำระเงิน</h2><p>สถานะสิทธิ์ รอบบิล และรายการชำระเชื่อมกับระบบ POS/IT ชุดเดียวกัน</p></div><button className="ghostButton" onClick={()=>void refresh()}><RefreshCw size={18}/>รีเฟรช</button></div>
+    {error?<ErrorPanel message={error}/>:null}
+    <section className="packageHero packageHeroFive">
+      <div><span>แพ็กเกจ</span><strong>{info?.contract?.package_name||info?.contract?.package_code||"—"}</strong><small>{info?.contract?.package_code||"แพ็กเกจปัจจุบัน"}</small></div>
+      <div><span>สถานะ</span><strong>{billingStatusLabel(status)}</strong><small>{info?.runtime?.access_locked?"การใช้งานถูกจำกัด":"ระบบพร้อมใช้งาน"}</small></div>
+      <div><span>รอบชำระ</span><strong>{interval}</strong><small>Auto renew: {info?.contract?.auto_renew?"เปิด":"ปิด"}</small></div>
+      <div><span>หมดอายุ</span><strong>{expiry?dateOnly.format(new Date(expiry)):"—"}</strong><small>{daysRemaining===null?"ไม่กำหนด":daysRemaining<0?`เกินกำหนด ${Math.abs(daysRemaining)} วัน`:`เหลือ ${daysRemaining} วัน`}</small></div>
+      <div><span>ค่าบริการต่อรอบ</span><strong>{info?.contract?.amount_per_cycle==null?"—":formatCurrency(Number(info.contract.amount_per_cycle),billingCurrency)}</strong><small>{billingCurrency}</small></div>
     </section>
-    {context.role==="owner"?<article className="panel tablePanel"><div className="panelHeader"><div><p className="eyebrow">BILLING HISTORY</p><h3>รอบบิลล่าสุด</h3></div></div>{info?.billingCycles.length?<div className="tableWrap"><table><thead><tr><th>ช่วงรอบบิล</th><th>สถานะ</th><th className="right">ยอดเรียกเก็บ</th><th className="right">ชำระแล้ว</th></tr></thead><tbody>{info.billingCycles.map((cycle,index)=><tr key={`${cycle.period_start}-${index}`}><td>{dateOnly.format(new Date(cycle.period_start))} – {dateOnly.format(new Date(cycle.period_end))}</td><td><span className={cycle.status==="paid"?"status status-completed":"status"}>{cycle.status}</span></td><td className="right">{money.format(Number(cycle.amount_due))}</td><td className="right">{money.format(Number(cycle.amount_paid))}</td></tr>)}</tbody></table></div>:<Empty>ยังไม่มีประวัติรอบบิลที่แสดงได้</Empty>}</article>:<div className="infoBox">ผู้จัดการสามารถดูสถานะแพ็กเกจได้ แต่ประวัติการชำระเงินสงวนสำหรับ Owner</div>}
-    <div className="auditNote">สิทธิ์แพ็กเกจและสัญญาเป็นข้อมูลการค้า จึงแก้ไขจาก Customer Portal ไม่ได้ และต้องจัดการจากฝ่าย IT/สัญญาเพื่อป้องกันการเปลี่ยนสิทธิ์โดยไม่ตั้งใจ</div>
+
+    {openRequest?<div className="billingAlert"><Clock3 size={20}/><div><strong>รายการกำลังรอตรวจสอบ</strong><span>{billingStatusLabel(openRequest.status)} · {openRequest.package_name||info?.contract?.package_name||"แพ็กเกจ"} · ส่งเมื่อ {dateTime.format(new Date(openRequest.submitted_at))}</span></div></div>:null}
+    {canUpcoming?<div className="billingAlert warning"><CreditCard size={20}/><div><strong>ใกล้ถึงรอบชำระค่าบริการ</strong><span>ยอด {formatCurrency(Number(info?.contract?.amount_per_cycle??0),billingCurrency)} · กรุณาชำระและส่งสลิปเพื่อให้ IT ตรวจสอบ</span></div><button className="primaryAction" onClick={()=>setPaying(null)}>ชำระเงิน</button></div>:null}
+
+    {context.role==="owner"?<article className="panel tablePanel"><div className="panelHeader"><div><p className="eyebrow">BILLING HISTORY</p><h3>รายการรอบบิล</h3></div></div>{info?.billingCycles.length?<div className="tableWrap boundedTable"><table><thead><tr><th>ช่วงรอบบิล</th><th>สถานะ</th><th className="right">ยอดเรียกเก็บ</th><th className="right">ชำระแล้ว</th><th className="right">คงค้าง</th><th></th></tr></thead><tbody>{info.billingCycles.map(cycle=>{const outstanding=Math.max(0,Number(cycle.amount_due)-Number(cycle.amount_paid));const payable=PAYABLE_BILLING_STATUSES.has(cycle.status)&&outstanding>0&&!openRequest;return <tr key={cycle.id}><td>{dateOnly.format(new Date(cycle.period_start))} – {dateOnly.format(new Date(cycle.period_end))}</td><td><span className={cycle.status==="paid"?"status status-completed":"status status-pending"}>{billingStatusLabel(cycle.status)}</span></td><td className="right">{formatCurrency(Number(cycle.amount_due),billingCurrency)}</td><td className="right">{formatCurrency(Number(cycle.amount_paid),billingCurrency)}</td><td className="right"><strong>{formatCurrency(outstanding,billingCurrency)}</strong></td><td className="right">{payable?<button className="tableAction payAction" onClick={()=>setPaying(cycle)}><CreditCard size={15}/>ชำระเงิน</button>:null}</td></tr>;})}</tbody></table></div>:<Empty>ยังไม่มีประวัติรอบบิลที่แสดงได้</Empty>}</article>:<div className="infoBox">Manager ดูสถานะแพ็กเกจได้ ส่วนการชำระเงินและประวัติหลักฐานสงวนสำหรับ Owner</div>}
+
+    {context.role==="owner"&&info?.requests.length?<article className="panel tablePanel"><div className="panelHeader"><div><p className="eyebrow">PAYMENT REQUESTS</p><h3>สถานะการชำระและคำขอ</h3></div></div><div className="tableWrap"><table><thead><tr><th>วันที่ส่ง</th><th>แพ็กเกจ</th><th>ประเภท</th><th>สถานะ</th><th>หลักฐาน</th></tr></thead><tbody>{info.requests.map(row=><tr key={row.id}><td>{dateTime.format(new Date(row.submitted_at))}</td><td>{row.package_name||"—"}</td><td>{row.request_type}</td><td><span className={["pending","under_review"].includes(row.status)?"status status-pending":"status"}>{billingStatusLabel(row.status)}</span></td><td>{row.has_evidence?"ส่งแล้ว":"—"}</td></tr>)}</tbody></table></div></article>:null}
+    <div className="auditNote">CRM ส่งเฉพาะคำขอและหลักฐานไปยัง billing control plane เดิม การอนุมัติเงินจริง การออกใบเสร็จ และการเปลี่ยนสิทธิ์ยังดำเนินการโดย POS/IT ตามขั้นตอนเดิม</div>
+    {paying!==undefined&&info?<PackagePaymentModal tenantId={context.tenantId} info={info} cycle={paying} onClose={()=>setPaying(undefined)} onSaved={refresh}/>:null}
+  </>;
+}
+
+type MoreItem={key:string;label:string;desc:string;feature:string;target?:PortalView;icon:React.ReactNode};
+const moreItems:MoreItem[]=[
+  {key:"more.sales_summary",label:"สรุปยอดขาย",desc:"ยอดขาย ภาษี และภาพรวมการดำเนินงาน",feature:"advanced_sales_reports",target:"dashboard",icon:<TrendingUp/>},
+  {key:"more.receipts",label:"ใบเสร็จย้อนหลัง",desc:"ค้นหาและตรวจสอบรายการขายย้อนหลัง",feature:"receipt_reprint_history",target:"sales",icon:<ReceiptText/>},
+  {key:"more.tables",label:"จัดการโต๊ะ",desc:"โต๊ะ โซน และผังร้านสำหรับโหมดนั่งโต๊ะ",feature:"table_management",icon:<Table2/>},
+  {key:"more.kitchen_manage",label:"จัดการครัว",desc:"โซนครัว เส้นทางอาหาร และสถานะ KDS",feature:"kitchen_printing",icon:<ChefHat/>},
+  {key:"more.stock",label:"จัดการสินค้า",desc:"สินค้า วัตถุดิบ ราคา และสต๊อก",feature:"stock_management",target:"products",icon:<Boxes/>},
+  {key:"more.buffet",label:"ตั้งค่าราคาบุฟเฟ่",desc:"ข้อมูลราคาบุฟเฟ่ที่ใช้ร่วมกับ POS",feature:"table_management",icon:<Banknote/>},
+  {key:"more.members",label:"สมาชิก",desc:"ข้อมูลสมาชิกหน้าร้าน",feature:"core_pos_sales",icon:<UsersRound/>},
+  {key:"more.tax_invoices",label:"ออกใบกำกับภาษี",desc:"ข้อมูลใบกำกับภาษีจากรายการขาย",feature:"core_pos_sales",target:"sales",icon:<FileText/>},
+  {key:"more.product_sales",label:"รายการขายสินค้า",desc:"รายการสินค้าที่ขายและสินค้าขายดี",feature:"advanced_sales_reports",target:"sales",icon:<History/>},
+  {key:"more.ai_documents",label:"เก็บไฟล์เอกสาร",desc:"เอกสารและรายงานจาก CpiPOS AI",feature:"cpipos_ai",icon:<FileText/>}
+];
+
+function MoreView({context,branchId,onNavigate}:{context:PortalContext;branchId:string|null;onNavigate:(view:PortalView)=>void}){
+  const [state,setState]=useState<FeatureState|null>(null);
+  const [snapshot,setSnapshot]=useState<MoreSnapshot|null>(null);
+  const [error,setError]=useState("");
+  useEffect(()=>{
+    let active=true;
+    setState(null);
+    setSnapshot(null);
+    setError("");
+    Promise.all([
+      loadFeatureState(context.tenantId,branchId),
+      loadMoreSnapshot(context.tenantId,branchId)
+    ]).then(([features,data])=>{
+      if(!active)return;
+      setState(features);
+      setSnapshot(data);
+    }).catch(()=>{
+      if(active)setError("ไม่สามารถตรวจสอบสิทธิ์เมนูเพิ่มเติมได้");
+    });
+    return()=>{active=false;};
+  },[context.tenantId,branchId]);
+  const enabled=(item:MoreItem)=>{
+    const menu=state?.menu_policy?.[item.key]!==false;
+    const base=state?.package_features?.[item.feature]??false;
+    const override=state?.feature_overrides?.[item.feature];
+    return menu&&(override===undefined?base:override);
+  };
+  return <>
+    <div className="pageHeading"><div><p className="eyebrow">MORE</p><h2>เพิ่มเติม</h2><p>เมนูชุดเดียวกับ POS โดยตรวจสิทธิ์แพ็กเกจและนโยบายจาก IT ก่อนแสดงการใช้งาน</p></div></div>
+    {error?<ErrorPanel message={error}/>:null}
+    <div className="moduleGrid">{moreItems.map(item=>{const allowed=state?enabled(item):false;const count=item.key==="more.tables"?snapshot?.tables_count:item.key==="more.kitchen_manage"?snapshot?.kitchen_zones_count:item.key==="more.members"?snapshot?.members_count:item.key==="more.tax_invoices"?snapshot?.tax_invoices_count:item.key==="more.ai_documents"?snapshot?.ai_documents_count:null;return <button key={item.key} className={`moduleCard ${allowed?"":"locked"}`} disabled={!allowed||!item.target} onClick={()=>item.target&&onNavigate(item.target)}><span className="moduleIcon">{item.icon}</span><div><strong>{item.label}</strong><span>{item.desc}</span><small>{!state?"กำลังตรวจสิทธิ์...":!allowed?"ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด":item.target?"พร้อมใช้งานใน CRM":count==null?"เชื่อมข้อมูล POS แล้ว":`เชื่อมข้อมูล POS · ${number.format(Number(count))} รายการ`}</small></div><ChevronRight size={18}/></button>;})}</div>
+    <div className="auditNote">เมนูที่ยังไม่มีหน้าจัดการเฉพาะใน CRM จะยังไม่เขียนข้อมูลลง POS โดยตรง เพื่อรักษา transaction และกติกาเดิมของ POS/IT</div>
+  </>;
+}
+
+const settingsCatalog=[
+  ["settings.store","ข้อมูลร้านค้า/บริษัท","ข้อมูลชื่อร้าน โลโก้ ที่อยู่ และการติดต่อ","core_pos_sales","store"],
+  ["settings.branches","สาขา","สาขาและสถานะการเปิดใช้งาน","branch_management","branches"],
+  ["settings.devices","เครื่องแคชเชียร์","อุปกรณ์ POS และสถานะออนไลน์","mobile_device_enrollment","devices"],
+  ["settings.printers","เครื่องพิมพ์","การตั้งค่าเครื่องพิมพ์ของ POS","core_pos_sales","printers"],
+  ["settings.activity","ตรวจสอบพฤติกรรมการใช้งาน","ประวัติการทำงานและ Audit","core_pos_sales","activity"],
+  ["settings.payments","ตั้งค่าชำระเงิน","บัญชีธนาคารและ QR ของร้าน","core_pos_sales","payments"],
+  ["settings.inet_nops","INET QR","การเชื่อมต่อช่องทางรับชำระ INET","inet_nops_qr","inet"],
+  ["settings.taxes","ตั้งค่าภาษี","VAT และการคำนวณภาษี","core_pos_sales","taxes"],
+  ["settings.notifications","การแจ้งเตือน","QR โต๊ะ เสียงแจ้งเตือน และครัว","qr_table_ordering","notifications"],
+  ["settings.support","ศูนย์ช่วยเหลือ","Support และการติดต่อฝ่ายระบบ","core_pos_sales","support"],
+  ["settings.push_notifications","การแจ้งเตือนอุปกรณ์","Push notification ของเครื่อง POS","core_pos_sales","push"],
+  ["settings.users","ผู้ใช้งาน","พนักงาน สิทธิ์ และ PIN","user_management","users"],
+  ["settings.language","เปลี่ยนภาษา","ภาษาแสดงผลของ POS","core_pos_sales","language"],
+  ["settings.placement","สลับแถบเมนูหลัก","ตำแหน่งเมนูต่อเครื่อง POS","core_pos_sales","placement"],
+  ["settings.display","จอลูกค้า","Customer Display","customer_facing_display","display"],
+  ["settings.order_kitchen","ออเดอร์และครัว","การส่งออเดอร์และการแจ้งเตือนครัว","kitchen_printing","orderKitchen"],
+  ["settings.table_qr","QR โต๊ะ","การรับออเดอร์ผ่าน QR โต๊ะ","qr_table_ordering","tableQr"]
+] as const;
+
+type EditableSettingKind="store"|"branches"|"payments"|"taxes"|"notifications";
+
+function SettingEditorModal({
+  kind,context,branchId,snapshot,onClose,onSaved,onContextChanged
+}:{
+  kind:EditableSettingKind;
+  context:PortalContext;
+  branchId:string|null;
+  snapshot:SettingsSnapshot;
+  onClose:()=>void;
+  onSaved:()=>Promise<void>;
+  onContextChanged:()=>Promise<void>;
+}){
+  const initialBranchId=branchId||snapshot.branches[0]?.id||"";
+  const firstBranch=snapshot.branches.find(b=>b.id===initialBranchId)??snapshot.branches[0];
+  const firstAccount=snapshot.payment_accounts.find(a=>a.branch_id===initialBranchId)||snapshot.payment_accounts.find(a=>a.applies_to_all_branches)||snapshot.payment_accounts[0];
+  const firstTax=snapshot.tax_settings.find(x=>x.branch_id===initialBranchId);
+  const firstNotify=snapshot.notifications.find(x=>x.branch_id===initialBranchId);
+
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState("");
+  const [storeDraft,setStoreDraft]=useState({
+    display_name:snapshot.store?.display_name||snapshot.store?.name||"",
+    company_address:snapshot.store?.company_address||"",
+    contact_phone:snapshot.store?.contact_phone||snapshot.store?.owner_phone||""
+  });
+  const [branchChoice,setBranchChoice]=useState(firstBranch?.id||"__new__");
+  const [branchDraft,setBranchDraft]=useState({
+    id:firstBranch?.id||"",code:firstBranch?.code||"",name:firstBranch?.name||"",
+    address:firstBranch?.address||"",is_active:firstBranch?.is_active??true
+  });
+  const [accountChoice,setAccountChoice]=useState(firstAccount?.id||"__new__");
+  const [accountDraft,setAccountDraft]=useState({
+    id:firstAccount?.id||"",bank_name:firstAccount?.bank_name||"",account_name:firstAccount?.account_name||"",
+    account_number:firstAccount?.account_number||"",promptpay_phone:firstAccount?.promptpay_phone||"",
+    qr_image_url:firstAccount?.qr_image_url||"",qr_mode:firstAccount?.qr_mode||"promptpay_link",
+    applies_to_all_branches:firstAccount?.applies_to_all_branches??false,is_active:firstAccount?.is_active??true
+  });
+  const [scopeBranch,setScopeBranch]=useState(initialBranchId);
+  const [taxDraft,setTaxDraft]=useState({
+    is_enabled:firstTax?.is_enabled??false,
+    calculation_base:firstTax?.calculation_base||"exclusive",
+    settings:firstTax?.settings??{}
+  });
+  const [notificationDraft,setNotificationDraft]=useState({
+    table_qr_popup_enabled:firstNotify?.table_qr_popup_enabled??true,
+    table_qr_sound_enabled:firstNotify?.table_qr_sound_enabled??true,
+    table_qr_sound_volume:Number(firstNotify?.table_qr_sound_volume??1),
+    table_qr_popup_store_enabled:firstNotify?.table_qr_popup_store_enabled??true,
+    table_qr_kitchen_auto_send_enabled:firstNotify?.table_qr_kitchen_auto_send_enabled??false,
+    table_qr_kitchen_auto_print_enabled:firstNotify?.table_qr_kitchen_auto_print_enabled??false
+  });
+
+  function chooseBranch(value:string){
+    setBranchChoice(value);
+    if(value==="__new__"){setBranchDraft({id:"",code:"",name:"",address:"",is_active:true});return;}
+    const row=snapshot.branches.find(b=>b.id===value);
+    if(row)setBranchDraft({id:row.id,code:row.code||"",name:row.name,address:row.address||"",is_active:row.is_active});
+  }
+  function chooseAccount(value:string){
+    setAccountChoice(value);
+    if(value==="__new__"){setAccountDraft({id:"",bank_name:"",account_name:"",account_number:"",promptpay_phone:"",qr_image_url:"",qr_mode:"promptpay_link",applies_to_all_branches:false,is_active:true});return;}
+    const row=snapshot.payment_accounts.find(a=>a.id===value);
+    if(row){
+      setScopeBranch(row.branch_id||initialBranchId);
+      setAccountDraft({
+        id:row.id,bank_name:row.bank_name||"",account_name:row.account_name||"",account_number:row.account_number||"",
+        promptpay_phone:row.promptpay_phone||"",qr_image_url:row.qr_image_url||"",qr_mode:row.qr_mode||"promptpay_link",
+        applies_to_all_branches:row.applies_to_all_branches??false,is_active:row.is_active??true
+      });
+    }
+  }
+  function changeScope(value:string){
+    setScopeBranch(value);
+    const tax=snapshot.tax_settings.find(x=>x.branch_id===value);
+    setTaxDraft({is_enabled:tax?.is_enabled??false,calculation_base:tax?.calculation_base||"exclusive",settings:tax?.settings??{}});
+    const n=snapshot.notifications.find(x=>x.branch_id===value);
+    setNotificationDraft({
+      table_qr_popup_enabled:n?.table_qr_popup_enabled??true,
+      table_qr_sound_enabled:n?.table_qr_sound_enabled??true,
+      table_qr_sound_volume:Number(n?.table_qr_sound_volume??1),
+      table_qr_popup_store_enabled:n?.table_qr_popup_store_enabled??true,
+      table_qr_kitchen_auto_send_enabled:n?.table_qr_kitchen_auto_send_enabled??false,
+      table_qr_kitchen_auto_print_enabled:n?.table_qr_kitchen_auto_print_enabled??false
+    });
+  }
+
+  async function submit(event:React.FormEvent){
+    event.preventDefault();setBusy(true);setError("");
+    if(kind==="payments"&&accountDraft.qr_mode==="promptpay_link"&&!accountDraft.promptpay_phone.trim()){
+      setError("กรุณาระบุหมายเลข PromptPay");
+      setBusy(false);
+      return;
+    }
+    try{
+      if(kind==="store")await saveSetting(context.tenantId,null,"update_store",storeDraft);
+      if(kind==="branches")await saveSetting(context.tenantId,branchDraft.id||null,"save_branch",branchDraft);
+      if(kind==="payments")await saveSetting(context.tenantId,scopeBranch||null,"save_payment_account",accountDraft);
+      if(kind==="taxes")await saveSetting(context.tenantId,scopeBranch||null,"save_tax",taxDraft);
+      if(kind==="notifications")await saveSetting(context.tenantId,scopeBranch||null,"save_notifications",notificationDraft);
+      await onSaved();
+      if(kind==="store"||kind==="branches")await onContextChanged();
+      onClose();
+    }catch(err){setError(err instanceof Error?err.message:"บันทึกการตั้งค่าไม่สำเร็จ");}
+    finally{setBusy(false);}
+  }
+
+  const title=kind==="store"?"ข้อมูลร้านค้า/บริษัท":kind==="branches"?"สาขา":kind==="payments"?"ตั้งค่าชำระเงิน":kind==="taxes"?"ตั้งค่าภาษี":"การแจ้งเตือน";
+  return <Modal title={title} subtitle="บันทึกลงข้อมูลกลาง CpiPOS-001 และ POS จะอ่านค่าชุดเดียวกัน" onClose={onClose} wide>
+    <form className="entityForm" onSubmit={submit}>
+      {error?<ErrorPanel message={error}/>:null}
+      <div className="formGrid">
+        {kind==="store"?<>
+          <label className="span2"><span>ชื่อร้าน/ชื่อแสดงผล</span><input value={storeDraft.display_name} onChange={e=>setStoreDraft({...storeDraft,display_name:e.target.value})} required/></label>
+          <label className="span2"><span>ที่อยู่</span><input value={storeDraft.company_address} onChange={e=>setStoreDraft({...storeDraft,company_address:e.target.value})}/></label>
+          <label className="span2"><span>เบอร์ติดต่อ</span><input value={storeDraft.contact_phone} onChange={e=>setStoreDraft({...storeDraft,contact_phone:e.target.value})}/></label>
+        </>:null}
+
+        {kind==="branches"?<>
+          <label className="span2"><span>เลือกสาขา</span><select value={branchChoice} onChange={e=>chooseBranch(e.target.value)}>{snapshot.branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}<option value="__new__">+ เพิ่มสาขาใหม่</option></select></label>
+          <label><span>รหัสสาขา</span><input value={branchDraft.code} onChange={e=>setBranchDraft({...branchDraft,code:e.target.value})} required/></label>
+          <label><span>ชื่อสาขา</span><input value={branchDraft.name} onChange={e=>setBranchDraft({...branchDraft,name:e.target.value})} required/></label>
+          <label className="span2"><span>ที่อยู่สาขา</span><input value={branchDraft.address} onChange={e=>setBranchDraft({...branchDraft,address:e.target.value})}/></label>
+          <label className="switchField span2"><input type="checkbox" checked={branchDraft.is_active} onChange={e=>setBranchDraft({...branchDraft,is_active:e.target.checked})}/><span>เปิดใช้งานสาขา</span></label>
+        </>:null}
+
+        {kind==="payments"?<>
+          <label className="span2"><span>บัญชี</span><select value={accountChoice} onChange={e=>chooseAccount(e.target.value)}>{snapshot.payment_accounts.map(a=><option key={a.id} value={a.id}>{a.bank_name||"บัญชี"} · ••••{String(a.account_number||"").slice(-4)}</option>)}<option value="__new__">+ เพิ่มบัญชีใหม่</option></select></label>
+          <label><span>สาขา</span><select value={scopeBranch} onChange={e=>setScopeBranch(e.target.value)} disabled={accountDraft.applies_to_all_branches}>{snapshot.branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></label>
+          <label><span>ธนาคาร</span><input value={accountDraft.bank_name} onChange={e=>setAccountDraft({...accountDraft,bank_name:e.target.value})} required/></label>
+          <label><span>ชื่อบัญชี</span><input value={accountDraft.account_name} onChange={e=>setAccountDraft({...accountDraft,account_name:e.target.value})}/></label>
+          <label><span>เลขบัญชี</span><input value={accountDraft.account_number} onChange={e=>setAccountDraft({...accountDraft,account_number:e.target.value})}/></label>
+          <label><span>PromptPay</span><input value={accountDraft.promptpay_phone} onChange={e=>setAccountDraft({...accountDraft,promptpay_phone:e.target.value})} required={accountDraft.qr_mode==="promptpay_link"} placeholder={accountDraft.qr_mode==="promptpay_link"?"ระบุหมายเลข PromptPay":undefined}/></label>
+          <label><span>รูปแบบ QR</span><select value={accountDraft.qr_mode} onChange={e=>setAccountDraft({...accountDraft,qr_mode:e.target.value})}><option value="promptpay_link">PromptPay</option><option value="qr_image">รูป QR</option></select></label>
+          {accountDraft.qr_mode==="qr_image"?<label className="span2"><span>URL / พาธรูป QR</span><input value={accountDraft.qr_image_url} onChange={e=>setAccountDraft({...accountDraft,qr_image_url:e.target.value})} placeholder="https://... หรือพาธรูป QR ที่ระบบ POS ใช้งาน" required/><small>ใช้รูป QR เดียวกับที่ POS อ่านจากบัญชีรับชำระ</small></label>:null}
+          <label className="switchField"><input type="checkbox" checked={accountDraft.applies_to_all_branches} onChange={e=>setAccountDraft({...accountDraft,applies_to_all_branches:e.target.checked})}/><span>ใช้ทุกสาขา</span></label>
+          <label className="switchField"><input type="checkbox" checked={accountDraft.is_active} onChange={e=>setAccountDraft({...accountDraft,is_active:e.target.checked})}/><span>เปิดใช้งาน</span></label>
+        </>:null}
+
+        {kind==="taxes"?<>
+          <label className="span2"><span>สาขา</span><select value={scopeBranch} onChange={e=>changeScope(e.target.value)}>{snapshot.branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></label>
+          <label><span>วิธีคำนวณ</span><select value={taxDraft.calculation_base} onChange={e=>setTaxDraft({...taxDraft,calculation_base:e.target.value})}><option value="exclusive">ภาษีแยกจากราคา</option><option value="inclusive">ราคารวมภาษี</option></select></label>
+          <label className="switchField"><input type="checkbox" checked={taxDraft.is_enabled} onChange={e=>setTaxDraft({...taxDraft,is_enabled:e.target.checked})}/><span>เปิดใช้ภาษี</span></label>
+        </>:null}
+
+        {kind==="notifications"?<>
+          <label className="span2"><span>สาขา</span><select value={scopeBranch} onChange={e=>changeScope(e.target.value)}>{snapshot.branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></label>
+          <label className="switchField"><input type="checkbox" checked={notificationDraft.table_qr_popup_enabled} onChange={e=>setNotificationDraft({...notificationDraft,table_qr_popup_enabled:e.target.checked})}/><span>Popup QR โต๊ะ</span></label>
+          <label className="switchField"><input type="checkbox" checked={notificationDraft.table_qr_sound_enabled} onChange={e=>setNotificationDraft({...notificationDraft,table_qr_sound_enabled:e.target.checked})}/><span>เสียงแจ้งเตือน</span></label>
+          <label><span>ระดับเสียง 0–1</span><input type="number" min="0" max="1" step="0.1" value={notificationDraft.table_qr_sound_volume} onChange={e=>setNotificationDraft({...notificationDraft,table_qr_sound_volume:Number(e.target.value)})}/></label>
+          <label className="switchField"><input type="checkbox" checked={notificationDraft.table_qr_popup_store_enabled} onChange={e=>setNotificationDraft({...notificationDraft,table_qr_popup_store_enabled:e.target.checked})}/><span>แจ้งหน้าร้าน</span></label>
+          <label className="switchField"><input type="checkbox" checked={notificationDraft.table_qr_kitchen_auto_send_enabled} onChange={e=>setNotificationDraft({...notificationDraft,table_qr_kitchen_auto_send_enabled:e.target.checked})}/><span>ส่งเข้าครัวอัตโนมัติ</span></label>
+          <label className="switchField"><input type="checkbox" checked={notificationDraft.table_qr_kitchen_auto_print_enabled} onChange={e=>setNotificationDraft({...notificationDraft,table_qr_kitchen_auto_print_enabled:e.target.checked})}/><span>พิมพ์ครัวอัตโนมัติ</span></label>
+        </>:null}
+      </div>
+      <div className="modalActions"><button type="button" className="secondaryButton" onClick={onClose}>ยกเลิก</button><button className="primaryAction" disabled={busy}>{busy?<LoaderCircle className="spin" size={17}/>:<Save size={17}/>}บันทึกการตั้งค่า</button></div>
+    </form>
+  </Modal>;
+}
+
+function SettingsView({context,branchId,onNavigate,onContextChanged}:{context:PortalContext;branchId:string|null;onNavigate:(view:PortalView)=>void;onContextChanged:()=>Promise<void>}){
+  const [snapshot,setSnapshot]=useState<SettingsSnapshot|null>(null);
+  const [features,setFeatures]=useState<FeatureState|null>(null);
+  const [error,setError]=useState("");
+  const [editor,setEditor]=useState<EditableSettingKind|null>(null);
+  const refreshSeq=useRef(0);
+
+  const refresh=useCallback(async()=>{
+    const requestId=++refreshSeq.current;
+    setError("");
+    try{
+      const [s,f]=await Promise.all([loadSettingsSnapshot(context.tenantId,branchId),loadFeatureState(context.tenantId,branchId)]);
+      if(requestId!==refreshSeq.current)return;
+      setSnapshot(s);setFeatures(f);
+    }catch{
+      if(requestId===refreshSeq.current)setError("ไม่สามารถโหลดการตั้งค่าร้านได้");
+    }
+  },[context.tenantId,branchId]);
+  useEffect(()=>{
+    void refresh();
+    return()=>{refreshSeq.current+=1;};
+  },[refresh]);
+
+  const allowed=(key:string,feature:string)=>{
+    if(features?.menu_policy?.[key]===false)return false;
+    const base=features?.package_features?.[feature]??false;
+    const override=features?.feature_overrides?.[feature];
+    return override===undefined?base:override;
+  };
+  const detail=(kind:string)=>{
+    if(!snapshot)return "กำลังโหลดข้อมูล...";
+    if(kind==="store")return snapshot.store?.display_name||snapshot.store?.name||"ร้านค้า";
+    if(kind==="branches")return snapshot.branches.length+" สาขา";
+    if(kind==="devices")return snapshot.devices.length+" เครื่อง";
+    if(kind==="payments")return snapshot.payment_accounts.length+" บัญชี";
+    if(kind==="taxes")return snapshot.tax_settings.filter(x=>x.is_enabled).length+" สาขาเปิดภาษี";
+    if(kind==="notifications")return snapshot.notifications.length+" สาขา";
+    if(kind==="users")return "จัดการจากเมนูพนักงาน";
+    return "เชื่อมกับการตั้งค่า POS";
+  };
+  const editable=(kind:string):kind is EditableSettingKind=>["store","branches","payments","taxes","notifications"].includes(kind);
+  const localOnly=["devices","printers","activity","inet","support","push","language","placement","display","orderKitchen","tableQr"];
+
+  return <>
+    <div className="pageHeading"><div><p className="eyebrow">SETTINGS</p><h2>ตั้งค่า</h2><p>โครงเมนูตาม POS และใช้สิทธิ์จากแพ็กเกจ + นโยบาย IT ชุดเดียวกัน</p></div><button className="ghostButton" onClick={()=>void Promise.all([refresh(),onContextChanged()])}><RefreshCw size={18}/>รีเฟรช</button></div>
+    {error?<ErrorPanel message={error}/>:null}
+    {snapshot?<section className="settingsOverview">
+      <div><Store size={20}/><span>ร้าน</span><strong>{snapshot.store?.display_name||snapshot.store?.name||"—"}</strong></div>
+      <div><Building2 size={20}/><span>สาขา</span><strong>{snapshot.branches.length}</strong></div>
+      <div><MonitorSmartphone size={20}/><span>อุปกรณ์</span><strong>{snapshot.devices.length}</strong></div>
+      <div><CreditCard size={20}/><span>บัญชีรับเงิน</span><strong>{snapshot.payment_accounts.length}</strong></div>
+    </section>:null}
+    <div className="moduleGrid settingsGrid">{settingsCatalog.map(([key,label,desc,feature,kind])=>{const isAllowed=features?allowed(key,feature):false;const target=kind==="users"?"staff" as PortalView:undefined;const canEdit=editable(kind)&&snapshot&&(context.role==="owner"||["taxes","notifications"].includes(kind));const disabled=!isAllowed||(!target&&!canEdit&&localOnly.includes(kind));return <button key={key} className={`moduleCard ${isAllowed?"":"locked"}`} disabled={disabled} onClick={()=>target?onNavigate(target):canEdit?setEditor(kind as EditableSettingKind):undefined}><span className="moduleIcon">{kind==="devices"?<MonitorSmartphone/>:kind==="payments"?<CreditCard/>:kind==="notifications"?<Bell/>:kind==="printers"?<Printer/>:kind==="branches"?<Building2/>:kind==="users"?<UsersRound/>:<Settings/>}</span><div><strong>{label}</strong><span>{desc}</span><small>{!features?"กำลังตรวจสิทธิ์...":!isAllowed?"ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด":canEdit?"กดเพื่อจัดการ":detail(kind)}</small></div><ChevronRight size={18}/></button>;})}</div>
+    {snapshot?<article className="panel settingsDataPanel"><div className="panelHeader"><div><p className="eyebrow">CONNECTED POS SETTINGS</p><h3>ข้อมูลที่เชื่อมอยู่</h3></div></div><div className="settingsDataGrid">
+      <div><strong>ข้อมูลร้าน</strong><span>{snapshot.store?.company_address||"ยังไม่ได้ระบุที่อยู่"}</span><span>{snapshot.store?.contact_phone||snapshot.store?.owner_phone||"—"}</span></div>
+      <div><strong>สาขา</strong>{snapshot.branches.slice(0,5).map(b=><span key={b.id}>{b.name} · {b.is_active?"ใช้งาน":"ปิด"}</span>)}</div>
+      <div><strong>อุปกรณ์</strong>{snapshot.devices.slice(0,5).map(d=><span key={d.id}>{d.device_name||d.device_code||"POS"} · {d.status||"—"}</span>)}</div>
+      <div><strong>บัญชีรับชำระของร้าน</strong>{snapshot.payment_accounts.slice(0,5).map(a=><span key={a.id}>{a.bank_name||"บัญชี"} · ••••{String(a.account_number||"").slice(-4)}</span>)}</div>
+    </div></article>:null}
+    <div className="auditNote">ค่าที่เป็น local ต่อเครื่อง เช่น ภาษา/ตำแหน่งแถบเมนู และฮาร์ดแวร์เครื่องพิมพ์ อ่านสถานะร่วมกันแต่ CRM จะไม่สั่งเปลี่ยนเครื่อง POS โดยตรง</div>
+    {editor&&snapshot?<SettingEditorModal kind={editor} context={context} branchId={branchId} snapshot={snapshot} onClose={()=>setEditor(null)} onSaved={refresh} onContextChanged={onContextChanged}/>:null}
   </>;
 }
 
@@ -677,9 +1134,11 @@ const nav: Array<{ id: PortalView; label: string; icon: React.ReactNode }> = [
   { id:"dashboard",label:"ภาพรวม",icon:<LayoutDashboard size={21}/> },
   { id:"sales",label:"ยอดขาย",icon:<ReceiptText size={21}/> },
   { id:"products",label:"สินค้า",icon:<Boxes size={21}/> },
-  { id:"stock",label:"สต๊อก",icon:<Warehouse size={21}/> },
+  { id:"stock",label:"วัตถุดิบ",icon:<Warehouse size={21}/> },
   { id:"staff",label:"พนักงาน",icon:<UsersRound size={21}/> },
-  { id:"package",label:"แพ็กเกจ",icon:<PackageCheck size={21}/> }
+  { id:"package",label:"แพ็กเกจ",icon:<PackageCheck size={21}/> },
+  { id:"more",label:"เพิ่มเติม",icon:<MoreHorizontal size={21}/> },
+  { id:"settings",label:"ตั้งค่า",icon:<Settings size={21}/> }
 ];
 
 export default function App() {
@@ -701,6 +1160,22 @@ export default function App() {
     try{setContext(await loadPortalContext());}
     catch(err){const message=err instanceof Error?err.message:"";if(message!=="not_authenticated")setFatal("ไม่สามารถตรวจสอบสิทธิ์ Customer Portal ได้");setContext(null);}
     finally{setChecking(false);}
+  },[]);
+
+  const refreshContextAfterMutation=useCallback(async()=>{
+    try{
+      const next=await loadPortalContext();
+      setContext(next);
+      setFatal("");
+    }catch(err){
+      const message=err instanceof Error?err.message:"";
+      if(message==="not_authenticated"){
+        setContext(null);
+        setFatal("");
+        return;
+      }
+      setFatal("บันทึกสำเร็จแล้ว แต่ไม่สามารถโหลดข้อมูลร้านล่าสุดได้ กรุณากดรีเฟรชอีกครั้ง");
+    }
   },[]);
 
   useEffect(()=>{
@@ -806,6 +1281,8 @@ export default function App() {
       {view==="stock"?<StockView context={context} branchId={branchId||null}/>:null}
       {view==="staff"?<StaffView context={context} branchId={branchId||null}/>:null}
       {view==="package"?<PackageView context={context}/>:null}
+      {view==="more"?<MoreView context={context} branchId={branchId||null} onNavigate={chooseView}/>:null}
+      {view==="settings"?<SettingsView context={context} branchId={branchId||null} onNavigate={chooseView} onContextChanged={refreshContextAfterMutation}/>:null}
 
       <footer>ข้อมูลและสิทธิ์ถูกจำกัดตามบัญชี {context.role==="owner"?"Owner":"Manager"} · {context.branches.length} สาขาที่เข้าถึงได้</footer>
     </main>

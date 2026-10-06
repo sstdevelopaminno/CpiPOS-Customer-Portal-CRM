@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import bcrypt from "npm:bcryptjs@2.4.3";
 
 const JSON_HEADERS={"content-type":"application/json; charset=utf-8","cache-control":"no-store"};
 
@@ -50,6 +51,7 @@ Deno.serve(async(req)=>{
 
   try{
     const body=await req.json().catch(()=>({})) as Record<string,unknown>;
+    const action=String(body.action??"create");
     const tenantId=String(body.tenant_id??"");
     const branchId=String(body.branch_id??"");
     const employeeCode=String(body.employee_code??"").trim();
@@ -59,9 +61,6 @@ Deno.serve(async(req)=>{
     const permissionRole=String(body.permission_role??"pos_user").trim().slice(0,80)||"pos_user";
 
     if(!/^[0-9a-f-]{36}$/i.test(tenantId)||!/^[0-9a-f-]{36}$/i.test(branchId))return json(req,{error:"invalid_scope"},400);
-    if(!/^[A-Za-z0-9._-]{2,32}$/.test(employeeCode))return json(req,{error:"invalid_employee_code"},400);
-    if(!fullName||fullName.length>180)return json(req,{error:"invalid_full_name"},400);
-    if(!["owner","manager","staff","kitchen"].includes(branchRole))return json(req,{error:"invalid_branch_role"},400);
 
     const {data:actorRoles,error:roleError}=await admin.from("user_branch_roles").select("branch_id,role").eq("tenant_id",tenantId).eq("user_id",actor.id);
     if(roleError)return json(req,{error:"authorization_unavailable"},503);
@@ -73,6 +72,20 @@ Deno.serve(async(req)=>{
 
     const {data:branch,error:branchError}=await admin.from("branches").select("id,is_active").eq("id",branchId).eq("tenant_id",tenantId).maybeSingle();
     if(branchError||!branch?.is_active)return json(req,{error:"branch_not_found"},404);
+
+    if(action==="set_pin"){
+      // PIN edits are intentionally handled by customer_portal_update_staff_v2 so
+      // profile/role/PIN changes commit atomically and branch authority is checked
+      // inside one database transaction.
+      return json(req,{error:"pin_update_via_atomic_rpc_required"},409);
+    }
+
+    if(action!=="create")return json(req,{error:"invalid_action"},400);
+    if(!/^[A-Za-z0-9._-]{2,32}$/.test(employeeCode))return json(req,{error:"invalid_employee_code"},400);
+    if(!fullName||fullName.length>180)return json(req,{error:"invalid_full_name"},400);
+    if(!["owner","manager","staff","kitchen"].includes(branchRole))return json(req,{error:"invalid_branch_role"},400);
+    const createPin=String(body.pin??"").trim();
+    if(createPin&&!/^\d{4,12}$/.test(createPin))return json(req,{error:"invalid_pin"},422);
 
     const {data:existing}=await admin.from("pos_user_profiles").select("user_id").eq("tenant_id",tenantId).eq("employee_code",employeeCode).maybeSingle();
     if(existing)return json(req,{error:"duplicate_employee_code"},409);
@@ -91,8 +104,10 @@ Deno.serve(async(req)=>{
     }
 
     try{
+      const pinHash=createPin?await bcrypt.hash(createPin,10):null;
       const {error:profileError}=await admin.from("users_profiles").insert({
-        id:created.id,email:syntheticEmail,full_name:fullName,platform_role:"tenant_user",is_active:true
+        id:created.id,email:syntheticEmail,full_name:fullName,platform_role:"tenant_user",is_active:true,
+        ...(pinHash?{pin_hash:pinHash}:{})
       });
       if(profileError)throw profileError;
 

@@ -245,3 +245,77 @@ th,td{padding:13px 15px}
 .paginationBar{display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:12px 14px;border-top:1px solid #edf2f7;background:#fbfdff}
 .paginationBar>span{font-size:11px;font-weight:800;color:#6e8297;min-width:88px;text-align:center}
 @media(max-width:640px){.paginationBar{justify-content:space-between}.paginationBar .secondaryButton{min-width:0;flex:1}.paginationBar>span{font-size:10px}}
+
+
+/* CRM portal phase: paginated tables, billing, More + Settings */
+.dashboardScroll{max-height:300px;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.topProductsList.dashboardScroll{padding-right:6px}
+.boundedTable{max-height:min(62vh,680px);overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.boundedTable thead th{position:sticky;top:0;z-index:3;background:#f7faff;box-shadow:0 1px 0 #e6eef6}
+.productTable{min-width:1120px}
+.tableThumb{width:58px;height:48px;border-radius:9px;overflow:hidden;display:grid;place-items:center;background:#eef5fb;color:#7e9bb7}
+.tableThumb img{width:100%;height:100%;object-fit:cover}
+.monoCode{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;color:#315b81}
+.paginationBar{display:flex;align-items:center;justify-content:center;gap:12px;padding:14px;border-top:1px solid #eaf0f6;background:#fbfdff}
+.pageNumbers{display:flex;align-items:center;justify-content:center;gap:5px;flex-wrap:wrap}
+.pageNumbers button{width:34px;height:34px;border:1px solid #d5e1ed;border-radius:9px;background:#fff;color:#4d6984;font-size:11px;font-weight:800}
+.pageNumbers button:hover{border-color:#7fb2df;color:#165b98}
+.pageNumbers button.active{background:#156fb9;border-color:#156fb9;color:#fff;box-shadow:0 5px 12px rgba(17,105,181,.18)}
+.pageNumbers>span{padding:0 3px;color:#8294a6;font-weight:800}
+.packageHeroFive{grid-template-columns:repeat(5,minmax(0,1fr))}
+.billingAlert{display:flex;align-items:center;gap:12px;margin:0 0 14px;padding:14px 16px;border:1px solid #bfe8d3;border-radius:14px;background:#f1fbf6;color:#1d7050}
+.billingAlert.warning{border-color:#f2d3a4;background:#fff8ec;color:#8a5613}
+.billingAlert>div{display:grid;gap:3px;flex:1}
+.billingAlert strong{font-size:13px}.billingAlert span{font-size:11px;line-height:1.5}
+.status-pending{background:#fff1d8!important;color:#9a6200!important}
+.payAction{border-color:#b8d9f4!important;background:#f0f8ff!important;color:#1266a9!important}
+.paymentSummary{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;padding:18px 20px 8px}
+.paymentSummary>div{display:grid;gap:5px;padding:12px;border:1px solid #e0e9f2;border-radius:11px;background:#f9fbfd}
+.paymentSummary span{font-size:10px;color:#7c8fa2}.paymentSummary strong{font-size:15px;color:#173f65}
+.issuerBox{display:grid;gap:5px;margin:10px 20px;padding:14px;border-radius:12px;background:#eef6ff;border:1px solid #d5e7f7;color:#315b80}
+.issuerBox strong{font-size:13px}.issuerBox span{font-size:11px}.issuerBox b{font-size:17px;letter-spacing:.04em;color:#0d5e9e}
+.singleColumn{grid-template-columns:1fr!important}
+.moduleGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.moduleCard{min-height:118px;display:grid;grid-template-columns:48px minmax(0,1fr) 18px;align-items:center;gap:12px;padding:16px;text-align:left;border:1px solid #dce6f0;border-radius:15px;background:#fff;color:#274e73;box-shadow:0 4px 14px rgba(25,67,105,.04);transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}
+.moduleCard:not(:disabled):hover{transform:translateY(-1px);border-color:#9fc5e6;box-shadow:0 9px 20px rgba(28,77,120,.08)}
+.moduleCard>div{min-width:0;display:grid;gap:4px}
+.moduleCard strong{font-size:14px;color:#153f67}
+.moduleCard span{font-size:11px;line-height:1.45;color:#6d8298}
+.moduleCard small{font-size:9px;font-weight:800;color:#2871ad}
+.moduleCard.locked{opacity:.58;background:#f7f9fb;box-shadow:none}
+.moduleCard.locked small{color:#9a6b49}
+.moduleIcon{width:46px;height:46px;display:grid!important;place-items:center;border-radius:13px;background:#eaf4fd;color:#1373bd}
+.moduleIcon svg{width:22px;height:22px}
+.settingsOverview{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.settingsOverview>div{display:grid;grid-template-columns:28px 1fr;align-items:center;gap:3px 8px;padding:13px 15px;border:1px solid #dce6f0;border-radius:13px;background:#fff;color:#2d638f}
+.settingsOverview span{font-size:10px;color:#8293a4}
+.settingsOverview strong{font-size:16px;color:#153f67;grid-column:2}
+.settingsDataPanel{margin-top:8px}
+.settingsDataGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;padding:15px}
+.settingsDataGrid>div{display:grid;align-content:start;gap:5px;padding:12px;border:1px solid #e2eaf2;border-radius:11px;background:#fbfdff}
+.settingsDataGrid strong{font-size:12px;color:#214f78}
+.settingsDataGrid span{font-size:10px;line-height:1.45;color:#6e8398}
+.formGrid small{font-size:9px;color:#8597a8;line-height:1.45}
+
+@media(max-width:1200px){
+  .packageHeroFive{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .moduleGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .settingsDataGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:900px){
+  .settingsOverview{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .boundedTable{max-height:58vh}
+}
+@media(max-width:640px){
+  .dashboardScroll{max-height:260px}
+  .packageHeroFive,.moduleGrid,.settingsOverview,.settingsDataGrid{grid-template-columns:1fr}
+  .moduleCard{min-height:100px;padding:13px;grid-template-columns:42px minmax(0,1fr) 16px}
+  .moduleIcon{width:40px;height:40px}
+  .paginationBar{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .pageNumbers{grid-column:1/-1;grid-row:1}
+  .paginationBar>.secondaryButton{width:100%}
+  .paymentSummary{grid-template-columns:1fr;padding:14px 15px 6px}
+  .issuerBox{margin:8px 15px}
+  .billingAlert{align-items:flex-start;flex-wrap:wrap}
+  .billingAlert .primaryAction{width:100%}
+}
