@@ -111,13 +111,29 @@ Deno.serve(async(req)=>{
       .select("billing_bank_account_number,billing_promptpay_id").eq("id","default").maybeSingle();
     if(!issuer?.billing_bank_account_number&&!issuer?.billing_promptpay_id)return json(req,{error:"receiving_account_not_configured"},422);
 
-    const {data:open,error:openError}=await admin
+    const {data:openRows,error:openError}=await admin
       .from("tenant_subscription_payment_requests")
-      .select("id,requested_package_id,status,evidence_url,metadata")
-      .eq("tenant_id",tenantId).in("status",["pending","under_review"]).limit(1).maybeSingle();
+      .select("id,request_type,requested_package_id,status,evidence_url,metadata")
+      .eq("tenant_id",tenantId)
+      .in("status",["pending","under_review"])
+      .order("created_at",{ascending:false})
+      .limit(20);
     if(openError)return json(req,{error:"request_check_failed"},503);
-    if(open?.evidence_url)return json(req,{error:"open_request_exists",request_id:open.id},409);
-    if(open?.requested_package_id&&open.requested_package_id!==packageId)return json(req,{error:"open_request_exists",request_id:open.id},409);
+
+    const openCandidates=openRows??[];
+    const matching=openCandidates.filter(row=>{
+      const metadata=(row.metadata??{}) as Record<string,unknown>;
+      const metadataCycle=typeof metadata.billing_cycle_id==="string"?metadata.billing_cycle_id:null;
+      return row.status==="pending"
+        && row.request_type==="renewal"
+        && row.requested_package_id===packageId
+        && !row.evidence_url
+        && metadataCycle===billingCycleId;
+    });
+    const open=openCandidates.length===1&&matching.length===1?matching[0]:null;
+    if(openCandidates.length>0&&!open){
+      return json(req,{error:"open_request_exists",request_id:openCandidates[0]?.id??null},409);
+    }
 
     const requestId=open?.id??requestedKey;
     const filePath=`${tenantId}/${requestId}/slip.${FILE_EXT[slip.type]}`;
@@ -140,7 +156,15 @@ Deno.serve(async(req)=>{
     const result=open
       ? await admin.from("tenant_subscription_payment_requests").update({
           amount_reported:null,evidence_url:filePath,metadata,updated_at:new Date().toISOString()
-        }).eq("id",requestId).eq("tenant_id",tenantId).is("evidence_url",null).select("id,status").maybeSingle()
+        })
+        .eq("id",requestId)
+        .eq("tenant_id",tenantId)
+        .eq("request_type","renewal")
+        .eq("requested_package_id",packageId)
+        .eq("status","pending")
+        .is("evidence_url",null)
+        .select("id,status")
+        .maybeSingle()
       : await admin.from("tenant_subscription_payment_requests").insert({
           id:requestId,tenant_id:tenantId,requested_package_id:packageId,
           request_type:"renewal",amount_reported:null,currency:String(contract.currency??"THB"),
