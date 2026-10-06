@@ -53,6 +53,17 @@ export function Modal({
   </div>;
 }
 
+export function ConnectedPosModuleModal({title,description,detail,onClose}:{title:string;description:string;detail?:string;onClose:()=>void}) {
+  return <Modal title={title} subtitle="เมนูเชื่อมกับระบบ POS" onClose={onClose}>
+    <div className="linkedModuleBody">
+      <div className="linkedModuleStatus"><strong>เชื่อมโครงเมนู POS แล้ว</strong><span>{detail||"ข้อมูลเมนูและสิทธิ์ใช้ชุดเดียวกับระบบ POS"}</span></div>
+      <p>{description}</p>
+      <div className="auditNote">Customer Portal ยังไม่สั่งเปลี่ยนค่าที่ผูกกับเครื่อง POS หรือ transaction เฉพาะหน้าขายโดยตรง เมนูนี้จะเปิดการจัดการเพิ่มเติมเมื่อมี control-plane ที่ปลอดภัยรองรับ</div>
+      <div className="modalActions"><button className="primaryAction" onClick={onClose}>รับทราบ</button></div>
+    </div>
+  </Modal>;
+}
+
 export function FilterBar({
   context,
   branchId,

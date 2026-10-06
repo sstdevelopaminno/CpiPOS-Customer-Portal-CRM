@@ -1,30 +1,29 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bell, Building2, ChevronRight, CreditCard, LoaderCircle, MonitorSmartphone, Printer, RefreshCw, Save, Settings, Store, UsersRound } from "lucide-react";
-import { loadFeatureState, loadSettingsSnapshot, saveSetting, type FeatureState, type PortalContext, type PortalView, type SettingsSnapshot } from "../lib/portal";
-import { ErrorPanel, Modal } from "../components/common";
+import { Activity, Bell, Building2, ChefHat, ChevronRight, CreditCard, Languages, LayoutPanelTop, LoaderCircle, MonitorSmartphone, Printer, QrCode, RefreshCw, Save, Settings, Store, UsersRound } from "lucide-react";
+import { loadFeatureState, loadMoreSnapshot, loadSettingsSnapshot, saveSetting, type FeatureState, type MoreSnapshot, type PortalContext, type PortalView, type SettingsSnapshot } from "../lib/portal";
+import { ConnectedPosModuleModal, ErrorPanel, Modal } from "../components/common";
 import { number } from "../lib/formatters";
+import { POS_SETTINGS_MENU_ITEMS, type PosMenuIcon, type PosSettingsEditorKind, type PosSettingsMenuItem } from "../config/pos-menu-catalog";
 
-const settingsCatalog=[
-  ["settings.store","ข้อมูลร้านค้า/บริษัท","ข้อมูลชื่อร้าน โลโก้ ที่อยู่ และการติดต่อ","core_pos_sales","store"],
-  ["settings.branches","สาขา","สาขาและสถานะการเปิดใช้งาน","branch_management","branches"],
-  ["settings.devices","เครื่องแคชเชียร์","อุปกรณ์ POS และสถานะออนไลน์","mobile_device_enrollment","devices"],
-  ["settings.printers","เครื่องพิมพ์","การตั้งค่าเครื่องพิมพ์ของ POS","core_pos_sales","printers"],
-  ["settings.activity","ตรวจสอบพฤติกรรมการใช้งาน","ประวัติการทำงานและ Audit","core_pos_sales","activity"],
-  ["settings.payments","ตั้งค่าชำระเงิน","บัญชีธนาคารและ QR ของร้าน","core_pos_sales","payments"],
-  ["settings.inet_nops","INET QR","การเชื่อมต่อช่องทางรับชำระ INET","inet_nops_qr","inet"],
-  ["settings.taxes","ตั้งค่าภาษี","VAT และการคำนวณภาษี","core_pos_sales","taxes"],
-  ["settings.notifications","การแจ้งเตือน","QR โต๊ะ เสียงแจ้งเตือน และครัว","qr_table_ordering","notifications"],
-  ["settings.support","ศูนย์ช่วยเหลือ","Support และการติดต่อฝ่ายระบบ","core_pos_sales","support"],
-  ["settings.push_notifications","การแจ้งเตือนอุปกรณ์","Push notification ของเครื่อง POS","core_pos_sales","push"],
-  ["settings.users","ผู้ใช้งาน","พนักงาน สิทธิ์ และ PIN","user_management","users"],
-  ["settings.language","เปลี่ยนภาษา","ภาษาแสดงผลของ POS","core_pos_sales","language"],
-  ["settings.placement","สลับแถบเมนูหลัก","ตำแหน่งเมนูต่อเครื่อง POS","core_pos_sales","placement"],
-  ["settings.display","จอลูกค้า","Customer Display","customer_facing_display","display"],
-  ["settings.order_kitchen","ออเดอร์และครัว","การส่งออเดอร์และการแจ้งเตือนครัว","kitchen_printing","orderKitchen"],
-  ["settings.table_qr","QR โต๊ะ","การรับออเดอร์ผ่าน QR โต๊ะ","qr_table_ordering","tableQr"]
-] as const;
+function SettingsMenuIcon({name}:{name:PosMenuIcon}) {
+  if(name==="store")return <Store/>;
+  if(name==="branch")return <Building2/>;
+  if(name==="terminal")return <MonitorSmartphone/>;
+  if(name==="printer")return <Printer/>;
+  if(name==="activity")return <Activity/>;
+  if(name==="payment")return <CreditCard/>;
+  if(name==="tax")return <Settings/>;
+  if(name==="bell")return <Bell/>;
+  if(name==="users")return <UsersRound/>;
+  if(name==="language")return <Languages/>;
+  if(name==="placement")return <LayoutPanelTop/>;
+  if(name==="display")return <MonitorSmartphone/>;
+  if(name==="kitchen")return <ChefHat/>;
+  if(name==="qr")return <QrCode/>;
+  return <Settings/>;
+}
 
-type EditableSettingKind="store"|"branches"|"payments"|"taxes"|"notifications";
+type EditableSettingKind=PosSettingsEditorKind;
 
 function SettingEditorModal({
   kind,context,branchId,snapshot,onClose,onSaved,onContextChanged
@@ -186,18 +185,24 @@ function SettingEditorModal({
 
 export function SettingsView({context,branchId,onNavigate,onContextChanged}:{context:PortalContext;branchId:string|null;onNavigate:(view:PortalView)=>void;onContextChanged:()=>Promise<void>}){
   const [snapshot,setSnapshot]=useState<SettingsSnapshot|null>(null);
+  const [linkedSnapshot,setLinkedSnapshot]=useState<MoreSnapshot|null>(null);
   const [features,setFeatures]=useState<FeatureState|null>(null);
   const [error,setError]=useState("");
   const [editor,setEditor]=useState<EditableSettingKind|null>(null);
+  const [linkedItem,setLinkedItem]=useState<PosSettingsMenuItem|null>(null);
   const refreshSeq=useRef(0);
 
   const refresh=useCallback(async()=>{
     const requestId=++refreshSeq.current;
     setError("");
     try{
-      const [s,f]=await Promise.all([loadSettingsSnapshot(context.tenantId,branchId),loadFeatureState(context.tenantId,branchId)]);
+      const [s,f,m]=await Promise.all([
+        loadSettingsSnapshot(context.tenantId,branchId),
+        loadFeatureState(context.tenantId,branchId),
+        loadMoreSnapshot(context.tenantId,branchId)
+      ]);
       if(requestId!==refreshSeq.current)return;
-      setSnapshot(s);setFeatures(f);
+      setSnapshot(s);setFeatures(f);setLinkedSnapshot(m);
     }catch{
       if(requestId===refreshSeq.current)setError("ไม่สามารถโหลดการตั้งค่าร้านได้");
     }
@@ -213,22 +218,34 @@ export function SettingsView({context,branchId,onNavigate,onContextChanged}:{con
     const override=features?.feature_overrides?.[feature];
     return override===undefined?base:override;
   };
-  const detail=(kind:string)=>{
+  const detail=(item:PosSettingsMenuItem)=>{
     if(!snapshot)return "กำลังโหลดข้อมูล...";
-    if(kind==="store")return snapshot.store?.display_name||snapshot.store?.name||"ร้านค้า";
-    if(kind==="branches")return snapshot.branches.length+" สาขา";
-    if(kind==="devices")return snapshot.devices.length+" เครื่อง";
-    if(kind==="payments")return snapshot.payment_accounts.length+" บัญชี";
-    if(kind==="taxes")return snapshot.tax_settings.filter(x=>x.is_enabled).length+" สาขาเปิดภาษี";
-    if(kind==="notifications")return snapshot.notifications.length+" สาขา";
-    if(kind==="users")return "จัดการจากเมนูพนักงาน";
+    if(item.kind==="store")return snapshot.store?.display_name||snapshot.store?.name||"ร้านค้า";
+    if(item.kind==="branches")return snapshot.branches.length+" สาขา";
+    if(item.kind==="devices")return snapshot.devices.length+" เครื่อง";
+    if(item.kind==="printers")return number.format(Number(linkedSnapshot?.printers_count??0))+" เครื่องที่เชื่อม";
+    if(item.kind==="activity")return number.format(Number(linkedSnapshot?.audit_count??0))+" รายการ Audit";
+    if(item.kind==="payments")return snapshot.payment_accounts.length+" บัญชี";
+    if(item.kind==="taxes")return snapshot.tax_settings.filter(x=>x.is_enabled).length+" สาขาเปิดภาษี";
+    if(item.kind==="notifications"||item.kind==="orderKitchen"||item.kind==="tableQr")return snapshot.notifications.length+" สาขามีการตั้งค่า";
+    if(item.kind==="users")return "จัดการจากเมนูพนักงาน";
+    if(item.kind==="display")return number.format(Number(linkedSnapshot?.display_pairings_count??0))+" การเชื่อมต่อ";
+    if(item.kind==="language"||item.kind==="placement")return "ค่าเฉพาะเครื่อง POS";
+    if(item.kind==="inet")return "เชื่อมการตั้งค่า INET QR";
     return "เชื่อมกับการตั้งค่า POS";
   };
-  const editable=(kind:string):kind is EditableSettingKind=>["store","branches","payments","taxes","notifications"].includes(kind);
-  const localOnly=["devices","printers","activity","inet","support","push","language","placement","display","orderKitchen","tableQr"];
+  const canEdit=(item:PosSettingsMenuItem)=>{
+    if(!item.editorKind||!snapshot)return false;
+    return context.role==="owner"||["taxes","notifications"].includes(item.editorKind);
+  };
+  const activate=(item:PosSettingsMenuItem)=>{
+    if(item.target){onNavigate(item.target);return;}
+    if(canEdit(item)&&item.editorKind){setEditor(item.editorKind);return;}
+    setLinkedItem(item);
+  };
 
   return <>
-    <div className="pageHeading"><div><p className="eyebrow">SETTINGS</p><h2>ตั้งค่า</h2><p>โครงเมนูตาม POS และใช้สิทธิ์จากแพ็กเกจ + นโยบาย IT ชุดเดียวกัน</p></div><button className="ghostButton" onClick={()=>void Promise.all([refresh(),onContextChanged()])}><RefreshCw size={18}/>รีเฟรช</button></div>
+    <div className="pageHeading"><div><p className="eyebrow">SETTINGS · POS MENU</p><h2>ตั้งค่า</h2><p>รายการและลำดับเมนูอ้างอิงจาก CpiPOS ฝั่ง POS รวมเมนู QR โต๊ะและออเดอร์/ครัวที่แสดงในหน้าตั้งค่าจริง</p></div><button className="ghostButton" onClick={()=>void Promise.all([refresh(),onContextChanged()])}><RefreshCw size={18}/>รีเฟรช</button></div>
     {error?<ErrorPanel message={error}/>:null}
     {snapshot?<section className="settingsOverview">
       <div><Store size={20}/><span>ร้าน</span><strong>{snapshot.store?.display_name||snapshot.store?.name||"—"}</strong></div>
@@ -236,14 +253,15 @@ export function SettingsView({context,branchId,onNavigate,onContextChanged}:{con
       <div><MonitorSmartphone size={20}/><span>อุปกรณ์</span><strong>{snapshot.devices.length}</strong></div>
       <div><CreditCard size={20}/><span>บัญชีรับเงิน</span><strong>{snapshot.payment_accounts.length}</strong></div>
     </section>:null}
-    <div className="moduleGrid settingsGrid">{settingsCatalog.map(([key,label,desc,feature,kind])=>{const isAllowed=features?allowed(key,feature):false;const target=kind==="users"?"staff" as PortalView:undefined;const canEdit=editable(kind)&&snapshot&&(context.role==="owner"||["taxes","notifications"].includes(kind));const disabled=!isAllowed||(!target&&!canEdit&&localOnly.includes(kind));return <button key={key} className={`moduleCard ${isAllowed?"":"locked"}`} disabled={disabled} onClick={()=>target?onNavigate(target):canEdit?setEditor(kind as EditableSettingKind):undefined}><span className="moduleIcon">{kind==="devices"?<MonitorSmartphone/>:kind==="payments"?<CreditCard/>:kind==="notifications"?<Bell/>:kind==="printers"?<Printer/>:kind==="branches"?<Building2/>:kind==="users"?<UsersRound/>:<Settings/>}</span><div><strong>{label}</strong><span>{desc}</span><small>{!features?"กำลังตรวจสิทธิ์...":!isAllowed?"ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด":canEdit?"กดเพื่อจัดการ":detail(kind)}</small></div><ChevronRight size={18}/></button>;})}</div>
+    <div className="moduleGrid settingsGrid posMenuGrid">{POS_SETTINGS_MENU_ITEMS.map(item=>{const isAllowed=features?allowed(item.key,item.feature):false;const editable=canEdit(item);const directlyManaged=Boolean(item.target||editable);return <button key={item.key} className={`moduleCard posMenuCard ${isAllowed?"":"locked"} ${isAllowed&&!directlyManaged?"linkedOnly":""}`} disabled={!features||!isAllowed} onClick={()=>activate(item)}><span className="moduleIcon"><SettingsMenuIcon name={item.icon}/></span><div><strong>{item.label}</strong><span>{item.desc}</span><small>{!features?"กำลังตรวจสิทธิ์...":!isAllowed?"ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด":editable?"กดเพื่อจัดการ":item.target?"เปิดใช้งานใน Customer Portal":detail(item)}</small></div><ChevronRight size={18}/></button>;})}</div>
     {snapshot?<article className="panel settingsDataPanel"><div className="panelHeader"><div><p className="eyebrow">CONNECTED POS SETTINGS</p><h3>ข้อมูลที่เชื่อมอยู่</h3></div></div><div className="settingsDataGrid">
       <div><strong>ข้อมูลร้าน</strong><span>{snapshot.store?.company_address||"ยังไม่ได้ระบุที่อยู่"}</span><span>{snapshot.store?.contact_phone||snapshot.store?.owner_phone||"—"}</span></div>
       <div><strong>สาขา</strong>{snapshot.branches.slice(0,5).map(b=><span key={b.id}>{b.name} · {b.is_active?"ใช้งาน":"ปิด"}</span>)}</div>
       <div><strong>อุปกรณ์</strong>{snapshot.devices.slice(0,5).map(d=><span key={d.id}>{d.device_name||d.device_code||"POS"} · {d.status||"—"}</span>)}</div>
       <div><strong>บัญชีรับชำระของร้าน</strong>{snapshot.payment_accounts.slice(0,5).map(a=><span key={a.id}>{a.bank_name||"บัญชี"} · ••••{String(a.account_number||"").slice(-4)}</span>)}</div>
     </div></article>:null}
-    <div className="auditNote">ค่าที่เป็น local ต่อเครื่อง เช่น ภาษา/ตำแหน่งแถบเมนู และฮาร์ดแวร์เครื่องพิมพ์ อ่านสถานะร่วมกันแต่ CRM จะไม่สั่งเปลี่ยนเครื่อง POS โดยตรง</div>
+    <div className="auditNote">เมนูตั้งค่าตรงกับ POS/main แล้ว ค่าที่เป็น local ต่อเครื่อง เช่น ภาษา ตำแหน่งเมนู เครื่องพิมพ์ และบางส่วนของ Customer Display จะยังไม่ถูกสั่งเปลี่ยนจาก CRM โดยตรง</div>
     {editor&&snapshot?<SettingEditorModal kind={editor} context={context} branchId={branchId} snapshot={snapshot} onClose={()=>setEditor(null)} onSaved={refresh} onContextChanged={onContextChanged}/>:null}
+    {linkedItem?<ConnectedPosModuleModal title={linkedItem.label} description={linkedItem.desc} detail={detail(linkedItem)} onClose={()=>setLinkedItem(null)}/>:null}
   </>;
 }
