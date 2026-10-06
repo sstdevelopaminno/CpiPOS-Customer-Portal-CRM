@@ -759,7 +759,7 @@ export default function App() {
   const chooseView=(next:PortalView)=>{setView(next);setMobileOpen(false);};
 
   if(checking)return <div className="bootScreen"><img className="bootLogo" src="/cpipos-logo.png" alt="CpiPOS"/><LoaderCircle className="spin"/><span>กำลังเตรียมข้อมูลร้าน...</span></div>;
-  if(!context)return <Login onSuccess={restore} canInstall={Boolean(installPrompt)&&!standalone&&!installed} onInstall={installApp}/>;
+  if(!context)return <Login onSuccess={restore} canInstall={Boolean(installPrompt)&&!standalone} onInstall={installApp}/>;
 
   const showFilters=view!=="package";
   const showPeriod=view==="dashboard"||view==="sales";
