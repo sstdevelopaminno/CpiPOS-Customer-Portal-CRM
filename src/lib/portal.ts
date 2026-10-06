@@ -89,7 +89,7 @@ export interface PackageInfo {
   }>;
 }
 
-export async function loginWithStorePin(storeCode: string, pin: string) {
+export async function loginWithStoreEmployeeCode(storeCode: string, employeeCode: string) {
   const response = await fetch(`${supabaseUrl}/functions/v1/customer-portal-login`, {
     method: "POST",
     headers: {
@@ -97,7 +97,7 @@ export async function loginWithStorePin(storeCode: string, pin: string) {
       apikey: supabaseKey,
       authorization: `Bearer ${supabaseKey}`
     },
-    body: JSON.stringify({ store_code: storeCode.trim(), pin: pin.trim() })
+    body: JSON.stringify({ store_code: storeCode.trim(), employee_code: employeeCode.trim() })
   });
 
   const payload = await response.json().catch(() => ({})) as {
@@ -108,7 +108,7 @@ export async function loginWithStorePin(storeCode: string, pin: string) {
 
   if (!response.ok || !payload.token_hash) {
     if (response.status === 429) throw new Error("ลองเข้าสู่ระบบหลายครั้งเกินไป กรุณารอประมาณ 15 นาที");
-    if (response.status === 401) throw new Error("รหัสร้านหรือ PIN ไม่ถูกต้อง");
+    if (response.status === 401) throw new Error("รหัสร้านหรือรหัสพนักงานไม่ถูกต้อง");
     throw new Error("ไม่สามารถเข้าสู่ระบบได้ในขณะนี้");
   }
 
