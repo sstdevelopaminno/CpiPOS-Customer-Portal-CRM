@@ -32,5 +32,7 @@ describe("POS menu parity",()=>{
     ]);
     expect(POS_SETTINGS_MENU_ITEMS.some(item=>["support","push"].includes(item.kind))).toBe(false);
     expect(POS_SETTINGS_MENU_ITEMS.find(item=>item.kind==="devices")?.adminModule).toBe("devices");
+    expect(POS_SETTINGS_MENU_ITEMS.find(item=>item.kind==="printers")?.adminModule).toBe("printers");
+    expect(POS_SETTINGS_MENU_ITEMS.find(item=>item.kind==="display")?.adminModule).toBe("display");
   });
 });

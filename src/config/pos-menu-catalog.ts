@@ -55,7 +55,7 @@ export const POS_SETTINGS_MENU_ITEMS: readonly PosSettingsMenuItem[] = [
   { key:"settings.store", posHref:"/preview/pos/settings", label:"ข้อมูลร้านค้า/บริษัท", desc:"รหัสร้าน ชื่อแสดงผล โลโก้ ที่อยู่ และเบอร์ติดต่อ", feature:"core_pos_sales", kind:"store", icon:"store", editorKind:"store" },
   { key:"settings.branches", posHref:"/preview/pos/settings", label:"สาขา", desc:"เปิดสาขา เพิ่ม แก้ไข และจัดการสถานะสาขา", feature:"branch_management", kind:"branches", icon:"branch", editorKind:"branches" },
   { key:"settings.devices", posHref:"/preview/pos/settings", label:"เพิ่มเครื่องแคชเชียร์", desc:"ผูกเครื่อง POS กับสาขา นโยบายล็อกอิน ขอบเขตผู้ใช้ และกะ", feature:"mobile_device_enrollment", kind:"devices", icon:"terminal", adminModule:"devices" },
-  { key:"settings.printers", posHref:"/preview/pos/settings", label:"ตั้งค่าเครื่องพิมพ์", desc:"ใบเสร็จ Print Agent เครื่องพิมพ์ประจำสาขา และลิ้นชักเก็บเงิน", feature:"core_pos_sales", kind:"printers", icon:"printer" },
+  { key:"settings.printers", posHref:"/preview/pos/settings", label:"ตั้งค่าเครื่องพิมพ์", desc:"ใบเสร็จ Print Agent เครื่องพิมพ์ประจำสาขา และลิ้นชักเก็บเงิน", feature:"core_pos_sales", kind:"printers", icon:"printer", adminModule:"printers" },
   { key:"settings.activity", posHref:"/preview/pos/settings", label:"ตรวจสอบพฤติกรรมการใช้งาน", desc:"ติดตามผู้ใช้งาน เมนู เวลา PIN และรายการอนุมัติ", feature:"core_pos_sales", kind:"activity", icon:"activity" },
   { key:"settings.payments", posHref:"/preview/pos/settings", label:"ตั้งค่าชำระเงิน", desc:"บัญชีธนาคาร PromptPay QR และสถานะการใช้งาน", feature:"core_pos_sales", kind:"payments", icon:"payment", editorKind:"payments" },
   { key:"settings.inet_nops", posHref:"/preview/pos/settings", label:"INET QR", desc:"Dynamic QR การเปิดใช้งานรายสาขา และการเชื่อมต่อ UAT", feature:"inet_nops_qr", kind:"inet", icon:"payment" },
@@ -64,7 +64,7 @@ export const POS_SETTINGS_MENU_ITEMS: readonly PosSettingsMenuItem[] = [
   { key:"settings.users", posHref:"/preview/pos/settings", label:"ผู้ใช้งาน", desc:"จัดการพนักงาน สิทธิ์ และ PIN", feature:"user_management", kind:"users", icon:"users", target:"staff" },
   { key:"settings.language", posHref:"/preview/pos/settings", label:"เปลี่ยนภาษา", desc:"สลับภาษาไทยหรืออังกฤษสำหรับหน้าขายและเมนูพนักงาน", feature:"core_pos_sales", kind:"language", icon:"language" },
   { key:"settings.placement", posHref:"/preview/pos/settings", label:"สลับแถบเมนูหลัก", desc:"ย้ายแถบเมนูหลักไปด้านซ้าย ด้านบน หรือด้านล่างของหน้าจอ", feature:"core_pos_sales", kind:"placement", icon:"placement" },
-  { key:"settings.display", posHref:"/preview/pos/customer-display", label:"จอลูกค้า", desc:"ตั้งค่า Customer Display สำหรับหน้าจอที่หันเข้าหาลูกค้า", feature:"customer_facing_display", kind:"display", icon:"display" },
+  { key:"settings.display", posHref:"/preview/pos/customer-display", label:"จอลูกค้า", desc:"ตั้งค่า Customer Display สำหรับหน้าจอที่หันเข้าหาลูกค้า", feature:"customer_facing_display", kind:"display", icon:"display", adminModule:"display" },
   { key:"settings.order_kitchen", posHref:"/preview/pos/settings/order-kitchen", label:"การแจ้งเตือนออเดอร์และครัว", desc:"เปิด/ปิดแจ้งเตือน QR ส่งเข้าครัว และพิมพ์ใบครัวอัตโนมัติ", feature:"kitchen_printing", kind:"orderKitchen", icon:"kitchen", editorKind:"notifications" },
   { key:"settings.table_qr", posHref:"/preview/pos/settings/table-qr", label:"ตั้งค่า QR โต๊ะ", desc:"กำหนดหมดอายุตามเวลา/ชั่วโมง หรือใช้งานตามอายุบิล", feature:"qr_table_ordering", kind:"tableQr", icon:"qr", editorKind:"notifications" }
 ];
