@@ -110,7 +110,10 @@ Deno.serve(async(req)=>{
       const cleanupErrors:string[]=[];
 
       for(const table of ["user_branch_roles","pos_user_profiles","users_profiles"]){
-        const query=admin.from(table).delete().eq("user_id",created.id);
+        const query=admin
+          .from(table)
+          .delete()
+          .eq(table==="users_profiles"?"id":"user_id",created.id);
         const scoped=table==="users_profiles"?query:query.eq("tenant_id",tenantId);
         const {error:cleanupError}=await scoped;
         if(cleanupError)cleanupErrors.push(table+":"+cleanupError.message);
