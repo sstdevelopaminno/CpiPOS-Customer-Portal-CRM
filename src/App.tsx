@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Banknote, Boxes, CalendarDays, ChevronLeft, ChevronRight, CircleAlert, Clock3,
   Download, Eye, LayoutDashboard, LoaderCircle, LogOut, Menu, PackageCheck,
@@ -334,19 +334,26 @@ function SalesView({ context, branchId, range, anchor }: { context: PortalContex
   const [totalCount,setTotalCount]=useState(0);
   const [salesTotal,setSalesTotal]=useState(0);
   const pageSize=100;
+  const requestIdRef=useRef(0);
 
   useEffect(()=>{setPage(0);},[context.tenantId,branchId,range,anchor]);
 
   const refresh=useCallback(async()=>{
+    const requestId=++requestIdRef.current;
     setLoading(true);setError("");
     try{
       const result=await loadSales(context.tenantId,branchId,range,anchor,page,pageSize);
+      if(requestId!==requestIdRef.current)return;
       setRows(result.rows);
       setTotalCount(result.total);
       setSalesTotal(result.salesTotal);
     }
-    catch{setError("ไม่สามารถโหลดรายการขายได้");}
-    finally{setLoading(false);}
+    catch{
+      if(requestId===requestIdRef.current)setError("ไม่สามารถโหลดรายการขายได้");
+    }
+    finally{
+      if(requestId===requestIdRef.current)setLoading(false);
+    }
   },[context.tenantId,branchId,range,anchor,page]);
 
   useEffect(()=>{void refresh();},[refresh]);
