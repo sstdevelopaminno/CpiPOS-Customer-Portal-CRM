@@ -266,7 +266,7 @@ export function SettingsView({context,branchId,onNavigate,onContextChanged}:{con
       <div><strong>อุปกรณ์</strong>{snapshot.devices.slice(0,5).map(d=><span key={d.id}>{d.device_name||d.device_code||"POS"} · {d.status||"—"}</span>)}</div>
       <div><strong>บัญชีรับชำระของร้าน</strong>{snapshot.payment_accounts.slice(0,5).map(a=><span key={a.id}>{a.bank_name||"บัญชี"} · ••••{String(a.account_number||"").slice(-4)}</span>)}</div>
     </div></article>:null}
-    <div className="auditNote">เครื่องแคชเชียร์จัดการเพิ่ม แก้ไข ลบจาก Customer Portal ได้แล้วพร้อมโควตาและ revoke session; ค่า local เช่น ภาษา ตำแหน่งเมนู และการเชื่อมต่อฮาร์ดแวร์เครื่องพิมพ์ยังคงแยกตามเครื่อง POS</div>
+    <div className="auditNote">เครื่องแคชเชียร์ เครื่องพิมพ์ และ Customer Display pairing จัดการจาก Customer Portal ได้แล้ว; การค้นหา USB/Bluetooth จริงและค่า local เช่นภาษา/ตำแหน่งเมนูยังทำที่เครื่อง POS/Print Agent</div>
     {editor&&snapshot?<SettingEditorModal kind={editor} context={context} branchId={branchId} snapshot={snapshot} onClose={()=>setEditor(null)} onSaved={refresh} onContextChanged={onContextChanged}/>:null}
     {linkedItem?<ConnectedPosModuleModal title={linkedItem.label} description={linkedItem.desc} detail={detail(linkedItem)} onClose={()=>setLinkedItem(null)}/>:null}
   </>;

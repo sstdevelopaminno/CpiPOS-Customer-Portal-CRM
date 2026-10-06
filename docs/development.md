@@ -27,3 +27,7 @@ Writable parity is enabled for tables/zones, members, kitchen zones/KDS/routing,
 ## POS administration control-plane
 
 Migration `customer_portal_pos_admin_crud_parity` adds authenticated Owner/Manager RPCs for shared POS back-office data. Every mutation is tenant/branch scoped, package-feature gated, IT menu-policy gated, and audit logged. Cashier-device provisioning also honors contract quota and revokes active POS sessions when device identity changes or a device is removed.
+
+## POS administration phase 2
+
+Customer Portal now manages the shared table floor plan, floor objects, product-level kitchen routing, printer profiles/registry assignments, and Customer Display pairing lifecycle. Customer Display device limits and inactivity policy remain IT-owned. USB/Bluetooth physical discovery remains a local POS/Print Agent responsibility; the portal manages the shared configuration after registration.

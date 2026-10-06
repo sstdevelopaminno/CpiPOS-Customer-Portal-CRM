@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 const root=process.cwd();
 const sql=readFileSync(join(root,"supabase/sql/customer_portal_pos_admin_crud_parity.sql"),"utf8");
+const phase2=readFileSync(join(root,"supabase/sql/customer_portal_pos_admin_phase2.sql"),"utf8");
 
 describe("POS admin control-plane",()=>{
   it("requires feature and menu policy before mutations",()=>{
@@ -21,6 +22,14 @@ describe("POS admin control-plane",()=>{
     const lockdown=readFileSync(join(root,"supabase/sql/customer_portal_pos_admin_helper_lockdown.sql"),"utf8");
     expect(lockdown).toContain("from public,anon,authenticated");
     expect(lockdown).toContain("to service_role");
+  });
+  it("phase2 keeps printer, display and floor-plan control server-side",()=>{
+    expect(phase2).toContain("customer_portal_pos_admin_phase2_snapshot");
+    expect(phase2).toContain("customer_portal_pos_admin_phase2_mutate");
+    expect(phase2).toContain("printer_device_assignments");
+    expect(phase2).toContain("display.pairing.create");
+    expect(phase2).toContain("floor_plan.save");
+    expect(phase2).not.toContain("display.policy.save");
   });
   it("audits Customer Portal mutations",()=>{
     expect(sql).toContain("insert into public.audit_logs");
