@@ -855,7 +855,23 @@ function MoreView({context,branchId,onNavigate}:{context:PortalContext;branchId:
   const [state,setState]=useState<FeatureState|null>(null);
   const [snapshot,setSnapshot]=useState<MoreSnapshot|null>(null);
   const [error,setError]=useState("");
-  useEffect(()=>{Promise.all([loadFeatureState(context.tenantId,branchId),loadMoreSnapshot(context.tenantId,branchId)]).then(([features,data])=>{setState(features);setSnapshot(data);}).catch(()=>setError("ไม่สามารถตรวจสอบสิทธิ์เมนูเพิ่มเติมได้"));},[context.tenantId,branchId]);
+  useEffect(()=>{
+    let active=true;
+    setState(null);
+    setSnapshot(null);
+    setError("");
+    Promise.all([
+      loadFeatureState(context.tenantId,branchId),
+      loadMoreSnapshot(context.tenantId,branchId)
+    ]).then(([features,data])=>{
+      if(!active)return;
+      setState(features);
+      setSnapshot(data);
+    }).catch(()=>{
+      if(active)setError("ไม่สามารถตรวจสอบสิทธิ์เมนูเพิ่มเติมได้");
+    });
+    return()=>{active=false;};
+  },[context.tenantId,branchId]);
   const enabled=(item:MoreItem)=>{
     const menu=state?.menu_policy?.[item.key]!==false;
     const base=state?.package_features?.[item.feature]??false;
@@ -979,6 +995,11 @@ function SettingEditorModal({
 
   async function submit(event:React.FormEvent){
     event.preventDefault();setBusy(true);setError("");
+    if(kind==="payments"&&accountDraft.qr_mode==="promptpay_link"&&!accountDraft.promptpay_phone.trim()){
+      setError("กรุณาระบุหมายเลข PromptPay");
+      setBusy(false);
+      return;
+    }
     try{
       if(kind==="store")await saveSetting(context.tenantId,null,"update_store",storeDraft);
       if(kind==="branches")await saveSetting(context.tenantId,branchDraft.id||null,"save_branch",branchDraft);
@@ -1017,7 +1038,7 @@ function SettingEditorModal({
           <label><span>ธนาคาร</span><input value={accountDraft.bank_name} onChange={e=>setAccountDraft({...accountDraft,bank_name:e.target.value})} required/></label>
           <label><span>ชื่อบัญชี</span><input value={accountDraft.account_name} onChange={e=>setAccountDraft({...accountDraft,account_name:e.target.value})}/></label>
           <label><span>เลขบัญชี</span><input value={accountDraft.account_number} onChange={e=>setAccountDraft({...accountDraft,account_number:e.target.value})}/></label>
-          <label><span>PromptPay</span><input value={accountDraft.promptpay_phone} onChange={e=>setAccountDraft({...accountDraft,promptpay_phone:e.target.value})}/></label>
+          <label><span>PromptPay</span><input value={accountDraft.promptpay_phone} onChange={e=>setAccountDraft({...accountDraft,promptpay_phone:e.target.value})} required={accountDraft.qr_mode==="promptpay_link"} placeholder={accountDraft.qr_mode==="promptpay_link"?"ระบุหมายเลข PromptPay":undefined}/></label>
           <label><span>รูปแบบ QR</span><select value={accountDraft.qr_mode} onChange={e=>setAccountDraft({...accountDraft,qr_mode:e.target.value})}><option value="promptpay_link">PromptPay</option><option value="qr_image">รูป QR</option></select></label>
           {accountDraft.qr_mode==="qr_image"?<label className="span2"><span>URL / พาธรูป QR</span><input value={accountDraft.qr_image_url} onChange={e=>setAccountDraft({...accountDraft,qr_image_url:e.target.value})} placeholder="https://... หรือพาธรูป QR ที่ระบบ POS ใช้งาน" required/><small>ใช้รูป QR เดียวกับที่ POS อ่านจากบัญชีรับชำระ</small></label>:null}
           <label className="switchField"><input type="checkbox" checked={accountDraft.applies_to_all_branches} onChange={e=>setAccountDraft({...accountDraft,applies_to_all_branches:e.target.checked})}/><span>ใช้ทุกสาขา</span></label>
