@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  BadgeThaiBaht, Boxes, ChevronRight, CircleAlert, Clock3, LayoutDashboard, LoaderCircle,
+  Banknote, Boxes, ChevronRight, CircleAlert, Clock3, LayoutDashboard, LoaderCircle,
   LogOut, PackageCheck, ReceiptText, RefreshCw, ShieldCheck, Store, TrendingUp,
   UserRoundCheck, Warehouse
 } from "lucide-react";
@@ -72,7 +72,7 @@ function DashboardView({context}:{context:PortalContext}) {
   return <>
     <div className="pageHeading"><div><p className="eyebrow">TODAY OVERVIEW</p><h2>ภาพรวมวันนี้</h2><p>ข้อมูลสดจาก CpiPOS-001 ตามสิทธิ์สาขาของบัญชีนี้</p></div><button className="ghostButton" onClick={()=>void refresh()}><RefreshCw size={17}/>รีเฟรช</button></div>
     <section className="metricsGrid">
-      <MetricCard icon={<BadgeThaiBaht/>} label="ยอดขายวันนี้" value={money.format(summary?.sales_total??0)} helper="เฉพาะบิลสำเร็จ"/>
+      <MetricCard icon={<Banknote/>} label="ยอดขายวันนี้" value={money.format(summary?.sales_total??0)} helper="เฉพาะบิลสำเร็จ"/>
       <MetricCard icon={<ReceiptText/>} label="จำนวนบิล" value={number.format(summary?.order_count??0)} helper="รายการขายวันนี้"/>
       <MetricCard icon={<TrendingUp/>} label="ยอดเฉลี่ยต่อบิล" value={money.format(summary?.average_ticket??0)} helper="Average ticket"/>
       <MetricCard icon={<Clock3/>} label="กะที่เปิดอยู่" value={number.format(summary?.open_shifts??0)} helper="ตามสาขาที่เข้าถึงได้"/>
