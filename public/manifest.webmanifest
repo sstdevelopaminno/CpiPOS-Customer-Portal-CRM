@@ -10,7 +10,10 @@
   "lang": "th",
   "theme_color": "#0b294d",
   "background_color": "#f3f7fb",
-  "categories": ["business", "productivity"],
+  "categories": [
+    "business",
+    "productivity"
+  ],
   "icons": [
     {
       "src": "/pwa-icon.svg",
