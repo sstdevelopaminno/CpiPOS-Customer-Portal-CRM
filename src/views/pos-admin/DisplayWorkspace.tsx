@@ -12,7 +12,7 @@ export function DisplayWorkspace({context,branchId}:{context:PortalContext;branc
   const [error,setError]=useState("");
   const [busy,setBusy]=useState(false);
   const [code,setCode]=useState<NewCode|null>(null);
-  const refresh=useCallback(async()=>{setBusy(true);setError("");try{setData(await loadPosAdminSnapshot(context.tenantId,branchId,"display"));}catch(e){setError(e instanceof Error?e.message:"โหลด Customer Display ไม่สำเร็จ");}finally{setBusy(false);}},[context.tenantId,branchId]);
+  const refresh=useCallback(async()=>{setBusy(true);setError("");try{setData(await loadPosAdminSnapshot<DisplayAdminSnapshot>(context.tenantId,branchId,"display"));}catch(e){setError(e instanceof Error?e.message:"โหลด Customer Display ไม่สำเร็จ");}finally{setBusy(false);}},[context.tenantId,branchId]);
   useEffect(()=>{void refresh();},[refresh]);
   async function create(){
     setBusy(true);setError("");

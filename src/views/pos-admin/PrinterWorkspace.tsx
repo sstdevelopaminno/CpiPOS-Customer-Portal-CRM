@@ -16,7 +16,7 @@ export function PrinterWorkspace({context,branchId}:{context:PortalContext;branc
   const [error,setError]=useState("");
   const [busy,setBusy]=useState(false);
   const [editor,setEditor]=useState<Editor|null|undefined>(undefined);
-  const refresh=useCallback(async()=>{setBusy(true);setError("");try{setData(await loadPosAdminSnapshot(context.tenantId,branchId,"printers"));}catch(e){setError(e instanceof Error?e.message:"โหลดเครื่องพิมพ์ไม่สำเร็จ");}finally{setBusy(false);}},[context.tenantId,branchId]);
+  const refresh=useCallback(async()=>{setBusy(true);setError("");try{setData(await loadPosAdminSnapshot<PrintersAdminSnapshot>(context.tenantId,branchId,"printers"));}catch(e){setError(e instanceof Error?e.message:"โหลดเครื่องพิมพ์ไม่สำเร็จ");}finally{setBusy(false);}},[context.tenantId,branchId]);
   useEffect(()=>{void refresh();},[refresh]);
   const byProfile=useMemo(()=>new Map((data?.devices??[]).filter(d=>d.printer_profile_id).map(d=>[d.printer_profile_id!,d])),[data]);
   function edit(profile:PrinterProfileAdmin|null){const device=profile?byProfile.get(profile.id)??null:null;setEditor({profile,device,assignments:device?.assignments??[]});}
