@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#0b294d"/>
+  <circle cx="256" cy="256" r="178" fill="#ffffff"/>
+  <image href="/cpipos-logo.png" x="118" y="118" width="276" height="276" preserveAspectRatio="xMidYMid meet"/>
+</svg>

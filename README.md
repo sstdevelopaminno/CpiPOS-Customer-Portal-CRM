@@ -16,3 +16,11 @@ The design intentionally minimizes Vercel Fluid Active CPU usage.
 ## Phase 1 status
 
 Foundation implementation is tracked in PR #1.
+
+## Progressive Web App
+
+- Installable on supported desktop/mobile browsers
+- Standalone app mode with CpiPOS branding
+- Service worker caches only same-origin static app-shell assets
+- Supabase/Auth/business-data requests are intentionally never intercepted or cached
+- The portal remains a static Vite deployment and does not add Vercel Functions
