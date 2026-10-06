@@ -2,7 +2,7 @@ import { supabase } from "../supabase";
 import { getReportWindow } from "../reporting";
 import { explainMutationError } from "../errors";
 import { orderSelect } from "../order-fields";
-import type { OrderItemRow, OrderRow, ReportRange } from "../../types/portal";
+import type { DashboardSummary, OrderItemRow, OrderRow, ReportRange } from "../../types/portal";
 
 export async function loadSales(
   tenantId: string,
