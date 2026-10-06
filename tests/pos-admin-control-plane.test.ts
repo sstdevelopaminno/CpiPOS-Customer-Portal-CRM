@@ -17,6 +17,11 @@ describe("POS admin control-plane",()=>{
     expect(sql).toContain("update public.pos_sessions set status='revoked'");
     expect(sql).toContain("device_quota_blocked");
   });
+  it("locks internal SECURITY DEFINER helpers away from browser roles",()=>{
+    const lockdown=readFileSync(join(root,"supabase/sql/customer_portal_pos_admin_helper_lockdown.sql"),"utf8");
+    expect(lockdown).toContain("from public,anon,authenticated");
+    expect(lockdown).toContain("to service_role");
+  });
   it("audits Customer Portal mutations",()=>{
     expect(sql).toContain("insert into public.audit_logs");
     expect(sql).toContain("'source','customer_portal'");
