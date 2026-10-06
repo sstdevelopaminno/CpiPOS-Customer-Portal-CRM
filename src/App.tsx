@@ -462,6 +462,8 @@ function ProductsView({ context, branchId }: { context: PortalContext; branchId:
   const [query,setQuery]=useState("");
   const [editing,setEditing]=useState<ProductRow|null|undefined>(undefined);
   const [error,setError]=useState("");
+  const [page,setPage]=useState(0);
+  const pageSize=20;
 
   const refresh=useCallback(async()=>{
     setLoading(true);setError("");
@@ -471,11 +473,14 @@ function ProductsView({ context, branchId }: { context: PortalContext; branchId:
   },[context.tenantId,branchId]);
 
   useEffect(()=>{void refresh();},[refresh]);
+  useEffect(()=>{setPage(0);},[branchId,query]);
 
   const filtered=rows.filter(row=>{
     const q=query.trim().toLowerCase();
     return !q||[row.sku,row.name,row.category].some(value=>String(value??"").toLowerCase().includes(q));
   });
+  const pageCount=Math.max(1,Math.ceil(filtered.length/pageSize));
+  const visible=filtered.slice(page*pageSize,(page+1)*pageSize);
 
   async function remove(row:ProductRow){
     if(!window.confirm(`ลบสินค้า “${row.name}” ? สินค้าจะถูก soft-delete และเก็บประวัติไว้`))return;
@@ -484,21 +489,26 @@ function ProductsView({ context, branchId }: { context: PortalContext; branchId:
   }
 
   return <>
-    <div className="pageHeading"><div><p className="eyebrow">PRODUCTS</p><h2>สินค้า</h2><p>รูปสินค้า รหัสสินค้า ราคา สถานะ และจำนวนพร้อมขายจากสูตรวัตถุดิบ</p></div><button className="primaryAction" onClick={()=>setEditing(null)}><Plus size={18}/>เพิ่มสินค้า</button></div>
+    <div className="pageHeading"><div><p className="eyebrow">PRODUCTS</p><h2>สินค้า</h2><p>ตรวจสอบรหัสสินค้า รูป ราคา จำนวนพร้อมขาย สาขา และสถานะในตารางเดียว</p></div><button className="primaryAction" onClick={()=>setEditing(null)}><Plus size={18}/>เพิ่มสินค้า</button></div>
     <div className="toolbar"><label className="searchBox"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="ค้นหา SKU ชื่อสินค้า หมวดหมู่..."/></label><span className="toolbarCount">{filtered.length} รายการ</span></div>
     {error?<ErrorPanel message={error}/>:null}
-    <article className="panel productPanel">{loading?<div className="loadingPanel"><LoaderCircle className="spin"/>กำลังโหลดสินค้า...</div>:filtered.length?
-      <div className="productGrid">{filtered.map(row=><article className="productCard" key={row.id}>
-        <div className="productImage">{row.image_url?<img src={row.image_url} alt={row.name} loading="lazy"/>:<Boxes size={30}/>}<span className={row.is_active?"activeDot":"inactiveDot"}/></div>
-        <div className="productBody">
-          <div className="productCode">{row.sku}</div>
-          <h3>{row.name}</h3>
-          <p>{row.category}</p>
-          <div className="productStats"><div><span>ราคา</span><strong>{money.format(Number(row.price))}</strong></div><div><span>จำนวน</span><strong>{row.available_quantity==null?"—":number.format(Number(row.available_quantity))}</strong></div></div>
-          <div className="productMeta"><span>{branchName(context,row.branch_id)}</span><span>{row.recipe_count>0?`สูตร ${row.recipe_count}`:"ไม่มีสูตร"}</span></div>
-          <div className="cardActions"><button onClick={()=>setEditing(row)}><Pencil size={16}/>แก้ไข</button><button className="dangerText" onClick={()=>void remove(row)}><Trash2 size={16}/>ลบ</button></div>
-        </div>
-      </article>)}</div>:<Empty>ยังไม่มีสินค้า</Empty>}</article>
+    <article className="panel tablePanel productTablePanel">{loading?<div className="loadingPanel"><LoaderCircle className="spin"/>กำลังโหลดสินค้า...</div>:visible.length?
+      <div className="tableWrap boundedTable"><table className="productTable"><thead><tr><th>รูป</th><th>รหัสสินค้า</th><th>ชื่อสินค้า</th><th>หมวดหมู่</th><th>สาขา</th><th className="right">ราคา</th><th className="right">จำนวน</th><th>หน่วย</th><th>สถานะ</th><th></th></tr></thead><tbody>
+        {visible.map(row=><tr key={row.id}>
+          <td><div className="tableThumb">{row.image_url?<img src={row.image_url} alt={row.name} loading="lazy"/>:<Boxes size={19}/>}</div></td>
+          <td><strong className="monoCode">{row.sku}</strong></td>
+          <td><strong>{row.name}</strong></td>
+          <td>{row.category||"—"}</td>
+          <td>{branchName(context,row.branch_id)}</td>
+          <td className="right"><strong>{money.format(Number(row.price))}</strong></td>
+          <td className="right">{row.available_quantity==null?"—":number.format(Number(row.available_quantity))}</td>
+          <td>{row.sell_unit||"unit"}</td>
+          <td><span className={row.is_active?"status status-completed":"status status-cancelled"}>{row.is_active?"เปิดขาย":"ปิดขาย"}</span></td>
+          <td className="right"><div className="inlineActions"><button className="tableAction" onClick={()=>setEditing(row)}><Pencil size={15}/>แก้ไข</button><button className="tableAction dangerText" onClick={()=>void remove(row)}><Trash2 size={15}/>ลบ</button></div></td>
+        </tr>)}
+      </tbody></table></div>:<Empty>ยังไม่มีสินค้า</Empty>}
+      <Pagination page={page} pageCount={pageCount} onPageChange={setPage} disabled={loading}/>
+    </article>
     {editing!==undefined?<ProductForm context={context} initial={editing} defaultBranch={branchId??""} onClose={()=>setEditing(undefined)} onSaved={refresh}/>:null}
   </>;
 }
@@ -542,37 +552,65 @@ function StockForm({
   </Modal>;
 }
 
+function stockDisplay(row:StockRow){
+  const match=row.name.match(/^STOCK:([^:]+):(.+)$/i);
+  return {
+    code:match?.[1]??("ING-"+row.id.slice(0,8).toUpperCase()),
+    name:match?.[2]??row.name
+  };
+}
+
 function StockView({ context, branchId }: { context: PortalContext; branchId: string | null }) {
   const [rows, setRows] = useState<StockRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [query,setQuery]=useState("");
   const [editing,setEditing]=useState<StockRow|null|undefined>(undefined);
   const [error,setError]=useState("");
+  const [page,setPage]=useState(0);
+  const pageSize=20;
 
   const refresh=useCallback(async()=>{
     setLoading(true);setError("");
     try{setRows(await loadStock(context.tenantId,branchId));}
-    catch{setError("ไม่สามารถโหลดสต๊อกได้");}
+    catch{setError("ไม่สามารถโหลดข้อมูลวัตถุดิบได้");}
     finally{setLoading(false);}
   },[context.tenantId,branchId]);
   useEffect(()=>{void refresh();},[refresh]);
+  useEffect(()=>{setPage(0);},[branchId,query]);
 
-  const filtered=rows.filter(row=>!query.trim()||row.name.toLowerCase().includes(query.trim().toLowerCase()));
+  const filtered=rows.filter(row=>{
+    const q=query.trim().toLowerCase();
+    const display=stockDisplay(row);
+    return !q||display.name.toLowerCase().includes(q)||display.code.toLowerCase().includes(q);
+  });
+  const pageCount=Math.max(1,Math.ceil(filtered.length/pageSize));
+  const visible=filtered.slice(page*pageSize,(page+1)*pageSize);
 
   async function remove(row:StockRow){
-    if(!window.confirm(`ลบวัตถุดิบ “${row.name}” ? หากมีสูตรหรือประวัติสต๊อก ระบบจะไม่อนุญาตให้ลบ`))return;
+    const display=stockDisplay(row);
+    if(!window.confirm(`ลบวัตถุดิบ “${display.name}” ? หากมีสูตรหรือประวัติสต๊อก ระบบจะไม่อนุญาตให้ลบ`))return;
     try{await deleteStock(context.tenantId,row);await refresh();}
     catch(err){setError(err instanceof Error?err.message:"ลบวัตถุดิบไม่สำเร็จ");}
   }
 
   return <>
-    <div className="pageHeading"><div><p className="eyebrow">INVENTORY</p><h2>วัตถุดิบและสต๊อก</h2><p>ดูจำนวนคงเหลือ จุดสั่งซื้อ ต้นทุน และปรับสต๊อกพร้อมบันทึก movement</p></div><button className="primaryAction" onClick={()=>setEditing(null)}><Plus size={18}/>เพิ่มวัตถุดิบ</button></div>
-    <div className="toolbar"><label className="searchBox"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="ค้นหาวัตถุดิบ..."/></label><span className="toolbarCount">{filtered.length} รายการ</span></div>
+    <div className="pageHeading"><div><p className="eyebrow">INVENTORY</p><h2>วัตถุดิบ</h2><p>ตรวจสอบรหัส ชื่อ สาขา หน่วย คงเหลือ จุดสั่งซื้อ ต้นทุนเฉลี่ย และสถานะ</p></div><button className="primaryAction" onClick={()=>setEditing(null)}><Plus size={18}/>เพิ่มวัตถุดิบ</button></div>
+    <div className="toolbar"><label className="searchBox"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="ค้นหารหัสหรือชื่อวัตถุดิบ..."/></label><span className="toolbarCount">{filtered.length} รายการ</span></div>
     {error?<ErrorPanel message={error}/>:null}
-    <article className="panel tablePanel">{loading?<div className="loadingPanel"><LoaderCircle className="spin"/>กำลังโหลดสต๊อก...</div>:filtered.length?
-      <div className="tableWrap"><table><thead><tr><th>วัตถุดิบ</th><th>สาขา</th><th>หน่วย</th><th className="right">คงเหลือ</th><th className="right">จุดสั่งซื้อ</th><th className="right">ต้นทุนเฉลี่ย</th><th>สถานะ</th><th></th></tr></thead><tbody>
-        {filtered.map(row=>{const low=Number(row.quantity_on_hand)<=Number(row.reorder_level);return <tr key={row.id}><td><strong>{row.name}</strong></td><td>{branchName(context,row.branch_id)}</td><td>{row.base_unit}</td><td className="right">{number.format(Number(row.quantity_on_hand))}</td><td className="right">{number.format(Number(row.reorder_level))}</td><td className="right">{money.format(Number(row.avg_unit_cost))}</td><td><span className={low?"status status-cancelled":"status status-completed"}>{low?"ควรสั่งเพิ่ม":"ปกติ"}</span></td><td className="right"><div className="inlineActions"><button className="tableAction" onClick={()=>setEditing(row)}><Pencil size={15}/>แก้ไข</button><button className="tableAction dangerText" onClick={()=>void remove(row)}><Trash2 size={15}/>ลบ</button></div></td></tr>;})}
-      </tbody></table></div>:<Empty>ยังไม่มีข้อมูลวัตถุดิบ</Empty>}</article>
+    <article className="panel tablePanel">{loading?<div className="loadingPanel"><LoaderCircle className="spin"/>กำลังโหลดวัตถุดิบ...</div>:visible.length?
+      <div className="tableWrap boundedTable"><table><thead><tr><th>รหัสสินค้า</th><th>ชื่อสินค้า</th><th>สาขา</th><th>หน่วย</th><th className="right">คงเหลือ</th><th className="right">จุดสั่งซื้อ</th><th className="right">ต้นทุนเฉลี่ย</th><th>สถานะ</th><th></th></tr></thead><tbody>
+        {visible.map(row=>{const low=Number(row.quantity_on_hand)<=Number(row.reorder_level);const display=stockDisplay(row);return <tr key={row.id}>
+          <td><strong className="monoCode">{display.code}</strong></td><td><strong>{display.name}</strong></td>
+          <td>{branchName(context,row.branch_id)}</td><td>{row.base_unit}</td>
+          <td className="right">{number.format(Number(row.quantity_on_hand))}</td>
+          <td className="right">{number.format(Number(row.reorder_level))}</td>
+          <td className="right">{money.format(Number(row.avg_unit_cost))}</td>
+          <td><span className={low?"status status-cancelled":"status status-completed"}>{low?"ควรสั่งเพิ่ม":"ปกติ"}</span></td>
+          <td className="right"><div className="inlineActions"><button className="tableAction" onClick={()=>setEditing(row)}><Pencil size={15}/>แก้ไข</button><button className="tableAction dangerText" onClick={()=>void remove(row)}><Trash2 size={15}/>ลบ</button></div></td>
+        </tr>;})}
+      </tbody></table></div>:<Empty>ยังไม่มีข้อมูลวัตถุดิบ</Empty>}
+      <Pagination page={page} pageCount={pageCount} onPageChange={setPage} disabled={loading}/>
+    </article>
     {editing!==undefined?<StockForm context={context} initial={editing} defaultBranch={branchId??""} onClose={()=>setEditing(undefined)} onSaved={refresh}/>:null}
   </>;
 }
