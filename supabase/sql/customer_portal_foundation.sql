@@ -61,3 +61,24 @@ begin
 end;$$;
 revoke all on function public.customer_portal_dashboard(uuid,timestamptz,timestamptz) from public,anon;
 grant execute on function public.customer_portal_dashboard(uuid,timestamptz,timestamptz) to authenticated;
+
+
+-- Owner Portal billing visibility for tenant-level cycles that do not carry branch_id.
+drop policy if exists tenant_billing_cycles_portal_owner_read on public.tenant_billing_cycles;
+create policy tenant_billing_cycles_portal_owner_read
+on public.tenant_billing_cycles
+for select
+to authenticated
+using (
+  exists (
+    select 1
+    from public.user_branch_roles ubr
+    join public.users_profiles up
+      on up.id=ubr.user_id
+     and up.is_active=true
+     and up.archived_at is null
+    where ubr.user_id=(select auth.uid())
+      and ubr.tenant_id=tenant_billing_cycles.tenant_id
+      and ubr.role::text='owner'
+  )
+);
