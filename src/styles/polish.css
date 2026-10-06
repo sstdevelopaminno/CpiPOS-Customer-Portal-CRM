@@ -1,0 +1,377 @@
+/* Customer Portal UI polish v5 — visual/responsive only */
+html{background:var(--page);scroll-behavior:smooth}
+body{background:var(--page);color:var(--text);line-height:1.45}
+button,input,select,textarea{font:inherit}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{
+  outline:3px solid rgba(38,126,202,.18);
+  outline-offset:2px;
+}
+button:disabled{cursor:not-allowed}
+.appShell{background:var(--page)}
+.sidebar{
+  background:linear-gradient(180deg,#082847 0%,#092d52 62%,#082442 100%);
+  border-right:1px solid rgba(255,255,255,.04);
+}
+.sidebarTop{min-height:48px}
+.brandBlock{min-width:0}
+.brandBlock strong{letter-spacing:-.015em}
+.brandBlock span{letter-spacing:.05em}
+.storeCard{
+  padding:13px 12px;
+  border-radius:15px;
+  background:rgba(255,255,255,.075);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035);
+}
+.storeAvatar{width:42px;height:42px;border-radius:11px;flex:0 0 auto}
+.sidebar nav{
+  min-height:0;
+  overflow-y:auto;
+  overflow-x:hidden;
+  padding-right:2px;
+  scrollbar-width:thin;
+  scrollbar-color:rgba(255,255,255,.16) transparent;
+}
+.sidebar nav button{
+  min-height:46px;
+  border-radius:11px;
+  transition:background .16s ease,color .16s ease,transform .16s ease;
+}
+.sidebar nav button:hover{transform:translateX(1px);background:rgba(67,150,231,.16)}
+.sidebar nav button.active{
+  background:linear-gradient(90deg,rgba(49,142,228,.26),rgba(49,142,228,.14));
+  box-shadow:inset 3px 0 #5eb2ff,0 5px 14px rgba(0,0,0,.08);
+}
+.sidebarBottom{
+  padding-top:12px;
+  border-top:1px solid rgba(255,255,255,.07);
+}
+.sidebarInstallButton,.roleBadge,.logoutButton{min-height:42px}
+.logoutButton{border-radius:10px}
+.logoutButton:hover{background:rgba(255,255,255,.06);color:#fff}
+
+.content{
+  width:100%;
+  max-width:1720px;
+  margin:0 auto;
+  padding:30px 34px 24px;
+}
+.portalFilters{
+  position:sticky;
+  top:12px;
+  z-index:18;
+  min-height:64px;
+  padding:10px 14px;
+  margin-bottom:22px;
+  border-color:rgba(201,216,230,.9);
+  box-shadow:0 8px 22px rgba(22,61,96,.055);
+  backdrop-filter:blur(12px);
+  background:rgba(255,255,255,.94);
+}
+.branchFilter select,.anchorPicker{
+  background:#fff;
+  border-color:var(--line-strong);
+}
+.rangeTabs{padding:4px;background:#edf3f8}
+.rangeTabs button{min-height:34px;min-width:62px}
+.rangeTabs button.active{box-shadow:0 3px 10px rgba(29,80,126,.12)}
+
+.pageHeading{
+  margin:4px 0 20px;
+  align-items:center;
+}
+.pageHeading h2{
+  font-size:31px;
+  line-height:1.18;
+  letter-spacing:-.025em;
+}
+.pageHeading>div{min-width:0}
+.pageHeading p{max-width:760px}
+.eyebrow{letter-spacing:.16em}
+.ghostButton,.primaryAction,.secondaryButton,.dangerButton,.tableAction,.iconButton{
+  transition:transform .14s ease,box-shadow .14s ease,border-color .14s ease,background .14s ease;
+}
+.ghostButton:hover,.secondaryButton:hover,.tableAction:hover,.iconButton:hover{
+  transform:translateY(-1px);
+  border-color:#a9c9e5;
+  box-shadow:0 5px 12px rgba(25,77,120,.07);
+}
+.primaryAction:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 10px 22px rgba(18,95,168,.22)}
+
+.metricsGrid{gap:14px;margin-bottom:16px}
+.metricCard{
+  min-height:112px;
+  padding:18px 19px;
+  border-radius:17px;
+  box-shadow:var(--shadow-sm);
+}
+.metricIcon{
+  width:48px;
+  height:48px;
+  border-radius:13px;
+  background:linear-gradient(145deg,#eef7ff,#e3f1fd);
+}
+.metricCard strong{letter-spacing:-.02em}
+.metricCard small{line-height:1.45}
+
+.panel{
+  border-radius:17px;
+  border-color:var(--line);
+  box-shadow:var(--shadow-sm);
+}
+.panelHeader{
+  min-height:66px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:16px 18px;
+  background:linear-gradient(180deg,#fff,#fdfefe);
+}
+.panelHeader h3{font-size:17px;letter-spacing:-.01em}
+.splitGrid{gap:16px}
+.dashboardScroll{
+  max-height:340px;
+  scrollbar-width:thin;
+  scrollbar-color:#c2d4e4 transparent;
+}
+.dataRow{min-height:62px;padding:14px 18px}
+.dataRow:hover{background:#f8fbfe}
+.healthList{padding:8px 18px 11px}
+.healthList>div{min-height:52px}
+.topProductsPanel{margin-top:16px}
+.topProductsList{padding:10px 18px 16px}
+.topProductRow{padding:9px 0}
+.topProductRank{width:30px;height:30px}
+.topProductTrack{height:7px}
+
+.toolbar{margin:0 0 15px}
+.searchBox{
+  height:46px;
+  border-radius:12px;
+  box-shadow:0 2px 8px rgba(23,66,102,.025);
+}
+.searchBox:focus-within{
+  border-color:#7fb2de;
+  box-shadow:0 0 0 3px rgba(47,133,206,.08);
+}
+.toolbarCount{font-size:12px;color:#6e8297}
+
+.tablePanel{min-height:300px}
+.tableWrap{
+  width:100%;
+  overflow:auto;
+  overscroll-behavior:contain;
+  scrollbar-width:thin;
+  scrollbar-color:#bfd0df transparent;
+}
+.boundedTable{max-height:min(66vh,720px)}
+table{font-variant-numeric:tabular-nums}
+th{
+  height:44px;
+  color:#5d748b;
+  letter-spacing:.07em;
+  background:#f5f9fc;
+}
+td{height:55px;color:#4b657e}
+tbody tr{transition:background .12s ease}
+tbody tr:hover{background:#f8fbfe}
+.boundedTable thead th{
+  top:0;
+  background:#f5f9fc;
+  box-shadow:0 1px 0 #dce7f1,0 5px 12px rgba(31,72,108,.03);
+}
+.tableThumb{width:62px;height:50px}
+.inlineActions{gap:7px}
+.tableAction{min-height:34px;padding:7px 10px}
+.status{min-height:24px;align-items:center}
+.monoCode{font-size:11px;word-break:break-all}
+
+.paginationBar{
+  position:relative;
+  min-height:62px;
+  gap:14px;
+  padding:12px 16px;
+  background:#fbfdff;
+}
+.paginationBar>.secondaryButton{min-width:104px}
+.pageNumbers{gap:6px}
+.pageNumbers button{
+  width:36px;
+  height:36px;
+  border-radius:10px;
+}
+.pageNumbers button.active{box-shadow:0 6px 14px rgba(20,105,181,.19)}
+
+.moduleGrid{gap:14px}
+.moduleCard{
+  min-height:124px;
+  border-radius:17px;
+  padding:17px;
+  box-shadow:var(--shadow-sm);
+}
+.moduleCard:not(:disabled):hover{
+  transform:translateY(-2px);
+  border-color:#9dc5e6;
+  box-shadow:var(--shadow-md);
+}
+.moduleCard strong{font-size:15px}
+.moduleCard span{font-size:12px}
+.moduleCard small{font-size:10px}
+.moduleIcon{width:48px;height:48px}
+
+.packageHeroFive{gap:14px}
+.packageHero>div{
+  min-height:105px;
+  border-radius:16px;
+  box-shadow:var(--shadow-sm);
+}
+.packageHero strong{font-size:19px}
+.billingAlert{border-radius:15px;box-shadow:var(--shadow-sm)}
+.settingsOverview{gap:12px}
+.settingsOverview>div{
+  min-height:88px;
+  border-radius:15px;
+  box-shadow:var(--shadow-sm);
+}
+.settingsDataGrid{gap:14px;padding:17px}
+.settingsDataGrid>div{min-height:100px;border-radius:13px}
+.auditNote{border-radius:12px}
+
+.formModal{
+  border-radius:20px;
+  border:1px solid rgba(255,255,255,.6);
+}
+.modalHeader{
+  position:sticky;
+  top:0;
+  z-index:4;
+  background:rgba(255,255,255,.97);
+  backdrop-filter:blur(10px);
+}
+.formGrid input,.formGrid select,.editableBillMeta input,.editableBillMeta textarea{
+  border-color:#cad9e6;
+  background:#fff;
+}
+.formGrid input,.formGrid select{min-height:45px}
+.modalActions{
+  position:sticky;
+  bottom:0;
+  z-index:4;
+  background:rgba(255,255,255,.97);
+  backdrop-filter:blur(10px);
+}
+
+.mobileHeader{
+  border-bottom:1px solid transparent;
+}
+.offlineBanner{box-shadow:var(--shadow-sm)}
+
+@media(max-width:1280px){
+  .appShell{grid-template-columns:252px minmax(0,1fr)}
+  .appShell.sidebarCollapsed{grid-template-columns:82px minmax(0,1fr)}
+  .content{padding:26px 24px 22px}
+  .pageHeading h2{font-size:29px}
+  .packageHeroFive{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:1024px){
+  .metricsGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .moduleGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .settingsDataGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .packageHeroFive{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:900px){
+  body{overflow-x:hidden}
+  .content{max-width:none;padding:12px 14px 22px}
+  .mobileHeader{
+    position:sticky;
+    top:0;
+    z-index:35;
+    min-height:58px;
+    margin:0 -14px 14px;
+    padding:8px 14px;
+    border-bottom-color:#dce6f0;
+    background:rgba(243,247,251,.94);
+    backdrop-filter:blur(12px);
+  }
+  .portalFilters{
+    position:relative;
+    top:auto;
+    z-index:10;
+    margin-bottom:18px;
+    box-shadow:var(--shadow-sm);
+  }
+  .sidebar,.sidebarCollapsed .sidebar{
+    width:min(330px,88vw);
+    padding-bottom:max(18px,env(safe-area-inset-bottom));
+  }
+  .drawerBackdrop{backdrop-filter:blur(2px)}
+  .pageHeading{align-items:flex-start}
+  .panel,.metricCard,.moduleCard,.packageHero>div,.settingsOverview>div{border-radius:15px}
+  .boundedTable{max-height:60vh}
+}
+@media(max-width:680px){
+  :root{font-size:15px}
+  .content{padding:10px 10px 18px}
+  .mobileHeader{margin:0 -10px 12px;padding:8px 10px}
+  .mobileHeader .iconButton{
+    width:42px;
+    height:42px;
+    padding:0;
+    justify-content:center;
+    flex:0 0 auto;
+  }
+  .mobileHeaderActions{gap:5px}
+  .portalFilters{padding:11px;border-radius:14px}
+  .branchFilter{display:grid;grid-template-columns:22px 52px minmax(0,1fr);gap:7px}
+  .branchFilter select{width:100%;height:44px}
+  .anchorPicker{height:44px}
+  .rangeTabs button{min-height:38px}
+  .pageHeading{gap:12px;margin-bottom:15px}
+  .pageHeading h2{font-size:27px}
+  .pageHeading p{font-size:13px;line-height:1.55}
+  .pageHeading>.ghostButton,.pageHeading>.primaryAction,.pageHeading>.headingStat{width:100%}
+  .pageHeading>.ghostButton,.pageHeading>.primaryAction{min-height:45px}
+  .metricsGrid{grid-template-columns:1fr;gap:9px}
+  .metricCard{min-height:96px;padding:15px}
+  .metricIcon{width:44px;height:44px}
+  .metricCard strong{font-size:22px}
+  .splitGrid{gap:11px}
+  .panelHeader{min-height:58px;padding:14px}
+  .dataRow{padding:13px 14px}
+  .dashboardScroll{max-height:300px}
+  .healthList{padding:6px 14px 9px}
+  .topProductsList{padding:8px 14px 13px}
+  .toolbar{gap:8px;margin-bottom:12px}
+  .searchBox{height:45px}
+  .boundedTable{max-height:56vh}
+  table{min-width:760px}
+  th,td{padding:11px 12px}
+  td{height:52px}
+  .paginationBar{grid-template-columns:1fr 1fr;gap:8px;padding:11px}
+  .pageNumbers{overflow-x:auto;justify-content:flex-start;padding-bottom:2px;scrollbar-width:none}
+  .pageNumbers::-webkit-scrollbar{display:none}
+  .pageNumbers button{flex:0 0 36px}
+  .paginationBar>.secondaryButton{min-width:0;min-height:42px}
+  .moduleGrid,.settingsOverview,.settingsDataGrid,.packageHeroFive{grid-template-columns:1fr}
+  .moduleCard{min-height:104px;padding:14px}
+  .moduleCard strong{font-size:14px}
+  .moduleCard span{font-size:11px}
+  .packageHero>div{min-height:92px;padding:15px}
+  .billingAlert{padding:13px}
+  .formModal,.formModal.wide{max-height:96dvh}
+  .modalHeader{padding-top:max(14px,env(safe-area-inset-top))}
+  .modalActions{padding-bottom:max(15px,env(safe-area-inset-bottom))}
+}
+@media(max-width:420px){
+  .mobileHeader .brandBlock strong{font-size:15px}
+  .mobileHeader .brandBlock span{max-width:35vw}
+  .pageHeading h2{font-size:25px}
+  .metricCard strong{font-size:21px}
+  .branchFilter{grid-template-columns:20px 48px minmax(0,1fr)}
+  .branchFilter>span{font-size:11px}
+  .rangeTabs button{font-size:10px;padding-left:6px;padding-right:6px}
+  .billItemsHead,.billItem{grid-template-columns:minmax(0,1fr) 48px 78px}
+}
+@media(prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}

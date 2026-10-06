@@ -1,26 +1,31 @@
 # CpiPOS Customer Portal CRM
 
-Customer-facing owner/manager portal for CpiPOS.
+Customer-facing Owner/Manager portal for CpiPOS.
 
 ## Architecture
 
-- Static SPA on Vercel (Vite + React)
-- CpiPOS-001 is the single source of truth
-- Browser reads authorized data directly from Supabase using Auth + RLS
-- Store-code + employee-code login is handled by a Supabase Edge Function, not a Vercel Function
-- Only `owner` and `manager` branch roles may enter the portal
-- Never expose `service_role` or privileged credential data to the browser
+- Static SPA on Vercel (Vite + React + TypeScript)
+- CpiPOS-001 / Supabase is the single source of truth
+- Browser uses Supabase Auth + RLS with a publishable key only
+- Privileged login, staff administration and billing evidence flows run in Supabase Edge Functions
+- Only Owner/Manager branch roles may enter the portal
+- No Vercel API routes, SSR or server functions are required
 
-The design intentionally minimizes Vercel Fluid Active CPU usage.
+## Front-end structure
 
-## Phase 1 status
+- `src/App.tsx`: app shell/navigation/session/global filters
+- `src/views/*`: feature screens
+- `src/components/*`: shared UI primitives
+- `src/lib/api/*`: feature-scoped Supabase data access
+- `src/types/portal.ts`: shared contracts
+- `src/styles/*`: design tokens and layered styles
 
-Foundation implementation is tracked in PR #1.
+`src/lib/portal.ts` is now a small compatibility barrel so feature code can migrate incrementally without changing behavior.
+
+## Quality gates
+
+Run `npm run check` for TypeScript, automated tests and production build. CI uses committed `package-lock.json` with `npm ci`.
 
 ## Progressive Web App
 
-- Installable on supported desktop/mobile browsers
-- Standalone app mode with CpiPOS branding
-- Service worker caches only same-origin static app-shell assets
-- Supabase/Auth/business-data requests are intentionally never intercepted or cached
-- The portal remains a static Vite deployment and does not add Vercel Functions
+The app remains installable. The service worker caches only same-origin static app-shell assets and never caches Supabase/Auth/business-data requests.
