@@ -33,7 +33,7 @@ begin
   end if;
 
   select jsonb_build_object(
-    'runtime', (
+    'runtime',(
       select to_jsonb(r) from (
         select lifecycle_status,access_locked,lock_reason,expires_at,payment_review_status,updated_at
         from public.tenant_subscription_runtime
@@ -41,7 +41,7 @@ begin
         limit 1
       ) r
     ),
-    'contract', (
+    'contract',(
       select to_jsonb(c) from (
         select tc.id,tc.package_id,sp.code as package_code,sp.name as package_name,
           tc.contract_type,tc.billing_interval,tc.status,tc.amount_per_cycle,tc.currency,
@@ -53,7 +53,7 @@ begin
         limit 1
       ) c
     ),
-    'billingCycles', coalesce((
+    'billingCycles',case when v_role='owner' then coalesce((
       select jsonb_agg(to_jsonb(c) order by c.period_end desc)
       from (
         select id,package_id,period_start,period_end,amount_due,amount_paid,status,created_at
@@ -62,8 +62,8 @@ begin
         order by period_end desc
         limit 36
       ) c
-    ),'[]'::jsonb),
-    'requests', case when v_role='owner' then coalesce((
+    ),'[]'::jsonb) else '[]'::jsonb end,
+    'requests',case when v_role='owner' then coalesce((
       select jsonb_agg(to_jsonb(r) order by r.submitted_at desc)
       from (
         select pr.id,pr.request_type,pr.requested_package_id,sp.name as package_name,
@@ -76,7 +76,7 @@ begin
         limit 30
       ) r
     ),'[]'::jsonb) else '[]'::jsonb end,
-    'issuer', case when v_role='owner' then (
+    'issuer',case when v_role='owner' then (
       select to_jsonb(i) from (
         select billing_legal_name_th,billing_bank_name,billing_bank_account_name,
           billing_bank_account_number,billing_promptpay_id,billing_email,support_email,
@@ -381,6 +381,8 @@ declare
   v_id uuid;
   v_branch_limit integer;
   v_active_branches integer;
+  v_current_branch_active boolean;
+  v_requested_branch_active boolean;
 begin
   select
     bool_or(ubr.role::text='owner'),
@@ -425,44 +427,75 @@ begin
       raise exception using errcode='22023',message='invalid_branch_name';
     end if;
 
+    v_requested_branch_active:=coalesce((p_payload->>'is_active')::boolean,true);
+
     if nullif(p_payload->>'id','') is null then
-      select coalesce(tc.max_branches,tc.branch_limit,sp.max_branches)
-      into v_branch_limit
-      from public.tenant_subscription_contracts tc
-      left join public.subscription_packages sp on sp.id=tc.package_id
-      where tc.tenant_id=p_tenant_id
-      order by tc.created_at desc limit 1;
+      if v_requested_branch_active then
+        select coalesce(tc.max_branches,tc.branch_limit,sp.max_branches)
+        into v_branch_limit
+        from public.tenant_subscription_contracts tc
+        left join public.subscription_packages sp on sp.id=tc.package_id
+        where tc.tenant_id=p_tenant_id
+        order by tc.created_at desc limit 1;
 
-      select count(*) into v_active_branches
-      from public.branches where tenant_id=p_tenant_id and is_active=true;
+        select count(*) into v_active_branches
+        from public.branches where tenant_id=p_tenant_id and is_active=true;
 
-      if v_branch_limit is not null and v_branch_limit>0 and v_active_branches>=v_branch_limit then
-        raise exception using errcode='P0001',message='branch_limit_reached';
+        if v_branch_limit is not null and v_branch_limit>0 and v_active_branches>=v_branch_limit then
+          raise exception using errcode='P0001',message='branch_limit_reached';
+        end if;
       end if;
 
       insert into public.branches(tenant_id,code,name,address,is_active)
       values(
         p_tenant_id,upper(btrim(p_payload->>'code')),btrim(p_payload->>'name'),
         nullif(btrim(coalesce(p_payload->>'address','')),''),
-        coalesce((p_payload->>'is_active')::boolean,true)
+        v_requested_branch_active
       ) returning id into v_id;
     else
       v_id=(p_payload->>'id')::uuid;
+
+      select is_active into v_current_branch_active
+      from public.branches
+      where id=v_id and tenant_id=p_tenant_id
+      for update;
+      if not found then
+        raise exception using errcode='P0002',message='branch_not_found';
+      end if;
+
+      if v_requested_branch_active and not coalesce(v_current_branch_active,false) then
+        select coalesce(tc.max_branches,tc.branch_limit,sp.max_branches)
+        into v_branch_limit
+        from public.tenant_subscription_contracts tc
+        left join public.subscription_packages sp on sp.id=tc.package_id
+        where tc.tenant_id=p_tenant_id
+        order by tc.created_at desc limit 1;
+
+        select count(*) into v_active_branches
+        from public.branches
+        where tenant_id=p_tenant_id and is_active=true and id<>v_id;
+
+        if v_branch_limit is not null and v_branch_limit>0 and v_active_branches>=v_branch_limit then
+          raise exception using errcode='P0001',message='branch_limit_reached';
+        end if;
+      end if;
+
       update public.branches
       set code=upper(btrim(p_payload->>'code')),
           name=btrim(p_payload->>'name'),
           address=nullif(btrim(coalesce(p_payload->>'address','')),''),
-          is_active=coalesce((p_payload->>'is_active')::boolean,is_active),
+          is_active=v_requested_branch_active,
           updated_at=now()
       where id=v_id and tenant_id=p_tenant_id;
-      if not found then raise exception using errcode='P0002',message='branch_not_found'; end if;
     end if;
+
     if nullif(p_payload->>'id','') is null then
       insert into public.user_branch_roles(user_id,tenant_id,branch_id,role,is_default)
       values(v_actor,p_tenant_id,v_id,'owner'::public.branch_role,false)
       on conflict(user_id,tenant_id,branch_id) do update
       set role='owner'::public.branch_role;
     end if;
+
     return jsonb_build_object('ok',true,'id',v_id,'action',p_action);
   end if;
 
@@ -727,6 +760,106 @@ begin
 end;
 $function$;
 
+CREATE OR REPLACE FUNCTION public.customer_portal_update_staff_v2(p_tenant_id uuid, p_branch_id uuid, p_user_id uuid, p_full_name text, p_employee_code text, p_position_title text, p_branch_role text, p_permission_role text, p_is_active boolean, p_pin text DEFAULT NULL::text)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_actor uuid := (select auth.uid());
+  v_actor_owner boolean := false;
+  v_target_role text;
+  v_pin text := nullif(btrim(coalesce(p_pin,'')),'');
+begin
+  if v_actor is null then
+    raise exception using errcode='42501',message='customer_portal_unauthenticated';
+  end if;
+
+  if not app.customer_portal_actor_can_manage(p_tenant_id,p_branch_id) then
+    raise exception using errcode='42501',message='customer_portal_forbidden';
+  end if;
+
+  select exists(
+    select 1 from public.user_branch_roles ubr
+    where ubr.user_id=v_actor and ubr.tenant_id=p_tenant_id and ubr.role::text='owner'
+  ) into v_actor_owner;
+
+  if not v_actor_owner and not exists(
+    select 1 from public.user_branch_roles ubr
+    where ubr.user_id=v_actor and ubr.tenant_id=p_tenant_id
+      and ubr.branch_id=p_branch_id and ubr.role::text='manager'
+  ) then
+    raise exception using errcode='42501',message='customer_portal_forbidden';
+  end if;
+
+  select ubr.role::text into v_target_role
+  from public.user_branch_roles ubr
+  where ubr.user_id=p_user_id and ubr.tenant_id=p_tenant_id and ubr.branch_id=p_branch_id
+  limit 1;
+
+  if v_target_role is null then
+    raise exception using errcode='P0002',message='staff_not_found';
+  end if;
+
+  if p_user_id<>v_actor and exists(
+    select 1 from public.user_branch_roles ubr
+    where ubr.user_id=p_user_id and ubr.tenant_id<>p_tenant_id
+  ) then
+    raise exception using errcode='42501',message='cross_tenant_user_edit_forbidden';
+  end if;
+
+  if not v_actor_owner and exists(
+    select 1 from public.user_branch_roles ubr
+    where ubr.user_id=p_user_id and ubr.role::text in ('owner','manager')
+  ) then
+    raise exception using errcode='42501',message='manager_cannot_edit_privileged_staff';
+  end if;
+
+  if p_branch_role not in ('owner','manager','staff','kitchen') then
+    raise exception using errcode='22023',message='invalid_branch_role';
+  end if;
+
+  if not v_actor_owner and p_branch_role in ('owner','manager') then
+    raise exception using errcode='42501',message='manager_cannot_grant_privileged_role';
+  end if;
+
+  if btrim(coalesce(p_employee_code,''))='' or length(btrim(p_employee_code))>32 then
+    raise exception using errcode='22023',message='invalid_employee_code';
+  end if;
+  if btrim(coalesce(p_full_name,''))='' or length(btrim(p_full_name))>180 then
+    raise exception using errcode='22023',message='invalid_full_name';
+  end if;
+  if v_pin is not null and v_pin !~ '^[0-9]{4,12}$' then
+    raise exception using errcode='22023',message='invalid_pin';
+  end if;
+
+  update public.users_profiles
+  set full_name=btrim(p_full_name),
+      is_active=coalesce(p_is_active,true),
+      archived_at=case when coalesce(p_is_active,true) then null else coalesce(archived_at,now()) end,
+      pin_hash=case when v_pin is null then pin_hash else extensions.crypt(v_pin,extensions.gen_salt('bf',10)) end,
+      updated_at=now()
+  where id=p_user_id;
+
+  update public.pos_user_profiles
+  set employee_code=btrim(p_employee_code),
+      position_title=left(coalesce(p_position_title,''),120),
+      permission_role=left(coalesce(nullif(btrim(p_permission_role),''),'pos_user'),80),
+      updated_at=now()
+  where tenant_id=p_tenant_id and user_id=p_user_id;
+
+  update public.user_branch_roles
+  set role=p_branch_role::public.branch_role
+  where tenant_id=p_tenant_id and branch_id=p_branch_id and user_id=p_user_id;
+
+  return true;
+exception
+  when unique_violation then
+    raise exception using errcode='23505',message='duplicate_employee_code';
+end;
+$function$;
+
 revoke all on function public.customer_portal_dashboard_v2(uuid,uuid,timestamptz,timestamptz) from public,anon;
 grant execute on function public.customer_portal_dashboard_v2(uuid,uuid,timestamptz,timestamptz) to authenticated;
 revoke all on function public.customer_portal_billing_overview(uuid) from public,anon;
@@ -739,3 +872,5 @@ revoke all on function public.customer_portal_more_snapshot(uuid,uuid) from publ
 grant execute on function public.customer_portal_more_snapshot(uuid,uuid) to authenticated;
 revoke all on function public.customer_portal_save_setting(uuid,uuid,text,jsonb) from public,anon;
 grant execute on function public.customer_portal_save_setting(uuid,uuid,text,jsonb) to authenticated;
+revoke all on function public.customer_portal_update_staff_v2(uuid,uuid,uuid,text,text,text,text,text,boolean,text) from public,anon;
+grant execute on function public.customer_portal_update_staff_v2(uuid,uuid,uuid,text,text,text,text,text,boolean,text) to authenticated;
