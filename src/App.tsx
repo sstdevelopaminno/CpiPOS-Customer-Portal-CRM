@@ -306,8 +306,8 @@ function OrderDetailModal({
       </div>
 
       <div className="editableBillMeta">
-        <label><span>ชื่อลูกค้า</span><input disabled={!editing} value={customerName} onChange={e=>setCustomerName(e.target.value)} placeholder="ไม่ระบุ"/></label>
-        <label><span>หมายเหตุ</span><textarea disabled={!editing} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="หมายเหตุรายการขาย"/></label>
+        <label><span>ชื่อลูกค้า</span><input disabled={!editing} maxLength={180} value={customerName} onChange={e=>setCustomerName(e.target.value)} placeholder="ไม่ระบุ"/></label>
+        <label><span>หมายเหตุ</span><textarea disabled={!editing} maxLength={1000} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="หมายเหตุรายการขาย"/></label>
       </div>
 
       <div className="billItems">
@@ -330,13 +330,24 @@ function SalesView({ context, branchId, range, anchor }: { context: PortalContex
   const [selectedOrder, setSelectedOrder] = useState<OrderRow | null>(null);
   const [error, setError] = useState("");
   const [query,setQuery]=useState("");
+  const [page,setPage]=useState(0);
+  const [totalCount,setTotalCount]=useState(0);
+  const [salesTotal,setSalesTotal]=useState(0);
+  const pageSize=100;
+
+  useEffect(()=>{setPage(0);},[context.tenantId,branchId,range,anchor]);
 
   const refresh=useCallback(async()=>{
     setLoading(true);setError("");
-    try{setRows(await loadSales(context.tenantId,branchId,range,anchor));}
+    try{
+      const result=await loadSales(context.tenantId,branchId,range,anchor,page,pageSize);
+      setRows(result.rows);
+      setTotalCount(result.total);
+      setSalesTotal(result.salesTotal);
+    }
     catch{setError("ไม่สามารถโหลดรายการขายได้");}
     finally{setLoading(false);}
-  },[context.tenantId,branchId,range,anchor]);
+  },[context.tenantId,branchId,range,anchor,page]);
 
   useEffect(()=>{void refresh();},[refresh]);
 
@@ -346,20 +357,28 @@ function SalesView({ context, branchId, range, anchor }: { context: PortalContex
     if(!q)return true;
     return [row.order_no,row.customer_name,row.channel,row.order_type,branchMap.get(row.branch_id)].some(value=>String(value??"").toLowerCase().includes(q));
   });
-  const total=filtered.filter(row=>row.status==="completed").reduce((sum,row)=>sum+amount(row),0);
+  const pageCount=Math.max(1,Math.ceil(totalCount/pageSize));
+  const pageLabel=totalCount
+    ? String(page*pageSize+1)+"–"+String(Math.min((page+1)*pageSize,totalCount))+" จาก "+number.format(totalCount)
+    : "0 รายการ";
 
   return <>
     <div className="pageHeading">
       <div><p className="eyebrow">SALES</p><h2>รายการขาย · {reportRangeLabel(range,anchor)}</h2><p>ดูรายวัน รายเดือน หรือรายปี พร้อมแก้ข้อมูลประกอบและยกเลิกบิลแบบคืนสต๊อก</p></div>
-      <div className="headingStat"><span>ยอดรวมที่แสดง</span><strong>{money.format(total)}</strong></div>
+      <div className="headingStat"><span>ยอดขายรวมช่วงนี้</span><strong>{money.format(salesTotal)}</strong></div>
     </div>
-    <div className="toolbar"><label className="searchBox"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="ค้นหาเลขที่บิล ลูกค้า ช่องทาง..."/></label></div>
+    <div className="toolbar"><label className="searchBox"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="ค้นหาในหน้าปัจจุบัน..."/></label><span className="toolbarCount">{pageLabel}</span></div>
     {error?<ErrorPanel message={error}/>:null}
     <article className="panel tablePanel">
       {loading?<div className="loadingPanel"><LoaderCircle className="spin"/>กำลังโหลดรายการขาย...</div>:filtered.length?
       <div className="tableWrap"><table><thead><tr><th>เลขที่บิล</th><th>เวลา</th><th>สาขา</th><th>สถานะ</th><th className="right">ยอดรวม</th><th></th></tr></thead><tbody>
         {filtered.map(row=><tr key={row.id}><td><strong>{row.order_no||"—"}</strong></td><td>{dateTime.format(new Date(row.created_at))}</td><td>{branchMap.get(row.branch_id)||"—"}</td><td><span className={`status status-${row.status}`}>{statusLabel(row.status)}</span></td><td className="right"><strong>{money.format(amount(row))}</strong></td><td className="right"><button className="tableAction" onClick={()=>setSelectedOrder(row)}><Eye size={16}/>ดู/จัดการ</button></td></tr>)}
       </tbody></table></div>:<Empty>ยังไม่มีข้อมูลรายการขายในช่วงเวลานี้</Empty>}
+      {totalCount>pageSize?<div className="paginationBar">
+        <button className="secondaryButton" disabled={page<=0||loading} onClick={()=>setPage(value=>Math.max(0,value-1))}><ChevronLeft size={17}/>ก่อนหน้า</button>
+        <span>หน้า {page+1} / {pageCount}</span>
+        <button className="secondaryButton" disabled={page+1>=pageCount||loading} onClick={()=>setPage(value=>Math.min(pageCount-1,value+1))}>ถัดไป<ChevronRight size={17}/></button>
+      </div>:null}
     </article>
     <div className="auditNote">รายการขายใหม่สร้างจาก POS เพื่อรักษา payment/shift/stock transaction ให้ถูกต้อง; Customer Portal รองรับแก้ไขข้อมูลประกอบและยกเลิกบิลอย่างปลอดภัย</div>
     {selectedOrder?<OrderDetailModal order={selectedOrder} context={context} onClose={()=>setSelectedOrder(null)} onChanged={refresh}/>:null}
@@ -667,7 +686,6 @@ export default function App() {
   const [installPrompt,setInstallPrompt]=useState<InstallPromptEvent|null>(null);
   const [online,setOnline]=useState(()=>navigator.onLine);
   const [standalone,setStandalone]=useState(()=>window.matchMedia("(display-mode: standalone)").matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone));
-  const [installed,setInstalled]=useState(()=>localStorage.getItem("cpipos-pwa-installed")==="1");
   const [collapsed,setCollapsed]=useState(()=>localStorage.getItem("cpipos-sidebar-collapsed")==="1");
   const [mobileOpen,setMobileOpen]=useState(false);
 
@@ -694,14 +712,14 @@ export default function App() {
 
   useEffect(()=>{
     const beforeInstall=(event:Event)=>{
-      if(installed||standalone)return;
+      if(standalone)return;
       const promptEvent=event as InstallPromptEvent;
       promptEvent.preventDefault();
       setInstallPrompt(promptEvent);
     };
     const appInstalled=()=>{
-      setInstallPrompt(null);setStandalone(true);setInstalled(true);
-      localStorage.setItem("cpipos-pwa-installed","1");
+      setInstallPrompt(null);
+      setStandalone(true);
     };
     const goOnline=()=>setOnline(true);
     const goOffline=()=>setOnline(false);
@@ -715,16 +733,13 @@ export default function App() {
       window.removeEventListener("online",goOnline);
       window.removeEventListener("offline",goOffline);
     };
-  },[installed,standalone]);
+  },[standalone]);
 
   const installApp=useCallback(async()=>{
     if(!installPrompt)return;
     await installPrompt.prompt();
     const choice=await installPrompt.userChoice;
-    if(choice.outcome==="accepted"){
-      setInstallPrompt(null);setInstalled(true);
-      localStorage.setItem("cpipos-pwa-installed","1");
-    }
+    if(choice.outcome==="accepted") setInstallPrompt(null);
   },[installPrompt]);
 
   const changeBranch=useCallback((value:string)=>{
@@ -748,7 +763,7 @@ export default function App() {
 
   const showFilters=view!=="package";
   const showPeriod=view==="dashboard"||view==="sales";
-  const canInstall=Boolean(installPrompt)&&!standalone&&!installed;
+  const canInstall=Boolean(installPrompt)&&!standalone;
 
   return <div className={`appShell ${collapsed?"sidebarCollapsed":""}`}>
     {mobileOpen?<button className="drawerBackdrop" aria-label="ปิดเมนู" onClick={()=>setMobileOpen(false)}/>:null}
