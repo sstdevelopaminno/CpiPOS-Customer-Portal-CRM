@@ -1,10 +1,15 @@
-const CACHE_NAME = "cpipos-customer-portal-shell-v1";
+const CACHE_NAME = "cpipos-customer-portal-shell-v2";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",
   "/cpipos-logo.png",
-  "/pwa-icon.svg",
-  "/pwa-maskable.svg"
+  "/favicon-16x16.png",
+  "/favicon-32x32.png",
+  "/favicon-48x48.png",
+  "/apple-touch-icon.png",
+  "/pwa-icon-192.png",
+  "/pwa-icon-512.png",
+  "/pwa-maskable-512.png"
 ];
 
 self.addEventListener("install", (event) => {
