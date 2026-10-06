@@ -429,6 +429,15 @@ begin
 
     v_requested_branch_active:=coalesce((p_payload->>'is_active')::boolean,true);
 
+    -- Serialize active-branch quota decisions per tenant so concurrent create/reactivate
+    -- requests cannot both observe the same free slot.
+    if v_requested_branch_active then
+      perform 1
+      from public.tenants t
+      where t.id=p_tenant_id
+      for update;
+    end if;
+
     if nullif(p_payload->>'id','') is null then
       if v_requested_branch_active then
         select coalesce(tc.max_branches,tc.branch_limit,sp.max_branches)
