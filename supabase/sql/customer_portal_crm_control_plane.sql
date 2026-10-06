@@ -93,6 +93,166 @@ begin
 end;
 $function$;
 
+CREATE OR REPLACE FUNCTION public.customer_portal_dashboard_v2(p_tenant_id uuid, p_branch_id uuid, p_from timestamp with time zone, p_to timestamp with time zone)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE
+ SET search_path TO ''
+AS $function$
+declare
+  v_actor uuid := (select auth.uid());
+  v_is_owner boolean := false;
+  v_sales numeric := 0;
+  v_orders bigint := 0;
+  v_products bigint := 0;
+  v_branches bigint := 0;
+  v_low_stock bigint := 0;
+  v_open_shifts bigint := 0;
+  v_top_products jsonb := '[]'::jsonb;
+begin
+  if p_from is null or p_to is null or p_from >= p_to or p_to - p_from > interval '366 days' then
+    raise exception using errcode='22023', message='invalid_report_range';
+  end if;
+
+  if not app.customer_portal_actor_can_manage(p_tenant_id,p_branch_id) then
+    raise exception using errcode='42501',message='customer_portal_forbidden';
+  end if;
+
+  select exists(
+    select 1 from public.user_branch_roles actor
+    where actor.user_id=v_actor
+      and actor.tenant_id=p_tenant_id
+      and actor.role::text='owner'
+  ) into v_is_owner;
+
+  select coalesce(sum(coalesce(o.grand_total,o.total_amount,0)),0),count(*)
+  into v_sales,v_orders
+  from public.orders o
+  where o.tenant_id=p_tenant_id
+    and (p_branch_id is null or o.branch_id=p_branch_id)
+    and (
+      v_is_owner or exists(
+        select 1 from public.user_branch_roles actor
+        where actor.user_id=v_actor
+          and actor.tenant_id=p_tenant_id
+          and actor.branch_id=o.branch_id
+          and actor.role::text='manager'
+      )
+    )
+    and o.status::text='completed'
+    and o.created_at>=p_from
+    and o.created_at<p_to;
+
+  select count(*) into v_products
+  from public.products p
+  where p.tenant_id=p_tenant_id
+    and (p_branch_id is null or p.branch_id=p_branch_id)
+    and (
+      v_is_owner or exists(
+        select 1 from public.user_branch_roles actor
+        where actor.user_id=v_actor
+          and actor.tenant_id=p_tenant_id
+          and actor.branch_id=p.branch_id
+          and actor.role::text='manager'
+      )
+    )
+    and p.is_active=true
+    and p.deleted_at is null;
+
+  select count(*) into v_branches
+  from public.branches b
+  where b.tenant_id=p_tenant_id
+    and (p_branch_id is null or b.id=p_branch_id)
+    and (
+      v_is_owner or exists(
+        select 1 from public.user_branch_roles actor
+        where actor.user_id=v_actor
+          and actor.tenant_id=p_tenant_id
+          and actor.branch_id=b.id
+          and actor.role::text='manager'
+      )
+    )
+    and b.is_active=true;
+
+  select count(*) into v_low_stock
+  from public.ingredients i
+  where i.tenant_id=p_tenant_id
+    and (p_branch_id is null or i.branch_id=p_branch_id)
+    and (
+      v_is_owner or exists(
+        select 1 from public.user_branch_roles actor
+        where actor.user_id=v_actor
+          and actor.tenant_id=p_tenant_id
+          and actor.branch_id=i.branch_id
+          and actor.role::text='manager'
+      )
+    )
+    and i.reorder_level is not null
+    and i.quantity_on_hand<=i.reorder_level;
+
+  select count(*) into v_open_shifts
+  from public.shifts s
+  where s.tenant_id=p_tenant_id
+    and (p_branch_id is null or s.branch_id=p_branch_id)
+    and (
+      v_is_owner or exists(
+        select 1 from public.user_branch_roles actor
+        where actor.user_id=v_actor
+          and actor.tenant_id=p_tenant_id
+          and actor.branch_id=s.branch_id
+          and actor.role::text='manager'
+      )
+    )
+    and s.status::text='open';
+
+  select coalesce(jsonb_agg(to_jsonb(r) order by r.sales_total desc,r.quantity desc),'[]'::jsonb)
+  into v_top_products
+  from (
+    select
+      coalesce(nullif(oi.name,''),nullif(p.name,''),'สินค้า')::text as name,
+      sum(coalesce(oi.quantity,0))::numeric as quantity,
+      sum(coalesce(oi.line_total,0))::numeric as sales_total
+    from public.order_items oi
+    join public.orders o
+      on o.id=oi.order_id
+     and o.tenant_id=oi.tenant_id
+     and o.branch_id=oi.branch_id
+    left join public.products p on p.id=oi.product_id
+    where o.tenant_id=p_tenant_id
+      and (p_branch_id is null or o.branch_id=p_branch_id)
+      and (
+        v_is_owner or exists(
+          select 1 from public.user_branch_roles actor
+          where actor.user_id=v_actor
+            and actor.tenant_id=p_tenant_id
+            and actor.branch_id=o.branch_id
+            and actor.role::text='manager'
+        )
+      )
+      and o.status::text='completed'
+      and o.created_at>=p_from
+      and o.created_at<p_to
+    group by coalesce(nullif(oi.name,''),nullif(p.name,''),'สินค้า')
+    order by sales_total desc,quantity desc
+    limit 8
+  ) r;
+
+  return jsonb_build_object(
+    'sales_total',v_sales,
+    'order_count',v_orders,
+    'average_ticket',case when v_orders>0 then round(v_sales/v_orders,2) else 0 end,
+    'active_products',v_products,
+    'active_branches',v_branches,
+    'low_stock_count',v_low_stock,
+    'open_shifts',v_open_shifts,
+    'top_products',v_top_products,
+    'from',p_from,
+    'to',p_to,
+    'branch_id',p_branch_id
+  );
+end;
+$function$;
+
 CREATE OR REPLACE FUNCTION public.customer_portal_feature_state(p_tenant_id uuid, p_branch_id uuid DEFAULT NULL::uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -140,21 +300,70 @@ CREATE OR REPLACE FUNCTION public.customer_portal_more_snapshot(p_tenant_id uuid
  SECURITY DEFINER
  SET search_path TO ''
 AS $function$
+declare
+  v_actor uuid := (select auth.uid());
+  v_is_owner boolean := false;
 begin
   if not app.customer_portal_actor_can_manage(p_tenant_id,p_branch_id) then
     raise exception using errcode='42501',message='customer_portal_forbidden';
   end if;
 
+  select exists(
+    select 1 from public.user_branch_roles
+    where user_id=v_actor and tenant_id=p_tenant_id and role::text='owner'
+  ) into v_is_owner;
+
   return jsonb_build_object(
-    'tables_count',(select count(*) from public.dining_tables where tenant_id=p_tenant_id and (p_branch_id is null or branch_id=p_branch_id) and coalesce(is_active,true)),
-    'kitchen_zones_count',(select count(*) from public.kitchen_zones where tenant_id=p_tenant_id and (p_branch_id is null or branch_id=p_branch_id) and coalesce(is_active,true)),
-    'kitchen_rules_count',(select count(*) from public.kitchen_routing_rules where tenant_id=p_tenant_id and (p_branch_id is null or branch_id=p_branch_id) and coalesce(is_active,true)),
-    'members_count',(select count(*) from public.mobile_members where tenant_id=p_tenant_id and (p_branch_id is null or branch_id=p_branch_id)),
-    'tax_invoices_count',(select count(*) from public.pos_tax_invoices where tenant_id=p_tenant_id and (p_branch_id is null or branch_id=p_branch_id)),
-    'ai_documents_count',(select count(*) from public.pos_ai_documents where tenant_id=p_tenant_id and (p_branch_id is null or branch_id=p_branch_id)),
-    'printers_count',(select count(*) from public.printer_devices where tenant_id=p_tenant_id and (p_branch_id is null or branch_id=p_branch_id) and coalesce(is_active,true)),
-    'display_pairings_count',(select count(*) from public.pos_customer_display_pairings where tenant_id=p_tenant_id and (p_branch_id is null or branch_id=p_branch_id) and coalesce(is_active,true)),
-    'audit_count',(select count(*) from public.audit_logs where tenant_id=p_tenant_id and (p_branch_id is null or branch_id=p_branch_id))
+    'tables_count',(
+      select count(*) from public.dining_tables x
+      where x.tenant_id=p_tenant_id and (p_branch_id is null or x.branch_id=p_branch_id)
+        and (v_is_owner or exists(select 1 from public.user_branch_roles a where a.user_id=v_actor and a.tenant_id=p_tenant_id and a.branch_id=x.branch_id and a.role::text='manager'))
+        and coalesce(x.is_active,true)
+    ),
+    'kitchen_zones_count',(
+      select count(*) from public.kitchen_zones x
+      where x.tenant_id=p_tenant_id and (p_branch_id is null or x.branch_id=p_branch_id)
+        and (v_is_owner or exists(select 1 from public.user_branch_roles a where a.user_id=v_actor and a.tenant_id=p_tenant_id and a.branch_id=x.branch_id and a.role::text='manager'))
+        and coalesce(x.is_active,true)
+    ),
+    'kitchen_rules_count',(
+      select count(*) from public.kitchen_routing_rules x
+      where x.tenant_id=p_tenant_id and (p_branch_id is null or x.branch_id=p_branch_id)
+        and (v_is_owner or exists(select 1 from public.user_branch_roles a where a.user_id=v_actor and a.tenant_id=p_tenant_id and a.branch_id=x.branch_id and a.role::text='manager'))
+        and coalesce(x.is_active,true)
+    ),
+    'members_count',(
+      select count(*) from public.mobile_members x
+      where x.tenant_id=p_tenant_id and (p_branch_id is null or x.branch_id=p_branch_id)
+        and (v_is_owner or exists(select 1 from public.user_branch_roles a where a.user_id=v_actor and a.tenant_id=p_tenant_id and a.branch_id=x.branch_id and a.role::text='manager'))
+    ),
+    'tax_invoices_count',(
+      select count(*) from public.pos_tax_invoices x
+      where x.tenant_id=p_tenant_id and (p_branch_id is null or x.branch_id=p_branch_id)
+        and (v_is_owner or exists(select 1 from public.user_branch_roles a where a.user_id=v_actor and a.tenant_id=p_tenant_id and a.branch_id=x.branch_id and a.role::text='manager'))
+    ),
+    'ai_documents_count',(
+      select count(*) from public.pos_ai_documents x
+      where x.tenant_id=p_tenant_id and (p_branch_id is null or x.branch_id=p_branch_id)
+        and (v_is_owner or exists(select 1 from public.user_branch_roles a where a.user_id=v_actor and a.tenant_id=p_tenant_id and a.branch_id=x.branch_id and a.role::text='manager'))
+    ),
+    'printers_count',(
+      select count(*) from public.printer_devices x
+      where x.tenant_id=p_tenant_id and (p_branch_id is null or x.branch_id=p_branch_id)
+        and (v_is_owner or exists(select 1 from public.user_branch_roles a where a.user_id=v_actor and a.tenant_id=p_tenant_id and a.branch_id=x.branch_id and a.role::text='manager'))
+        and coalesce(x.is_active,true)
+    ),
+    'display_pairings_count',(
+      select count(*) from public.pos_customer_display_pairings x
+      where x.tenant_id=p_tenant_id and (p_branch_id is null or x.branch_id=p_branch_id)
+        and (v_is_owner or exists(select 1 from public.user_branch_roles a where a.user_id=v_actor and a.tenant_id=p_tenant_id and a.branch_id=x.branch_id and a.role::text='manager'))
+        and coalesce(x.is_active,true)
+    ),
+    'audit_count',(
+      select count(*) from public.audit_logs x
+      where x.tenant_id=p_tenant_id and (p_branch_id is null or x.branch_id=p_branch_id)
+        and (v_is_owner or exists(select 1 from public.user_branch_roles a where a.user_id=v_actor and a.tenant_id=p_tenant_id and a.branch_id=x.branch_id and a.role::text='manager'))
+    )
   );
 end;
 $function$;
@@ -414,49 +623,103 @@ begin
     'branches',coalesce((
       select jsonb_agg(to_jsonb(b) order by b.name)
       from (
-        select id,code,name,address,is_active
-        from public.branches
-        where tenant_id=p_tenant_id
-          and (v_is_owner or id=p_branch_id)
+        select br.id,br.code,br.name,br.address,br.is_active
+        from public.branches br
+        where br.tenant_id=p_tenant_id
+          and (p_branch_id is null or br.id=p_branch_id)
+          and (
+            v_is_owner or exists(
+              select 1 from public.user_branch_roles actor
+              where actor.user_id=v_actor
+                and actor.tenant_id=p_tenant_id
+                and actor.branch_id=br.id
+                and actor.role::text='manager'
+            )
+          )
       ) b
     ),'[]'::jsonb),
     'devices',coalesce((
       select jsonb_agg(to_jsonb(d) order by d.device_code)
       from (
-        select id,branch_id,device_code,device_name,device_type,status,is_locked,last_seen_at,is_active
-        from public.branch_devices
-        where tenant_id=p_tenant_id
-          and (p_branch_id is null or branch_id=p_branch_id)
+        select bd.id,bd.branch_id,bd.device_code,bd.device_name,bd.device_type,bd.status,
+          bd.is_locked,bd.last_seen_at,bd.is_active
+        from public.branch_devices bd
+        where bd.tenant_id=p_tenant_id
+          and (p_branch_id is null or bd.branch_id=p_branch_id)
+          and (
+            v_is_owner or exists(
+              select 1 from public.user_branch_roles actor
+              where actor.user_id=v_actor
+                and actor.tenant_id=p_tenant_id
+                and actor.branch_id=bd.branch_id
+                and actor.role::text='manager'
+            )
+          )
       ) d
     ),'[]'::jsonb),
     'payment_accounts',coalesce((
       select jsonb_agg(to_jsonb(a) order by a.is_active desc,a.bank_name)
       from (
-        select id,branch_id,bank_name,account_name,account_number,promptpay_phone,qr_image_url,
-          qr_mode,applies_to_all_branches,is_active
-        from public.tenant_payment_accounts
-        where tenant_id=p_tenant_id
-          and (v_is_owner or branch_id=p_branch_id or branch_id is null or applies_to_all_branches=true)
+        select pa.id,pa.branch_id,pa.bank_name,pa.account_name,pa.account_number,pa.promptpay_phone,
+          pa.qr_image_url,pa.qr_mode,pa.applies_to_all_branches,pa.is_active
+        from public.tenant_payment_accounts pa
+        where pa.tenant_id=p_tenant_id
+          and (
+            v_is_owner
+            or pa.applies_to_all_branches=true
+            or pa.branch_id is null
+            or exists(
+              select 1 from public.user_branch_roles actor
+              where actor.user_id=v_actor
+                and actor.tenant_id=p_tenant_id
+                and actor.branch_id=pa.branch_id
+                and actor.role::text='manager'
+            )
+          )
+          and (
+            p_branch_id is null
+            or pa.applies_to_all_branches=true
+            or pa.branch_id is null
+            or pa.branch_id=p_branch_id
+          )
       ) a
     ),'[]'::jsonb),
     'tax_settings',coalesce((
       select jsonb_agg(to_jsonb(x))
       from (
-        select id,branch_id,is_enabled,calculation_base,settings,updated_at
-        from public.tenant_tax_settings
-        where tenant_id=p_tenant_id
-          and (p_branch_id is null or branch_id=p_branch_id)
+        select ts.id,ts.branch_id,ts.is_enabled,ts.calculation_base,ts.settings,ts.updated_at
+        from public.tenant_tax_settings ts
+        where ts.tenant_id=p_tenant_id
+          and (p_branch_id is null or ts.branch_id=p_branch_id)
+          and (
+            v_is_owner or exists(
+              select 1 from public.user_branch_roles actor
+              where actor.user_id=v_actor
+                and actor.tenant_id=p_tenant_id
+                and actor.branch_id=ts.branch_id
+                and actor.role::text='manager'
+            )
+          )
       ) x
     ),'[]'::jsonb),
     'notifications',coalesce((
       select jsonb_agg(to_jsonb(n))
       from (
-        select tenant_id,branch_id,table_qr_popup_enabled,table_qr_sound_enabled,
-          table_qr_sound_volume,table_qr_popup_store_enabled,
-          table_qr_kitchen_auto_send_enabled,table_qr_kitchen_auto_print_enabled,updated_at
-        from public.tenant_pos_notification_settings
-        where tenant_id=p_tenant_id
-          and (p_branch_id is null or branch_id=p_branch_id)
+        select ns.tenant_id,ns.branch_id,ns.table_qr_popup_enabled,ns.table_qr_sound_enabled,
+          ns.table_qr_sound_volume,ns.table_qr_popup_store_enabled,
+          ns.table_qr_kitchen_auto_send_enabled,ns.table_qr_kitchen_auto_print_enabled,ns.updated_at
+        from public.tenant_pos_notification_settings ns
+        where ns.tenant_id=p_tenant_id
+          and (p_branch_id is null or ns.branch_id=p_branch_id)
+          and (
+            v_is_owner or exists(
+              select 1 from public.user_branch_roles actor
+              where actor.user_id=v_actor
+                and actor.tenant_id=p_tenant_id
+                and actor.branch_id=ns.branch_id
+                and actor.role::text='manager'
+            )
+          )
       ) n
     ),'[]'::jsonb),
     'is_owner',v_is_owner
@@ -464,6 +727,8 @@ begin
 end;
 $function$;
 
+revoke all on function public.customer_portal_dashboard_v2(uuid,uuid,timestamptz,timestamptz) from public,anon;
+grant execute on function public.customer_portal_dashboard_v2(uuid,uuid,timestamptz,timestamptz) to authenticated;
 revoke all on function public.customer_portal_billing_overview(uuid) from public,anon;
 grant execute on function public.customer_portal_billing_overview(uuid) to authenticated;
 revoke all on function public.customer_portal_feature_state(uuid,uuid) from public,anon;
