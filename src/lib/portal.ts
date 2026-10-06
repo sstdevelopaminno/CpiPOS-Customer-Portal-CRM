@@ -368,7 +368,8 @@ export async function loadSales(
     .eq("tenant_id", tenantId)
     .gte("created_at", from)
     .lt("created_at", to)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false });
 
   if (branchId) salesQuery = salesQuery.eq("branch_id", branchId);
 
