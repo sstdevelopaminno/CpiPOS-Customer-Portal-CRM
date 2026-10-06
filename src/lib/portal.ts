@@ -1,7 +1,7 @@
 import { supabase, supabaseKey, supabaseUrl } from "./supabase";
 
 export type PortalRole = "owner" | "manager";
-export type PortalView = "dashboard" | "sales" | "products" | "stock" | "staff" | "package";
+export type PortalView = "dashboard" | "sales" | "products" | "stock" | "staff" | "package" | "more" | "settings";
 export type ReportRange = "day" | "month" | "year";
 
 export interface BranchSummary {
@@ -143,6 +143,7 @@ export interface StaffDraft {
   permission_role: string;
   branch_role: string;
   is_active: boolean;
+  pin?: string;
 }
 
 export interface PackageInfo {
@@ -151,8 +152,14 @@ export interface PackageInfo {
     access_locked: boolean | null;
     lock_reason: string | null;
     expires_at: string | null;
+    payment_review_status: string | null;
+    updated_at?: string | null;
   } | null;
   contract: {
+    id?: string | null;
+    package_id?: string | null;
+    package_code?: string | null;
+    package_name?: string | null;
     contract_type: string | null;
     billing_interval: string | null;
     status: string | null;
@@ -161,14 +168,71 @@ export interface PackageInfo {
     auto_renew: boolean | null;
     started_at: string | null;
     ended_at: string | null;
+    max_branches?: number | null;
+    max_devices?: number | null;
+    max_users?: number | null;
   } | null;
   billingCycles: Array<{
+    id: string;
+    package_id: string | null;
     period_start: string;
     period_end: string;
     amount_due: number;
     amount_paid: number;
     status: string;
+    created_at?: string;
   }>;
+  requests: Array<{
+    id: string;
+    request_type: string;
+    requested_package_id: string | null;
+    package_name: string | null;
+    status: string;
+    amount_reported: number | null;
+    currency: string | null;
+    submitted_at: string;
+    reviewed_at: string | null;
+    review_note: string | null;
+    has_evidence: boolean;
+    metadata: Record<string, unknown> | null;
+  }>;
+  issuer: {
+    billing_legal_name_th: string | null;
+    billing_bank_name: string | null;
+    billing_bank_account_name: string | null;
+    billing_bank_account_number: string | null;
+    billing_promptpay_id: string | null;
+    billing_email: string | null;
+    support_email: string | null;
+    billing_vat_registered: boolean | null;
+  } | null;
+  actor_role?: string | null;
+}
+
+export interface FeatureState {
+  package_id: string | null;
+  package_features: Record<string, boolean>;
+  feature_overrides: Record<string, boolean>;
+  menu_policy: Record<string, boolean>;
+}
+
+export interface SettingsSnapshot {
+  store: {
+    id: string;
+    code: string | null;
+    name: string | null;
+    display_name: string | null;
+    logo_url: string | null;
+    company_address: string | null;
+    contact_phone: string | null;
+    owner_phone: string | null;
+  } | null;
+  branches: Array<{id:string;code:string|null;name:string;address:string|null;is_active:boolean}>;
+  devices: Array<{id:string;branch_id:string;device_code:string|null;device_name:string|null;device_type:string|null;status:string|null;is_locked:boolean|null;last_seen_at:string|null;is_active:boolean|null}>;
+  payment_accounts: Array<{id:string;branch_id:string|null;bank_name:string|null;account_name:string|null;account_number:string|null;promptpay_phone:string|null;qr_image_url:string|null;qr_mode:string|null;applies_to_all_branches:boolean|null;is_active:boolean|null}>;
+  tax_settings: Array<{id:string;branch_id:string;is_enabled:boolean;calculation_base:string|null;settings:Record<string,unknown>|null;updated_at:string|null}>;
+  notifications: Array<{tenant_id:string;branch_id:string;table_qr_popup_enabled:boolean|null;table_qr_sound_enabled:boolean|null;table_qr_sound_volume:number|null;table_qr_popup_store_enabled:boolean|null;table_qr_kitchen_auto_send_enabled:boolean|null;table_qr_kitchen_auto_print_enabled:boolean|null;updated_at:string|null}>;
+  is_owner: boolean;
 }
 
 function localDateParts(anchor?: string) {
@@ -533,7 +597,8 @@ export async function createStaff(tenantId: string, draft: StaffDraft) {
       full_name: draft.full_name,
       position_title: draft.position_title,
       branch_role: draft.branch_role,
-      permission_role: draft.permission_role
+      permission_role: draft.permission_role,
+      pin: draft.pin || ""
     })
   });
   const payload = await response.json().catch(() => ({})) as { error?: string };
@@ -558,30 +623,93 @@ export async function updateStaff(tenantId: string, draft: StaffDraft) {
     p_is_active: draft.is_active
   });
   if (error) throw new Error(explainMutationError(error.message));
+
+  if (draft.pin) {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) throw new Error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่");
+    const response = await fetch(`${supabaseUrl}/functions/v1/customer-portal-staff-admin`, {
+      method: "POST",
+      headers: {"content-type":"application/json",apikey:supabaseKey,authorization:`Bearer ${token}`},
+      body: JSON.stringify({
+        action:"set_pin",tenant_id:tenantId,branch_id:draft.branch_id,
+        user_id:draft.user_id,pin:draft.pin
+      })
+    });
+    if (!response.ok) throw new Error("ไม่สามารถตั้ง PIN พนักงานได้");
+  }
 }
 
-export async function loadPackage(tenantId: string, role: PortalRole): Promise<PackageInfo> {
-  const [{ data: runtime, error: runtimeError }, { data: contract, error: contractError }] = await Promise.all([
-    supabase.from("tenant_subscription_runtime").select("lifecycle_status,access_locked,lock_reason,expires_at").eq("tenant_id", tenantId).maybeSingle(),
-    supabase.from("tenant_subscription_contracts").select("contract_type,billing_interval,status,amount_per_cycle,currency,auto_renew,started_at,ended_at").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(1).maybeSingle()
-  ]);
-  if (runtimeError) throw runtimeError;
-  if (contractError) throw contractError;
-
-  let billingCycles: PackageInfo["billingCycles"] = [];
-  if (role === "owner") {
-    const { data, error } = await supabase
-      .from("tenant_billing_cycles")
-      .select("period_start,period_end,amount_due,amount_paid,status")
-      .eq("tenant_id", tenantId)
-      .order("period_end", { ascending: false })
-      .limit(12);
-    if (!error) billingCycles = (data ?? []) as PackageInfo["billingCycles"];
-  }
-
+export async function loadPackage(tenantId: string, _role: PortalRole): Promise<PackageInfo> {
+  const { data, error } = await supabase.rpc("customer_portal_billing_overview", {
+    p_tenant_id: tenantId
+  });
+  if (error) throw error;
+  const value = (data ?? {}) as unknown as PackageInfo;
   return {
-    runtime: runtime as PackageInfo["runtime"],
-    contract: contract as PackageInfo["contract"],
-    billingCycles
+    runtime: value.runtime ?? null,
+    contract: value.contract ?? null,
+    billingCycles: Array.isArray(value.billingCycles) ? value.billingCycles : [],
+    requests: Array.isArray(value.requests) ? value.requests : [],
+    issuer: value.issuer ?? null,
+    actor_role: value.actor_role ?? null
   };
+}
+
+export async function loadFeatureState(tenantId: string, branchId: string | null): Promise<FeatureState> {
+  const { data, error } = await supabase.rpc("customer_portal_feature_state", {
+    p_tenant_id: tenantId,
+    p_branch_id: branchId
+  });
+  if (error) throw error;
+  const value=(data??{}) as Record<string,unknown>;
+  return {
+    package_id: typeof value.package_id==="string"?value.package_id:null,
+    package_features: (value.package_features??{}) as Record<string,boolean>,
+    feature_overrides: (value.feature_overrides??{}) as Record<string,boolean>,
+    menu_policy: (value.menu_policy??{}) as Record<string,boolean>
+  };
+}
+
+export async function loadSettingsSnapshot(tenantId: string, branchId: string | null): Promise<SettingsSnapshot> {
+  const { data, error } = await supabase.rpc("customer_portal_settings_snapshot", {
+    p_tenant_id: tenantId,
+    p_branch_id: branchId
+  });
+  if (error) throw error;
+  return data as unknown as SettingsSnapshot;
+}
+
+export async function submitPackagePayment(input:{
+  tenantId:string;
+  billingCycleId?:string|null;
+  requestId?:string|null;
+  packageId:string;
+  billingInterval:string;
+  expectedAmount:number;
+  slip:File;
+}) {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token=sessionData.session?.access_token;
+  if(!token) throw new Error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่");
+  const form=new FormData();
+  form.set("tenant_id",input.tenantId);
+  form.set("request_key",input.requestId||crypto.randomUUID());
+  form.set("package_id",input.packageId);
+  form.set("billing_interval",input.billingInterval);
+  form.set("expected_amount",String(input.expectedAmount));
+  if(input.billingCycleId) form.set("billing_cycle_id",input.billingCycleId);
+  form.set("slip",input.slip);
+  const response=await fetch(`${supabaseUrl}/functions/v1/customer-portal-billing-payment`,{
+    method:"POST",
+    headers:{apikey:supabaseKey,authorization:`Bearer ${token}`},
+    body:form
+  });
+  const payload=await response.json().catch(()=>({})) as {error?:string;status?:string};
+  if(!response.ok){
+    if(payload.error==="open_request_exists") throw new Error("มีรายการแพ็กเกจที่กำลังรอตรวจสอบอยู่แล้ว");
+    if(payload.error==="slip_required") throw new Error("กรุณาแนบสลิป JPG, PNG หรือ WebP ขนาดไม่เกิน 4 MB");
+    throw new Error("ไม่สามารถส่งหลักฐานการชำระเงินได้");
+  }
+  return payload;
 }
