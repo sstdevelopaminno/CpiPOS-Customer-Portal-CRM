@@ -13,13 +13,22 @@ function explain(error: unknown) {
   if(message.includes("invalid_member_input"))return new Error("กรุณากรอกชื่อสมาชิกและเบอร์โทร 9–10 หลัก");
   if(message.includes("invalid_member_email"))return new Error("รูปแบบอีเมลสมาชิกไม่ถูกต้อง");
   if(message.includes("invalid_buffet_price"))return new Error("ราคาบุฟเฟ่ต้องมากกว่า 0 บาท");
+  if(message.includes("printer_name_required"))return new Error("กรุณาระบุชื่อเครื่องพิมพ์");
+  if(message.includes("printer_purpose_required"))return new Error("กรุณาเลือกหน้าที่ของเครื่องพิมพ์อย่างน้อย 1 รายการ");
+  if(message.includes("lan_ip_required"))return new Error("เครื่องพิมพ์ LAN ต้องระบุ IP Address");
+  if(message.includes("printer_zone_invalid"))return new Error("โซนครัวที่เลือกไม่ถูกต้องหรือถูกปิดใช้งาน");
+  if(message.includes("pairing_not_found"))return new Error("ไม่พบการเชื่อมต่อ Customer Display");
+  if(message.includes("layout_object_not_found"))return new Error("ไม่พบวัตถุในผังร้าน");
   return new Error(message||"ไม่สามารถดำเนินการกับข้อมูล POS ได้");
 }
 
 export async function loadPosAdminSnapshot<T extends PosAdminSnapshot>(
   tenantId:string, branchId:string, module:PosAdminModule
 ):Promise<T>{
-  const {data,error}=await supabase.rpc("customer_portal_pos_admin_snapshot",{
+  const rpc=["tables","kitchen","printers","display"].includes(module)
+    ?"customer_portal_pos_admin_phase2_snapshot"
+    :"customer_portal_pos_admin_snapshot";
+  const {data,error}=await supabase.rpc(rpc,{
     p_tenant_id:tenantId,p_branch_id:branchId,p_module:module
   });
   if(error)throw explain(error);
@@ -29,7 +38,8 @@ export async function loadPosAdminSnapshot<T extends PosAdminSnapshot>(
 export async function mutatePosAdmin<T=Record<string,unknown>>(
   tenantId:string, branchId:string, action:string, payload:Record<string,unknown>
 ):Promise<T>{
-  const {data,error}=await supabase.rpc("customer_portal_pos_admin_mutate",{
+  const phase2=action.startsWith("floor_plan.")||action.startsWith("layout_object.")||action.startsWith("printer.")||action.startsWith("display.");
+  const {data,error}=await supabase.rpc(phase2?"customer_portal_pos_admin_phase2_mutate":"customer_portal_pos_admin_mutate",{
     p_tenant_id:tenantId,p_branch_id:branchId,p_action:action,p_payload:payload
   });
   if(error)throw explain(error);
