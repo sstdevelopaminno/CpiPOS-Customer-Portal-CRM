@@ -299,6 +299,8 @@ function explainMutationError(message?: string) {
   if (value.includes("invalid_pin")) return "PIN ต้องเป็นตัวเลข 4–12 หลัก";
   if (value.includes("invalid_order_notes")) return "หมายเหตุรายการขายต้องไม่เกิน 1,000 ตัวอักษร";
   if (value.includes("invalid_customer_name")) return "ชื่อลูกค้าต้องไม่เกิน 180 ตัวอักษร";
+  if (value.includes("setting_policy_forbidden")) return "แพ็กเกจหรือฝ่าย IT ไม่อนุญาตให้แก้ไขการตั้งค่านี้";
+  if (value.includes("invalid_qr_mode")) return "รูปแบบ QR ไม่รองรับ กรุณาเลือก PromptPay หรือรูป QR";
   if (value.includes("customer_portal_forbidden")) return "บัญชีนี้ไม่มีสิทธิ์ดำเนินการในสาขาที่เลือก";
   return value || "ไม่สามารถบันทึกข้อมูลได้";
 }
@@ -738,6 +740,8 @@ export async function submitPackagePayment(input:{
   const payload=await response.json().catch(()=>({})) as {error?:string;status?:string};
   if(!response.ok){
     if(payload.error==="open_request_exists") throw new Error("มีรายการแพ็กเกจที่กำลังรอตรวจสอบอยู่แล้ว");
+    if(payload.error==="payable_cycle_exists") throw new Error("มีรอบบิลที่ต้องชำระอยู่ กรุณาชำระจากรายการรอบบิลนั้น");
+    if(payload.error==="renewal_not_due") throw new Error("ยังไม่ถึงช่วงเวลาที่เปิดให้ชำระรอบถัดไป");
     if(payload.error==="slip_required") throw new Error("กรุณาแนบสลิป JPG, PNG หรือ WebP ขนาดไม่เกิน 4 MB");
     throw new Error("ไม่สามารถส่งหลักฐานการชำระเงินได้");
   }
