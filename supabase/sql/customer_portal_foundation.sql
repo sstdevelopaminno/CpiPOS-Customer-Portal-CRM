@@ -8,19 +8,82 @@ create table if not exists app.customer_portal_login_attempts (
 );
 create index if not exists customer_portal_login_attempts_lookup_idx on app.customer_portal_login_attempts(store_code,client_key,attempted_at desc);
 
-create or replace function public.customer_portal_authenticate(p_store_code text,p_pin text,p_client_key text)
+create or replace function public.customer_portal_authenticate_employee(p_store_code text,p_employee_code text,p_client_key text)
 returns table(user_id uuid,email text,tenant_id uuid,tenant_code text,tenant_name text,portal_role text)
 language plpgsql security definer set search_path=''
 as $$
 declare
   v_store_code text:=trim(coalesce(p_store_code,''));
-  v_pin text:=trim(coalesce(p_pin,''));
+  v_employee_code text:=trim(coalesce(p_employee_code,''));
   v_client_key text:=trim(coalesce(p_client_key,''));
   v_failures integer:=0;
   v_candidate record;
 begin
   if v_store_code !~ '^[A-Za-z0-9_-]{3,32}$' then raise exception using errcode='22023',message='invalid_store_code'; end if;
-  if v_pin !~ '^[0-9]{4,12}$' then raise exception using errcode='22023',message='invalid_pin'; end if;
+  if v_employee_code !~ '^[A-Za-z0-9._-]{2,32}
+  if length(v_client_key)<16 or length(v_client_key)>128 then raise exception using errcode='22023',message='invalid_client_key'; end if;
+  delete from app.customer_portal_login_attempts where attempted_at<now()-interval '24 hours';
+  select count(*) into v_failures from app.customer_portal_login_attempts where store_code=v_store_code and client_key=v_client_key and success=false and attempted_at>=now()-interval '15 minutes';
+  if v_failures>=5 then raise exception using errcode='P0001',message='portal_rate_limited'; end if;
+
+  select up.id as user_id,au.email::text as email,t.id as tenant_id,t.code::text as tenant_code,
+         coalesce(nullif(t.display_name,''),t.name)::text as tenant_name,ubr.role::text as portal_role
+  into v_candidate
+  from public.tenants t
+  join public.user_branch_roles ubr on ubr.tenant_id=t.id and ubr.role::text in('owner','manager')
+  join public.users_profiles up on up.id=ubr.user_id and up.is_active=true and up.archived_at is null
+  join public.pos_user_profiles pup on pup.user_id=up.id and pup.tenant_id=t.id
+  join auth.users au on au.id=up.id and au.deleted_at is null
+  where t.code=v_store_code and t.is_active=true and btrim(pup.employee_code)=v_employee_code
+  order by case when ubr.role::text='owner' then 0 else 1 end,case when ubr.is_default then 0 else 1 end,up.created_at
+  limit 1;
+
+  if not found then insert into app.customer_portal_login_attempts(store_code,client_key,success) values(v_store_code,v_client_key,false);return;end if;
+  insert into app.customer_portal_login_attempts(store_code,client_key,success) values(v_store_code,v_client_key,true);
+  delete from app.customer_portal_login_attempts where store_code=v_store_code and client_key=v_client_key and success=false;
+  return query select v_candidate.user_id::uuid,v_candidate.email::text,v_candidate.tenant_id::uuid,v_candidate.tenant_code::text,v_candidate.tenant_name::text,v_candidate.portal_role::text;
+end;$$;
+revoke all on function public.customer_portal_authenticate_employee(text,text,text) from public,anon,authenticated;
+grant execute on function public.customer_portal_authenticate_employee(text,text,text) to service_role;
+
+create or replace function public.customer_portal_dashboard(p_tenant_id uuid,p_from timestamptz,p_to timestamptz)
+returns jsonb language plpgsql stable security invoker set search_path=''
+as $$
+declare v_authorized boolean:=false;v_sales numeric:=0;v_orders bigint:=0;v_products bigint:=0;v_branches bigint:=0;v_low_stock bigint:=0;v_open_shifts bigint:=0;
+begin
+  select exists(select 1 from public.user_branch_roles ubr where ubr.user_id=(select auth.uid()) and ubr.tenant_id=p_tenant_id and ubr.role::text in('owner','manager')) into v_authorized;
+  if not v_authorized then raise exception using errcode='42501',message='customer_portal_forbidden';end if;
+  select coalesce(sum(coalesce(o.grand_total,o.total_amount,0)),0),count(*) into v_sales,v_orders from public.orders o where o.tenant_id=p_tenant_id and o.status::text='completed' and o.created_at>=p_from and o.created_at<p_to;
+  select count(*) into v_products from public.products p where p.tenant_id=p_tenant_id and p.is_active=true and p.deleted_at is null;
+  select count(*) into v_branches from public.branches b where b.tenant_id=p_tenant_id and b.is_active=true;
+  select count(*) into v_low_stock from public.ingredients i where i.tenant_id=p_tenant_id and i.reorder_level is not null and i.quantity_on_hand<=i.reorder_level;
+  select count(*) into v_open_shifts from public.shifts s where s.tenant_id=p_tenant_id and s.status::text='open';
+  return jsonb_build_object('sales_total',v_sales,'order_count',v_orders,'average_ticket',case when v_orders>0 then round(v_sales/v_orders,2) else 0 end,'active_products',v_products,'active_branches',v_branches,'low_stock_count',v_low_stock,'open_shifts',v_open_shifts,'from',p_from,'to',p_to);
+end;$$;
+revoke all on function public.customer_portal_dashboard(uuid,timestamptz,timestamptz) from public,anon;
+grant execute on function public.customer_portal_dashboard(uuid,timestamptz,timestamptz) to authenticated;
+
+
+-- Owner Portal billing visibility for tenant-level cycles that do not carry branch_id.
+drop policy if exists tenant_billing_cycles_portal_owner_read on public.tenant_billing_cycles;
+create policy tenant_billing_cycles_portal_owner_read
+on public.tenant_billing_cycles
+for select
+to authenticated
+using (
+  exists (
+    select 1
+    from public.user_branch_roles ubr
+    join public.users_profiles up
+      on up.id=ubr.user_id
+     and up.is_active=true
+     and up.archived_at is null
+    where ubr.user_id=(select auth.uid())
+      and ubr.tenant_id=tenant_billing_cycles.tenant_id
+      and ubr.role::text='owner'
+  )
+);
+ then raise exception using errcode='22023',message='invalid_employee_code'; end if;
   if length(v_client_key)<16 or length(v_client_key)>128 then raise exception using errcode='22023',message='invalid_client_key'; end if;
   delete from app.customer_portal_login_attempts where attempted_at<now()-interval '24 hours';
   select count(*) into v_failures from app.customer_portal_login_attempts where store_code=v_store_code and client_key=v_client_key and success=false and attempted_at>=now()-interval '15 minutes';

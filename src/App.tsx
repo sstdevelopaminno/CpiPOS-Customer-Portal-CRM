@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import {
   loadDashboard, loadPackage, loadPortalContext, loadProducts, loadSales, loadStock,
-  loginWithStorePin, logoutPortal, type DashboardSummary, type OrderRow, type PackageInfo,
+  loginWithStoreEmployeeCode, logoutPortal, type DashboardSummary, type OrderRow, type PackageInfo,
   type PortalContext, type PortalView, type ProductRow, type StockRow
 } from "./lib/portal";
 import { supabase } from "./lib/supabase";
@@ -23,36 +23,36 @@ function statusLabel(status: string) {
 
 function Login({ onSuccess }: { onSuccess: () => Promise<void> }) {
   const [storeCode, setStoreCode] = useState("");
-  const [pin, setPin] = useState("");
+  const [employeeCode, setEmployeeCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   async function submit(event: React.FormEvent) {
     event.preventDefault(); setError(""); setBusy(true);
-    try { await loginWithStorePin(storeCode, pin); await onSuccess(); }
+    try { await loginWithStoreEmployeeCode(storeCode, employeeCode); await onSuccess(); }
     catch (err) { setError(err instanceof Error ? err.message : "เข้าสู่ระบบไม่สำเร็จ"); }
     finally { setBusy(false); }
   }
   return <main className="loginPage">
     <section className="loginBrand">
       <div className="brandPill">CpiPOS CUSTOMER PORTAL</div>
-      <h1>บริหารร้านของคุณ<br/>ได้จากทุกที่</h1>
-      <p>ดูยอดขาย สาขา สินค้า สต๊อก และสถานะแพ็กเกจจากข้อมูล CpiPOS จริงแบบปลอดภัย</p>
+      <h1>บริหารร้านง่ายขึ้น<br/><span>ทุกที่ ทุกเวลา</span></h1>
+      <p className="loginLead">ติดตามยอดขาย ตรวจสอบสินค้าและสต๊อก พร้อมดูภาพรวมการดำเนินงานของร้านได้สะดวกในที่เดียว</p>
       <div className="loginBenefits">
-        <span><ShieldCheck size={18}/> Owner / Manager เท่านั้น</span>
+        <span><ShieldCheck size={18}/> สำหรับเจ้าของร้านและผู้จัดการ</span>
         <span><UserRoundCheck size={18}/> ใช้งานพร้อมกันได้หลายเครื่อง</span>
-        <span><TrendingUp size={18}/> เชื่อมตรง CpiPOS-001</span>
+        <span><TrendingUp size={18}/> ติดตามข้อมูลร้านได้ทุกที่ทุกเวลา</span>
       </div>
     </section>
     <section className="loginCard">
-      <div className="portalMark">CP</div>
-      <div><p className="eyebrow">WELCOME BACK</p><h2>เข้าสู่ระบบร้านค้า</h2><p className="muted">ใช้รหัสร้าน และ PIN ของเจ้าของร้านหรือผู้จัดการ</p></div>
+      <div className="loginLogoWrap"><img className="loginLogo" src="/cpipos-logo.png" alt="CpiPOS" /></div>
+      <div><p className="eyebrow">WELCOME BACK</p><h2>เข้าสู่ระบบร้านค้า</h2><p className="muted">ใช้รหัสร้าน และรหัสพนักงานของเจ้าของร้านหรือผู้จัดการ</p></div>
       <form onSubmit={submit}>
         <label><span>รหัสร้าน</span><input autoComplete="username" value={storeCode} onChange={e=>setStoreCode(e.target.value)} placeholder="เช่น 459605" maxLength={32} required/></label>
-        <label><span>PIN</span><input autoComplete="current-password" inputMode="numeric" type="password" value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,"").slice(0,12))} placeholder="••••" minLength={4} maxLength={12} required/></label>
+        <label><span>รหัสพนักงาน</span><input autoComplete="off" inputMode="text" type="text" value={employeeCode} onChange={e=>setEmployeeCode(e.target.value.replace(/[^A-Za-z0-9._-]/g,"").slice(0,32))} placeholder="เช่น 000001" minLength={2} maxLength={32} required/></label>
         {error ? <div className="errorBox"><CircleAlert size={18}/>{error}</div> : null}
         <button className="primaryButton" disabled={busy}>{busy?<LoaderCircle className="spin" size={19}/>:null}{busy?"กำลังตรวจสอบ...":"เข้าสู่ระบบ"}</button>
       </form>
-      <p className="securityCopy">PIN ไม่ผ่าน Vercel Function และ Browser ไม่สามารถอ่าน PIN hash ได้</p>
+      <p className="securityCopy">สำหรับบัญชีเจ้าของร้านและผู้จัดการเท่านั้น</p>
     </section>
   </main>;
 }
@@ -70,7 +70,7 @@ function DashboardView({context}:{context:PortalContext}) {
   useEffect(()=>{void refresh();},[refresh]);
   if(loading&&!summary) return <div className="loadingPanel"><LoaderCircle className="spin"/>กำลังโหลด Dashboard...</div>;
   return <>
-    <div className="pageHeading"><div><p className="eyebrow">TODAY OVERVIEW</p><h2>ภาพรวมวันนี้</h2><p>ข้อมูลสดจาก CpiPOS-001 ตามสิทธิ์สาขาของบัญชีนี้</p></div><button className="ghostButton" onClick={()=>void refresh()}><RefreshCw size={17}/>รีเฟรช</button></div>
+    <div className="pageHeading"><div><p className="eyebrow">TODAY OVERVIEW</p><h2>ภาพรวมวันนี้</h2><p>ภาพรวมการดำเนินงานจากสาขาที่คุณมีสิทธิ์เข้าถึง</p></div><button className="ghostButton" onClick={()=>void refresh()}><RefreshCw size={17}/>รีเฟรช</button></div>
     <section className="metricsGrid">
       <MetricCard icon={<Banknote/>} label="ยอดขายวันนี้" value={money.format(summary?.sales_total??0)} helper="เฉพาะบิลสำเร็จ"/>
       <MetricCard icon={<ReceiptText/>} label="จำนวนบิล" value={number.format(summary?.order_count??0)} helper="รายการขายวันนี้"/>
@@ -147,17 +147,17 @@ export default function App(){
   const [fatal,setFatal]=useState("");
   const restore=useCallback(async()=>{setFatal("");try{setContext(await loadPortalContext());}catch(err){const m=err instanceof Error?err.message:"";if(m!=="not_authenticated")setFatal("ไม่สามารถตรวจสอบสิทธิ์ Customer Portal ได้");setContext(null);}finally{setChecking(false);}},[]);
   useEffect(()=>{void restore();const{data}=supabase.auth.onAuthStateChange(event=>{if(event==="SIGNED_OUT")setContext(null);});return()=>data.subscription.unsubscribe();},[restore]);
-  if(checking)return <div className="bootScreen"><div className="portalMark">CP</div><LoaderCircle className="spin"/><span>กำลังเชื่อมต่อ CpiPOS...</span></div>;
+  if(checking)return <div className="bootScreen"><img className="bootLogo" src="/cpipos-logo.png" alt="CpiPOS"/><LoaderCircle className="spin"/><span>กำลังเตรียมข้อมูลร้าน...</span></div>;
   if(!context)return <Login onSuccess={restore}/>;
   return <div className="appShell">
     <aside className="sidebar">
-      <div className="brandBlock"><div className="portalMark small">CP</div><div><strong>CpiPOS</strong><span>Customer Portal</span></div></div>
+      <div className="brandBlock"><img className="brandLogo" src="/cpipos-logo.png" alt="CpiPOS"/><div><strong>CpiPOS</strong><span>Customer Portal</span></div></div>
       <div className="storeCard"><div className="storeAvatar">{context.logoUrl?<img src={context.logoUrl} alt=""/>:<Store size={21}/>}</div><div><strong>{context.tenantName}</strong><span>ร้าน {context.tenantCode}</span></div></div>
       <nav>{nav.map(i=><button key={i.id} className={view===i.id?"active":""} onClick={()=>setView(i.id)}>{i.icon}<span>{i.label}</span><ChevronRight size={16}/></button>)}</nav>
       <div className="sidebarBottom"><div className="roleBadge"><ShieldCheck size={16}/><span>{context.role==="owner"?"Owner":"Manager"}</span></div><button className="logoutButton" onClick={()=>void logoutPortal()}><LogOut size={17}/>ออกจากระบบ</button></div>
     </aside>
     <main className="content">
-      <header className="mobileHeader"><div className="brandBlock"><div className="portalMark small">CP</div><div><strong>CpiPOS</strong><span>{context.tenantName}</span></div></div><button className="iconButton" onClick={()=>void logoutPortal()}><LogOut size={18}/></button></header>
+      <header className="mobileHeader"><div className="brandBlock"><img className="brandLogo" src="/cpipos-logo.png" alt="CpiPOS"/><div><strong>CpiPOS</strong><span>{context.tenantName}</span></div></div><button className="iconButton" onClick={()=>void logoutPortal()}><LogOut size={18}/></button></header>
       <div className="mobileNav">{nav.map(i=><button key={i.id} className={view===i.id?"active":""} onClick={()=>setView(i.id)}>{i.icon}<span>{i.label}</span></button>)}</div>
       {fatal?<div className="errorBox">{fatal}</div>:null}
       {view==="dashboard"?<DashboardView context={context}/>:null}

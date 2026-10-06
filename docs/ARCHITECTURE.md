@@ -6,7 +6,7 @@ Keep Vercel Fluid Active CPU close to zero during normal customer usage.
 ## Request path
 1. Vercel serves this Vite SPA as static files/CDN.
 2. Login calls Supabase Edge Function `customer-portal-login`.
-3. The function validates store code + owner/manager PIN via a service-role-only RPC.
+3. The function validates store code + owner/manager employee code via a service-role-only RPC.
 4. A one-time Supabase Auth token is exchanged directly with Supabase Auth.
 5. Browser queries CpiPOS-001 directly; existing RLS limits tenant/branch access.
 
@@ -14,9 +14,9 @@ There are no Vercel API Routes, Server Actions, SSR pages, middleware, cron jobs
 
 ## Security
 - Browser never receives `service_role`.
-- Browser never reads `users_profiles.pin_hash`.
+- Browser never receives privileged credential data.
 - Only `owner` and `manager` can bootstrap a Portal session.
-- PIN failures are rate-limited by store + hashed client fingerprint.
+- Employee-code login failures are rate-limited by store + hashed client fingerprint.
 - Existing CpiPOS RLS remains authoritative.
 
 ## Phase 1
