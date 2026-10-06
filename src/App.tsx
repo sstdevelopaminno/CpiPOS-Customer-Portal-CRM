@@ -1,19 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Banknote, Boxes, CalendarDays, ChevronLeft, ChevronRight, CircleAlert, Clock3,
-  Download, Eye, LayoutDashboard, LoaderCircle, LogOut, Menu, PackageCheck,
-  PanelLeftClose, PanelLeftOpen, Pencil, Plus, ReceiptText, RefreshCw, Save,
-  Search, ShieldCheck, Store, Trash2, TrendingUp, UserRoundCheck, UsersRound,
-  Warehouse, WifiOff, X
+  Banknote, Bell, Boxes, Building2, CalendarDays, ChefHat, ChevronLeft, ChevronRight,
+  CircleAlert, Clock3, CreditCard, Download, Eye, FileText, History, LayoutDashboard,
+  LoaderCircle, LogOut, Menu, MonitorSmartphone, MoreHorizontal, PackageCheck,
+  PanelLeftClose, PanelLeftOpen, Pencil, Plus, Printer, ReceiptText, RefreshCw, Save,
+  Search, Settings, ShieldCheck, Store, Table2, Trash2, TrendingUp, UserRoundCheck,
+  UsersRound, Warehouse, WifiOff, X
 } from "lucide-react";
 import {
-  cancelOrder, createStaff, deleteProduct, deleteStock, loadDashboard, loadOrderItems,
-  loadPackage, loadPortalContext, loadProducts, loadSales, loadStaff, loadStock,
-  loginWithStoreEmployeeCode, logoutPortal, reportRangeLabel, saveProduct, saveStock,
-  todayInputValue, updateOrder, updateStaff, type DashboardSummary, type OrderItemRow,
-  type OrderRow, type PackageInfo, type PortalContext, type PortalView, type ProductDraft,
-  type ProductRow, type ReportRange, type StaffDraft, type StaffRow, type StockDraft,
-  type StockRow
+  cancelOrder, createStaff, deleteProduct, deleteStock, loadDashboard, loadFeatureState,
+  loadOrderItems, loadPackage, loadPortalContext, loadProducts, loadSales, loadSettingsSnapshot,
+  loadStaff, loadStock, loginWithStoreEmployeeCode, logoutPortal, reportRangeLabel, saveProduct,
+  saveStock, submitPackagePayment, todayInputValue, updateOrder, updateStaff,
+  type DashboardSummary, type FeatureState, type OrderItemRow, type OrderRow, type PackageInfo,
+  type PortalContext, type PortalView, type ProductDraft, type ProductRow, type ReportRange,
+  type SettingsSnapshot, type StaffDraft, type StaffRow, type StockDraft, type StockRow
 } from "./lib/portal";
 import { supabase } from "./lib/supabase";
 
@@ -111,6 +112,21 @@ function ErrorPanel({ message }: { message: string }) {
   return <div className="errorPanel"><CircleAlert size={19}/><span>{message}</span></div>;
 }
 
+function Pagination({page,pageCount,onPageChange,disabled=false}:{page:number;pageCount:number;onPageChange:(page:number)=>void;disabled?:boolean}) {
+  if(pageCount<=1)return null;
+  const current=page+1;
+  const pages:Array<number|string>=[];
+  const add=(value:number|string)=>{if(pages[pages.length-1]!==value)pages.push(value);};
+  const candidates=new Set([1,pageCount,current-2,current-1,current,current+1,current+2].filter(value=>typeof value==="number"&&value>=1&&value<=pageCount) as number[]);
+  let last=0;
+  [...candidates].sort((a,b)=>a-b).forEach(value=>{if(last&&value-last>1)add("…");add(value);last=value;});
+  return <div className="paginationBar">
+    <button className="secondaryButton" disabled={page<=0||disabled} onClick={()=>onPageChange(Math.max(0,page-1))}><ChevronLeft size={17}/>ก่อนหน้า</button>
+    <div className="pageNumbers">{pages.map((item,index)=>item==="…"?<span key={"ellipsis-"+index}>…</span>:<button key={item} disabled={disabled} className={Number(item)===current?"active":""} onClick={()=>onPageChange(Number(item)-1)}>{item}</button>)}</div>
+    <button className="secondaryButton" disabled={page+1>=pageCount||disabled} onClick={()=>onPageChange(Math.min(pageCount-1,page+1))}>ถัดไป<ChevronRight size={17}/></button>
+  </div>;
+}
+
 function Modal({
   title,
   subtitle,
@@ -202,7 +218,7 @@ function DashboardView({ context, branchId, range, anchor }: { context: PortalCo
 
   return <>
     <div className="pageHeading">
-      <div><p className="eyebrow">SALES OVERVIEW</p><h2>ภาพรวม {periodLabel}</h2><p>ยอดขายและสถานะการดำเนินงานตามสาขาและช่วงเวลาที่เลือก</p></div>
+      <div><p className="eyebrow">SALES OVERVIEW</p><h2>ภาพรวม</h2><p>ยอดขายและสถานะการดำเนินงานตามสาขาและช่วงเวลาที่เลือก</p></div>
       <button className="ghostButton" onClick={()=>void refresh()}><RefreshCw size={18}/>รีเฟรช</button>
     </div>
     {error ? <ErrorPanel message={error}/> : null}
@@ -216,7 +232,7 @@ function DashboardView({ context, branchId, range, anchor }: { context: PortalCo
     <section className="splitGrid">
       <article className="panel">
         <div className="panelHeader"><div><p className="eyebrow">RECENT SALES</p><h3>บิลล่าสุด</h3></div></div>
-        {orders.length ? <div className="rows">{orders.map(order=><div className="dataRow" key={order.id}><div><strong>{order.order_no||"รายการขาย"}</strong><span>{dateTime.format(new Date(order.created_at))}</span></div><div className="rowAmount"><strong>{money.format(amount(order))}</strong><span>{order.order_type||order.channel||"POS"}</span></div></div>)}</div> : <Empty>ยังไม่มีรายการขายในช่วงเวลานี้</Empty>}
+        {orders.length ? <div className="rows dashboardScroll">{orders.map(order=><div className="dataRow" key={order.id}><div><strong>{order.order_no||"รายการขาย"}</strong><span>{dateTime.format(new Date(order.created_at))}</span></div><div className="rowAmount"><strong>{money.format(amount(order))}</strong><span>{order.order_type||order.channel||"POS"}</span></div></div>)}</div> : <Empty>ยังไม่มีรายการขายในช่วงเวลานี้</Empty>}
       </article>
       <article className="panel">
         <div className="panelHeader"><div><p className="eyebrow">STORE HEALTH</p><h3>สถานะร้าน</h3></div></div>
@@ -229,8 +245,8 @@ function DashboardView({ context, branchId, range, anchor }: { context: PortalCo
     </section>
 
     <article className="panel topProductsPanel">
-      <div className="panelHeader"><div><p className="eyebrow">TOP PRODUCTS</p><h3>สินค้าขายดี · {periodLabel}</h3></div></div>
-      {topProducts.length ? <div className="topProductsList">{topProducts.map((item,index)=>{
+      <div className="panelHeader"><div><p className="eyebrow">TOP PRODUCTS</p><h3>สินค้าขายดี</h3></div></div>
+      {topProducts.length ? <div className="topProductsList dashboardScroll">{topProducts.map((item,index)=>{
         const width=Math.max(8,(Number(item.sales_total||0)/maxTopSale)*100);
         return <div className="topProductRow" key={item.name+"-"+index}>
           <div className="topProductRank">{index+1}</div>
@@ -333,7 +349,7 @@ function SalesView({ context, branchId, range, anchor }: { context: PortalContex
   const [page,setPage]=useState(0);
   const [totalCount,setTotalCount]=useState(0);
   const [salesTotal,setSalesTotal]=useState(0);
-  const pageSize=100;
+  const pageSize=20;
   const requestIdRef=useRef(0);
 
   useEffect(()=>{setPage(0);},[context.tenantId,branchId,range,anchor]);
@@ -371,7 +387,7 @@ function SalesView({ context, branchId, range, anchor }: { context: PortalContex
 
   return <>
     <div className="pageHeading">
-      <div><p className="eyebrow">SALES</p><h2>รายการขาย · {reportRangeLabel(range,anchor)}</h2><p>ดูรายวัน รายเดือน หรือรายปี พร้อมแก้ข้อมูลประกอบและยกเลิกบิลแบบคืนสต๊อก</p></div>
+      <div><p className="eyebrow">SALES</p><h2>รายการขาย</h2><p>ดูรายวัน รายเดือน หรือรายปี พร้อมแก้ข้อมูลประกอบและยกเลิกบิลแบบคืนสต๊อก</p></div>
       <div className="headingStat"><span>ยอดขายรวมช่วงนี้</span><strong>{money.format(salesTotal)}</strong></div>
     </div>
     <div className="toolbar"><label className="searchBox"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="ค้นหาในหน้าปัจจุบัน..."/></label><span className="toolbarCount">{pageLabel}</span></div>
@@ -381,11 +397,7 @@ function SalesView({ context, branchId, range, anchor }: { context: PortalContex
       <div className="tableWrap"><table><thead><tr><th>เลขที่บิล</th><th>เวลา</th><th>สาขา</th><th>สถานะ</th><th className="right">ยอดรวม</th><th></th></tr></thead><tbody>
         {filtered.map(row=><tr key={row.id}><td><strong>{row.order_no||"—"}</strong></td><td>{dateTime.format(new Date(row.created_at))}</td><td>{branchMap.get(row.branch_id)||"—"}</td><td><span className={`status status-${row.status}`}>{statusLabel(row.status)}</span></td><td className="right"><strong>{money.format(amount(row))}</strong></td><td className="right"><button className="tableAction" onClick={()=>setSelectedOrder(row)}><Eye size={16}/>ดู/จัดการ</button></td></tr>)}
       </tbody></table></div>:<Empty>ยังไม่มีข้อมูลรายการขายในช่วงเวลานี้</Empty>}
-      {totalCount>pageSize?<div className="paginationBar">
-        <button className="secondaryButton" disabled={page<=0||loading} onClick={()=>setPage(value=>Math.max(0,value-1))}><ChevronLeft size={17}/>ก่อนหน้า</button>
-        <span>หน้า {page+1} / {pageCount}</span>
-        <button className="secondaryButton" disabled={page+1>=pageCount||loading} onClick={()=>setPage(value=>Math.min(pageCount-1,value+1))}>ถัดไป<ChevronRight size={17}/></button>
-      </div>:null}
+      <Pagination page={page} pageCount={pageCount} onPageChange={setPage} disabled={loading}/>
     </article>
     <div className="auditNote">รายการขายใหม่สร้างจาก POS เพื่อรักษา payment/shift/stock transaction ให้ถูกต้อง; Customer Portal รองรับแก้ไขข้อมูลประกอบและยกเลิกบิลอย่างปลอดภัย</div>
     {selectedOrder?<OrderDetailModal order={selectedOrder} context={context} onClose={()=>setSelectedOrder(null)} onChanged={refresh}/>:null}
