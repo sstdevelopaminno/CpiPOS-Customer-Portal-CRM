@@ -1,0 +1,28 @@
+{
+  "name": "CpiPOS Customer Portal",
+  "short_name": "CpiPOS",
+  "description": "เว็บแอปสำหรับเจ้าของร้านและผู้จัดการ เพื่อติดตามยอดขาย สินค้า สต๊อก และภาพรวมการดำเนินงาน",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "lang": "th",
+  "theme_color": "#0b294d",
+  "background_color": "#f3f7fb",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
