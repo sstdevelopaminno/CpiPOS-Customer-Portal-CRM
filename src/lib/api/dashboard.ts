@@ -1,7 +1,7 @@
 import { supabase } from "../supabase";
 import { getReportWindow } from "../reporting";
 import { orderSelect } from "../order-fields";
-import type { DashboardSummary, ReportRange } from "../../types/portal";
+import type { DashboardSummary, OrderRow, ReportRange } from "../../types/portal";
 
 export async function loadDashboard(tenantId: string, branchId: string | null, range: ReportRange, anchor: string) {
   const { from, to } = getReportWindow(range, anchor);
