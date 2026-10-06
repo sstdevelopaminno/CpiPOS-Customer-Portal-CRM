@@ -12,3 +12,7 @@ Customer-facing owner/manager portal for CpiPOS.
 - Never expose `service_role` or `users_profiles.pin_hash` to the browser
 
 The design intentionally minimizes Vercel Fluid Active CPU usage.
+
+## Phase 1 status
+
+Foundation implementation is tracked in PR #1.
