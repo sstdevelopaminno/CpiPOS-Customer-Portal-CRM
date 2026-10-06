@@ -648,7 +648,6 @@ function StaffForm({
       if(initial)await updateStaff(context.tenantId,draft);
       else await createStaff(context.tenantId,draft);
       await onSaved();
-      if(kind==="store"||kind==="branches")await onContextChanged();
       onClose();
     }catch(err){setError(err instanceof Error?err.message:"บันทึกพนักงานไม่สำเร็จ");}
     finally{setBusy(false);}
@@ -894,7 +893,7 @@ const settingsCatalog=[
 type EditableSettingKind="store"|"branches"|"payments"|"taxes"|"notifications";
 
 function SettingEditorModal({
-  kind,context,branchId,snapshot,onClose,onSaved
+  kind,context,branchId,snapshot,onClose,onSaved,onContextChanged
 }:{
   kind:EditableSettingKind;
   context:PortalContext;
@@ -902,6 +901,7 @@ function SettingEditorModal({
   snapshot:SettingsSnapshot;
   onClose:()=>void;
   onSaved:()=>Promise<void>;
+  onContextChanged:()=>Promise<void>;
 }){
   const initialBranchId=branchId||snapshot.branches[0]?.id||"";
   const firstBranch=snapshot.branches.find(b=>b.id===initialBranchId)??snapshot.branches[0];
@@ -985,7 +985,9 @@ function SettingEditorModal({
       if(kind==="payments")await saveSetting(context.tenantId,scopeBranch||null,"save_payment_account",accountDraft);
       if(kind==="taxes")await saveSetting(context.tenantId,scopeBranch||null,"save_tax",taxDraft);
       if(kind==="notifications")await saveSetting(context.tenantId,scopeBranch||null,"save_notifications",notificationDraft);
-      await onSaved();onClose();
+      await onSaved();
+      if(kind==="store"||kind==="branches")await onContextChanged();
+      onClose();
     }catch(err){setError(err instanceof Error?err.message:"บันทึกการตั้งค่าไม่สำเร็จ");}
     finally{setBusy(false);}
   }
