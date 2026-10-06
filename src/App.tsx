@@ -1086,10 +1086,10 @@ function SettingsView({context,branchId,onNavigate,onContextChanged}:{context:Po
     return "เชื่อมกับการตั้งค่า POS";
   };
   const editable=(kind:string):kind is EditableSettingKind=>["store","branches","payments","taxes","notifications"].includes(kind);
-  const localOnly=["printers","activity","inet","support","push","language","placement","display","orderKitchen","tableQr"];
+  const localOnly=["devices","printers","activity","inet","support","push","language","placement","display","orderKitchen","tableQr"];
 
   return <>
-    <div className="pageHeading"><div><p className="eyebrow">SETTINGS</p><h2>ตั้งค่า</h2><p>โครงเมนูตาม POS และใช้สิทธิ์จากแพ็กเกจ + นโยบาย IT ชุดเดียวกัน</p></div><button className="ghostButton" onClick={()=>void refresh()}><RefreshCw size={18}/>รีเฟรช</button></div>
+    <div className="pageHeading"><div><p className="eyebrow">SETTINGS</p><h2>ตั้งค่า</h2><p>โครงเมนูตาม POS และใช้สิทธิ์จากแพ็กเกจ + นโยบาย IT ชุดเดียวกัน</p></div><button className="ghostButton" onClick={()=>void Promise.all([refresh(),onContextChanged()])}><RefreshCw size={18}/>รีเฟรช</button></div>
     {error?<ErrorPanel message={error}/>:null}
     {snapshot?<section className="settingsOverview">
       <div><Store size={20}/><span>ร้าน</span><strong>{snapshot.store?.display_name||snapshot.store?.name||"—"}</strong></div>
@@ -1222,7 +1222,7 @@ export default function App() {
   if(checking)return <div className="bootScreen"><img className="bootLogo" src="/cpipos-logo.png" alt="CpiPOS"/><LoaderCircle className="spin"/><span>กำลังเตรียมข้อมูลร้าน...</span></div>;
   if(!context)return <Login onSuccess={restore} canInstall={Boolean(installPrompt)&&!standalone} onInstall={installApp}/>;
 
-  const showFilters=!["package","more"].includes(view);
+  const showFilters=view!=="package";
   const showPeriod=view==="dashboard"||view==="sales";
   const canInstall=Boolean(installPrompt)&&!standalone;
 
