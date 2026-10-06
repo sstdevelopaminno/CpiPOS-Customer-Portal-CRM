@@ -107,9 +107,28 @@ Deno.serve(async(req)=>{
       });
       if(branchRoleError)throw branchRoleError;
     }catch(dbError){
-      await admin.auth.admin.deleteUser(created.id).catch(()=>undefined);
-      console.error("[customer-portal-staff-admin] profile create failed",dbError instanceof Error?dbError.message:"db_error");
-      return json(req,{error:"staff_profile_create_failed"},503);
+      const cleanupErrors:string[]=[];
+
+      for(const table of ["user_branch_roles","pos_user_profiles","users_profiles"]){
+        const query=admin.from(table).delete().eq("user_id",created.id);
+        const scoped=table==="users_profiles"?query:query.eq("tenant_id",tenantId);
+        const {error:cleanupError}=await scoped;
+        if(cleanupError)cleanupErrors.push(table+":"+cleanupError.message);
+      }
+
+      let {error:authDeleteError}=await admin.auth.admin.deleteUser(created.id);
+      if(authDeleteError){
+        await new Promise(resolve=>setTimeout(resolve,200));
+        ({error:authDeleteError}=await admin.auth.admin.deleteUser(created.id));
+      }
+      if(authDeleteError)cleanupErrors.push("auth:"+authDeleteError.message);
+
+      console.error(
+        "[customer-portal-staff-admin] profile create failed",
+        dbError instanceof Error?dbError.message:"db_error",
+        cleanupErrors.length?{cleanup_errors:cleanupErrors}:undefined
+      );
+      return json(req,{error:cleanupErrors.length?"staff_profile_create_failed_cleanup_pending":"staff_profile_create_failed"},503);
     }
 
     return json(req,{ok:true,user_id:created.id},201);
