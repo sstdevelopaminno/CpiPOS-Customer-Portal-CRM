@@ -233,20 +233,26 @@ begin
 
       insert into public.branches(tenant_id,code,name,address,is_active)
       values(
-        p_tenant_id,btrim(p_payload->>'code'),btrim(p_payload->>'name'),
+        p_tenant_id,upper(btrim(p_payload->>'code')),btrim(p_payload->>'name'),
         nullif(btrim(coalesce(p_payload->>'address','')),''),
         coalesce((p_payload->>'is_active')::boolean,true)
       ) returning id into v_id;
     else
       v_id=(p_payload->>'id')::uuid;
       update public.branches
-      set code=btrim(p_payload->>'code'),
+      set code=upper(btrim(p_payload->>'code')),
           name=btrim(p_payload->>'name'),
           address=nullif(btrim(coalesce(p_payload->>'address','')),''),
           is_active=coalesce((p_payload->>'is_active')::boolean,is_active),
           updated_at=now()
       where id=v_id and tenant_id=p_tenant_id;
       if not found then raise exception using errcode='P0002',message='branch_not_found'; end if;
+    end if;
+    if nullif(p_payload->>'id','') is null then
+      insert into public.user_branch_roles(user_id,tenant_id,branch_id,role,is_default)
+      values(v_actor,p_tenant_id,v_id,'owner'::public.branch_role,false)
+      on conflict(user_id,tenant_id,branch_id) do update
+      set role='owner'::public.branch_role;
     end if;
     return jsonb_build_object('ok',true,'id',v_id,'action',p_action);
   end if;
@@ -255,21 +261,48 @@ begin
     if not v_is_owner then
       raise exception using errcode='42501',message='owner_required';
     end if;
-    if btrim(coalesce(p_payload->>'bank_name',''))='' then
-      raise exception using errcode='22023',message='invalid_bank_name';
+    if p_branch_id is null then
+      raise exception using errcode='22023',message='branch_required';
     end if;
-    if nullif(p_payload->>'id','') is null then
+    if btrim(coalesce(p_payload->>'bank_name',''))='' or btrim(coalesce(p_payload->>'account_name',''))='' then
+      raise exception using errcode='22023',message='invalid_payment_account';
+    end if;
+    if coalesce(nullif(p_payload->>'qr_mode',''),'promptpay_link')='promptpay_link'
+       and regexp_replace(coalesce(p_payload->>'promptpay_phone',''),'[^0-9]','','g')='' then
+      raise exception using errcode='22023',message='promptpay_required';
+    end if;
+    if coalesce(nullif(p_payload->>'qr_mode',''),'promptpay_link')='qr_image'
+       and btrim(coalesce(p_payload->>'qr_image_url',''))='' then
+      raise exception using errcode='22023',message='qr_image_required';
+    end if;
+
+    v_id=nullif(p_payload->>'id','')::uuid;
+
+    if coalesce((p_payload->>'is_active')::boolean,true) then
+      update public.tenant_payment_accounts
+      set is_active=false,updated_at=now()
+      where tenant_id=p_tenant_id
+        and is_active=true
+        and (v_id is null or id<>v_id)
+        and (
+          coalesce((p_payload->>'applies_to_all_branches')::boolean,false)
+          or branch_id=p_branch_id
+          or applies_to_all_branches=true
+        );
+    end if;
+
+    if v_id is null then
       insert into public.tenant_payment_accounts(
-        tenant_id,branch_id,bank_name,account_name,account_number,promptpay_phone,
+        tenant_id,branch_id,bank_name,account_name,account_number,promptpay_phone,promptpay_payload,
         qr_image_url,qr_mode,applies_to_all_branches,is_active,created_by
       )
       values(
-        p_tenant_id,
-        case when coalesce((p_payload->>'applies_to_all_branches')::boolean,false) then null else p_branch_id end,
-        btrim(p_payload->>'bank_name'),
-        nullif(btrim(coalesce(p_payload->>'account_name','')),''),
+        p_tenant_id,p_branch_id,btrim(p_payload->>'bank_name'),
+        btrim(p_payload->>'account_name'),
         nullif(btrim(coalesce(p_payload->>'account_number','')),''),
-        nullif(btrim(coalesce(p_payload->>'promptpay_phone','')),''),
+        nullif(regexp_replace(coalesce(p_payload->>'promptpay_phone',''),'[^0-9]','','g'),''),
+        case when regexp_replace(coalesce(p_payload->>'promptpay_phone',''),'[^0-9]','','g')=''
+          then null else 'https://promptpay.io/'||regexp_replace(coalesce(p_payload->>'promptpay_phone',''),'[^0-9]','','g') end,
         nullif(btrim(coalesce(p_payload->>'qr_image_url','')),''),
         coalesce(nullif(p_payload->>'qr_mode',''),'promptpay_link'),
         coalesce((p_payload->>'applies_to_all_branches')::boolean,false),
@@ -277,13 +310,14 @@ begin
         v_actor
       ) returning id into v_id;
     else
-      v_id=(p_payload->>'id')::uuid;
       update public.tenant_payment_accounts
-      set branch_id=case when coalesce((p_payload->>'applies_to_all_branches')::boolean,false) then null else p_branch_id end,
+      set branch_id=p_branch_id,
           bank_name=btrim(p_payload->>'bank_name'),
-          account_name=nullif(btrim(coalesce(p_payload->>'account_name','')),''),
+          account_name=btrim(p_payload->>'account_name'),
           account_number=nullif(btrim(coalesce(p_payload->>'account_number','')),''),
-          promptpay_phone=nullif(btrim(coalesce(p_payload->>'promptpay_phone','')),''),
+          promptpay_phone=nullif(regexp_replace(coalesce(p_payload->>'promptpay_phone',''),'[^0-9]','','g'),''),
+          promptpay_payload=case when regexp_replace(coalesce(p_payload->>'promptpay_phone',''),'[^0-9]','','g')=''
+            then null else 'https://promptpay.io/'||regexp_replace(coalesce(p_payload->>'promptpay_phone',''),'[^0-9]','','g') end,
           qr_image_url=nullif(btrim(coalesce(p_payload->>'qr_image_url','')),''),
           qr_mode=coalesce(nullif(p_payload->>'qr_mode',''),'promptpay_link'),
           applies_to_all_branches=coalesce((p_payload->>'applies_to_all_branches')::boolean,false),
