@@ -23,6 +23,12 @@ const number = new Intl.NumberFormat("th-TH", { maximumFractionDigits: 2 });
 const dateTime = new Intl.DateTimeFormat("th-TH", { dateStyle: "medium", timeStyle: "short" });
 const dateOnly = new Intl.DateTimeFormat("th-TH", { dateStyle: "medium" });
 
+function formatCurrency(value:number,currency:string|null|undefined){
+  const code=String(currency||"THB").toUpperCase();
+  try{return new Intl.NumberFormat("th-TH",{style:"currency",currency:code,maximumFractionDigits:2}).format(Number(value)||0);}
+  catch{return `${number.format(Number(value)||0)} ${code}`;}
+}
+
 function amount(order: OrderRow) {
   return Number(order.grand_total ?? order.total_amount ?? 0);
 }
@@ -480,6 +486,7 @@ function ProductsView({ context, branchId }: { context: PortalContext; branchId:
     return !q||[row.sku,row.name,row.category].some(value=>String(value??"").toLowerCase().includes(q));
   });
   const pageCount=Math.max(1,Math.ceil(filtered.length/pageSize));
+  useEffect(()=>{if(page>=pageCount)setPage(Math.max(0,pageCount-1));},[page,pageCount]);
   const visible=filtered.slice(page*pageSize,(page+1)*pageSize);
 
   async function remove(row:ProductRow){
@@ -584,6 +591,7 @@ function StockView({ context, branchId }: { context: PortalContext; branchId: st
     return !q||display.name.toLowerCase().includes(q)||display.code.toLowerCase().includes(q);
   });
   const pageCount=Math.max(1,Math.ceil(filtered.length/pageSize));
+  useEffect(()=>{if(page>=pageCount)setPage(Math.max(0,pageCount-1));},[page,pageCount]);
   const visible=filtered.slice(page*pageSize,(page+1)*pageSize);
 
   async function remove(row:StockRow){
@@ -639,7 +647,9 @@ function StaffForm({
     try{
       if(initial)await updateStaff(context.tenantId,draft);
       else await createStaff(context.tenantId,draft);
-      await onSaved();onClose();
+      await onSaved();
+      if(kind==="store"||kind==="branches")await onContextChanged();
+      onClose();
     }catch(err){setError(err instanceof Error?err.message:"บันทึกพนักงานไม่สำเร็จ");}
     finally{setBusy(false);}
   }
@@ -685,6 +695,7 @@ function StaffView({ context, branchId }: { context: PortalContext; branchId: st
     return !q||[row.full_name,row.position_title,row.branch_name,row.branch_role,row.employee_code].some(value=>String(value??"").toLowerCase().includes(q));
   });
   const pageCount=Math.max(1,Math.ceil(filtered.length/pageSize));
+  useEffect(()=>{if(page>=pageCount)setPage(Math.max(0,pageCount-1));},[page,pageCount]);
   const visible=filtered.slice(page*pageSize,(page+1)*pageSize);
 
   async function deactivate(row:StaffRow){
@@ -720,6 +731,7 @@ function billingStatusLabel(status:string){
     active:"ใช้งาน",trial:"ทดลองใช้งาน",locked:"ระงับใช้งาน"
   } as Record<string,string>)[status]??status;
 }
+const PAYABLE_BILLING_STATUSES=new Set(["open","due","overdue","pending"]);
 
 function PackagePaymentModal({
   tenantId,info,cycle,onClose,onSaved
@@ -734,6 +746,7 @@ function PackagePaymentModal({
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
   const contract=info.contract;
+  const billingCurrency=contract?.currency||"THB";
   const expected=cycle?Math.max(0,Number(cycle.amount_due)-Number(cycle.amount_paid)):Number(contract?.amount_per_cycle??0);
   const packageId=contract?.package_id??"";
 
@@ -761,7 +774,7 @@ function PackagePaymentModal({
       {error?<ErrorPanel message={error}/>:null}
       <div className="paymentSummary">
         <div><span>แพ็กเกจ</span><strong>{contract?.package_name||contract?.package_code||"CpiPOS"}</strong></div>
-        <div><span>ยอดที่ต้องชำระ</span><strong>{money.format(expected)}</strong></div>
+        <div><span>ยอดที่ต้องชำระ</span><strong>{formatCurrency(expected,billingCurrency)}</strong></div>
         {cycle?<div><span>รอบบิล</span><strong>{dateOnly.format(new Date(cycle.period_start))} – {dateOnly.format(new Date(cycle.period_end))}</strong></div>:null}
       </div>
       <div className="issuerBox">
@@ -797,10 +810,11 @@ function PackageView({ context }: { context: PortalContext }) {
   const expiry=info?.runtime?.expires_at||info?.contract?.ended_at;
   const daysRemaining=expiry?Math.ceil((new Date(expiry).getTime()-Date.now())/86400000):null;
   const openRequest=info?.requests.find(row=>["pending","under_review"].includes(row.status));
-  const dueCycles=(info?.billingCycles??[]).filter(cycle=>cycle.status!=="paid"&&Number(cycle.amount_due)>Number(cycle.amount_paid));
+  const dueCycles=(info?.billingCycles??[]).filter(cycle=>PAYABLE_BILLING_STATUSES.has(cycle.status)&&Number(cycle.amount_due)>Number(cycle.amount_paid));
   const canUpcoming=Boolean(context.role==="owner"&&!openRequest&&!dueCycles.length&&info?.contract?.package_id&&Number(info.contract.amount_per_cycle)>0&&daysRemaining!==null&&daysRemaining<=7);
   const status=info?.runtime?.lifecycle_status||info?.contract?.status||"—";
   const interval=info?.contract?.billing_interval==="yearly"?"รายปี":info?.contract?.billing_interval==="monthly"?"รายเดือน":info?.contract?.billing_interval||"—";
+  const billingCurrency=info?.contract?.currency||"THB";
 
   return <>
     <div className="pageHeading"><div><p className="eyebrow">PACKAGE & BILLING</p><h2>แพ็กเกจและการชำระเงิน</h2><p>สถานะสิทธิ์ รอบบิล และรายการชำระเชื่อมกับระบบ POS/IT ชุดเดียวกัน</p></div><button className="ghostButton" onClick={()=>void refresh()}><RefreshCw size={18}/>รีเฟรช</button></div>
@@ -810,13 +824,13 @@ function PackageView({ context }: { context: PortalContext }) {
       <div><span>สถานะ</span><strong>{billingStatusLabel(status)}</strong><small>{info?.runtime?.access_locked?"การใช้งานถูกจำกัด":"ระบบพร้อมใช้งาน"}</small></div>
       <div><span>รอบชำระ</span><strong>{interval}</strong><small>Auto renew: {info?.contract?.auto_renew?"เปิด":"ปิด"}</small></div>
       <div><span>หมดอายุ</span><strong>{expiry?dateOnly.format(new Date(expiry)):"—"}</strong><small>{daysRemaining===null?"ไม่กำหนด":daysRemaining<0?`เกินกำหนด ${Math.abs(daysRemaining)} วัน`:`เหลือ ${daysRemaining} วัน`}</small></div>
-      <div><span>ค่าบริการต่อรอบ</span><strong>{info?.contract?.amount_per_cycle==null?"—":money.format(Number(info.contract.amount_per_cycle))}</strong><small>{info?.contract?.currency||"THB"}</small></div>
+      <div><span>ค่าบริการต่อรอบ</span><strong>{info?.contract?.amount_per_cycle==null?"—":formatCurrency(Number(info.contract.amount_per_cycle),billingCurrency)}</strong><small>{billingCurrency}</small></div>
     </section>
 
     {openRequest?<div className="billingAlert"><Clock3 size={20}/><div><strong>รายการกำลังรอตรวจสอบ</strong><span>{billingStatusLabel(openRequest.status)} · {openRequest.package_name||info?.contract?.package_name||"แพ็กเกจ"} · ส่งเมื่อ {dateTime.format(new Date(openRequest.submitted_at))}</span></div></div>:null}
-    {canUpcoming?<div className="billingAlert warning"><CreditCard size={20}/><div><strong>ใกล้ถึงรอบชำระค่าบริการ</strong><span>ยอด {money.format(Number(info?.contract?.amount_per_cycle??0))} · กรุณาชำระและส่งสลิปเพื่อให้ IT ตรวจสอบ</span></div><button className="primaryAction" onClick={()=>setPaying(null)}>ชำระเงิน</button></div>:null}
+    {canUpcoming?<div className="billingAlert warning"><CreditCard size={20}/><div><strong>ใกล้ถึงรอบชำระค่าบริการ</strong><span>ยอด {formatCurrency(Number(info?.contract?.amount_per_cycle??0),billingCurrency)} · กรุณาชำระและส่งสลิปเพื่อให้ IT ตรวจสอบ</span></div><button className="primaryAction" onClick={()=>setPaying(null)}>ชำระเงิน</button></div>:null}
 
-    {context.role==="owner"?<article className="panel tablePanel"><div className="panelHeader"><div><p className="eyebrow">BILLING HISTORY</p><h3>รายการรอบบิล</h3></div></div>{info?.billingCycles.length?<div className="tableWrap boundedTable"><table><thead><tr><th>ช่วงรอบบิล</th><th>สถานะ</th><th className="right">ยอดเรียกเก็บ</th><th className="right">ชำระแล้ว</th><th className="right">คงค้าง</th><th></th></tr></thead><tbody>{info.billingCycles.map(cycle=>{const outstanding=Math.max(0,Number(cycle.amount_due)-Number(cycle.amount_paid));const payable=cycle.status!=="paid"&&outstanding>0&&!openRequest;return <tr key={cycle.id}><td>{dateOnly.format(new Date(cycle.period_start))} – {dateOnly.format(new Date(cycle.period_end))}</td><td><span className={cycle.status==="paid"?"status status-completed":"status status-pending"}>{billingStatusLabel(cycle.status)}</span></td><td className="right">{money.format(Number(cycle.amount_due))}</td><td className="right">{money.format(Number(cycle.amount_paid))}</td><td className="right"><strong>{money.format(outstanding)}</strong></td><td className="right">{payable?<button className="tableAction payAction" onClick={()=>setPaying(cycle)}><CreditCard size={15}/>ชำระเงิน</button>:null}</td></tr>;})}</tbody></table></div>:<Empty>ยังไม่มีประวัติรอบบิลที่แสดงได้</Empty>}</article>:<div className="infoBox">Manager ดูสถานะแพ็กเกจได้ ส่วนการชำระเงินและประวัติหลักฐานสงวนสำหรับ Owner</div>}
+    {context.role==="owner"?<article className="panel tablePanel"><div className="panelHeader"><div><p className="eyebrow">BILLING HISTORY</p><h3>รายการรอบบิล</h3></div></div>{info?.billingCycles.length?<div className="tableWrap boundedTable"><table><thead><tr><th>ช่วงรอบบิล</th><th>สถานะ</th><th className="right">ยอดเรียกเก็บ</th><th className="right">ชำระแล้ว</th><th className="right">คงค้าง</th><th></th></tr></thead><tbody>{info.billingCycles.map(cycle=>{const outstanding=Math.max(0,Number(cycle.amount_due)-Number(cycle.amount_paid));const payable=PAYABLE_BILLING_STATUSES.has(cycle.status)&&outstanding>0&&!openRequest;return <tr key={cycle.id}><td>{dateOnly.format(new Date(cycle.period_start))} – {dateOnly.format(new Date(cycle.period_end))}</td><td><span className={cycle.status==="paid"?"status status-completed":"status status-pending"}>{billingStatusLabel(cycle.status)}</span></td><td className="right">{formatCurrency(Number(cycle.amount_due),billingCurrency)}</td><td className="right">{formatCurrency(Number(cycle.amount_paid),billingCurrency)}</td><td className="right"><strong>{formatCurrency(outstanding,billingCurrency)}</strong></td><td className="right">{payable?<button className="tableAction payAction" onClick={()=>setPaying(cycle)}><CreditCard size={15}/>ชำระเงิน</button>:null}</td></tr>;})}</tbody></table></div>:<Empty>ยังไม่มีประวัติรอบบิลที่แสดงได้</Empty>}</article>:<div className="infoBox">Manager ดูสถานะแพ็กเกจได้ ส่วนการชำระเงินและประวัติหลักฐานสงวนสำหรับ Owner</div>}
 
     {context.role==="owner"&&info?.requests.length?<article className="panel tablePanel"><div className="panelHeader"><div><p className="eyebrow">PAYMENT REQUESTS</p><h3>สถานะการชำระและคำขอ</h3></div></div><div className="tableWrap"><table><thead><tr><th>วันที่ส่ง</th><th>แพ็กเกจ</th><th>ประเภท</th><th>สถานะ</th><th>หลักฐาน</th></tr></thead><tbody>{info.requests.map(row=><tr key={row.id}><td>{dateTime.format(new Date(row.submitted_at))}</td><td>{row.package_name||"—"}</td><td>{row.request_type}</td><td><span className={["pending","under_review"].includes(row.status)?"status status-pending":"status"}>{billingStatusLabel(row.status)}</span></td><td>{row.has_evidence?"ส่งแล้ว":"—"}</td></tr>)}</tbody></table></div></article>:null}
     <div className="auditNote">CRM ส่งเฉพาะคำขอและหลักฐานไปยัง billing control plane เดิม การอนุมัติเงินจริง การออกใบเสร็จ และการเปลี่ยนสิทธิ์ยังดำเนินการโดย POS/IT ตามขั้นตอนเดิม</div>
@@ -939,11 +953,14 @@ function SettingEditorModal({
     setAccountChoice(value);
     if(value==="__new__"){setAccountDraft({id:"",bank_name:"",account_name:"",account_number:"",promptpay_phone:"",qr_image_url:"",qr_mode:"promptpay_link",applies_to_all_branches:false,is_active:true});return;}
     const row=snapshot.payment_accounts.find(a=>a.id===value);
-    if(row)setAccountDraft({
-      id:row.id,bank_name:row.bank_name||"",account_name:row.account_name||"",account_number:row.account_number||"",
-      promptpay_phone:row.promptpay_phone||"",qr_image_url:row.qr_image_url||"",qr_mode:row.qr_mode||"promptpay_link",
-      applies_to_all_branches:row.applies_to_all_branches??false,is_active:row.is_active??true
-    });
+    if(row){
+      setScopeBranch(row.branch_id||initialBranchId);
+      setAccountDraft({
+        id:row.id,bank_name:row.bank_name||"",account_name:row.account_name||"",account_number:row.account_number||"",
+        promptpay_phone:row.promptpay_phone||"",qr_image_url:row.qr_image_url||"",qr_mode:row.qr_mode||"promptpay_link",
+        applies_to_all_branches:row.applies_to_all_branches??false,is_active:row.is_active??true
+      });
+    }
   }
   function changeScope(value:string){
     setScopeBranch(value);
@@ -1025,7 +1042,7 @@ function SettingEditorModal({
   </Modal>;
 }
 
-function SettingsView({context,branchId,onNavigate}:{context:PortalContext;branchId:string|null;onNavigate:(view:PortalView)=>void}){
+function SettingsView({context,branchId,onNavigate,onContextChanged}:{context:PortalContext;branchId:string|null;onNavigate:(view:PortalView)=>void;onContextChanged:()=>Promise<void>}){
   const [snapshot,setSnapshot]=useState<SettingsSnapshot|null>(null);
   const [features,setFeatures]=useState<FeatureState|null>(null);
   const [error,setError]=useState("");
@@ -1077,7 +1094,7 @@ function SettingsView({context,branchId,onNavigate}:{context:PortalContext;branc
       <div><strong>บัญชีรับชำระของร้าน</strong>{snapshot.payment_accounts.slice(0,5).map(a=><span key={a.id}>{a.bank_name||"บัญชี"} · ••••{String(a.account_number||"").slice(-4)}</span>)}</div>
     </div></article>:null}
     <div className="auditNote">ค่าที่เป็น local ต่อเครื่อง เช่น ภาษา/ตำแหน่งแถบเมนู และฮาร์ดแวร์เครื่องพิมพ์ อ่านสถานะร่วมกันแต่ CRM จะไม่สั่งเปลี่ยนเครื่อง POS โดยตรง</div>
-    {editor&&snapshot?<SettingEditorModal kind={editor} context={context} branchId={branchId} snapshot={snapshot} onClose={()=>setEditor(null)} onSaved={refresh}/>:null}
+    {editor&&snapshot?<SettingEditorModal kind={editor} context={context} branchId={branchId} snapshot={snapshot} onClose={()=>setEditor(null)} onSaved={refresh} onContextChanged={onContextChanged}/>:null}
   </>;
 }
 
@@ -1217,7 +1234,7 @@ export default function App() {
       {view==="staff"?<StaffView context={context} branchId={branchId||null}/>:null}
       {view==="package"?<PackageView context={context}/>:null}
       {view==="more"?<MoreView context={context} branchId={branchId||null} onNavigate={chooseView}/>:null}
-      {view==="settings"?<SettingsView context={context} branchId={branchId||null} onNavigate={chooseView}/>:null}
+      {view==="settings"?<SettingsView context={context} branchId={branchId||null} onNavigate={chooseView} onContextChanged={restore}/>:null}
 
       <footer>ข้อมูลและสิทธิ์ถูกจำกัดตามบัญชี {context.role==="owner"?"Owner":"Manager"} · {context.branches.length} สาขาที่เข้าถึงได้</footer>
     </main>
