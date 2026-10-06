@@ -31,6 +31,12 @@ describe("POS admin control-plane",()=>{
     expect(phase2).toContain("floor_plan.save");
     expect(phase2).not.toContain("display.policy.save");
   });
+  it("hardens Customer Display pairing code generation",()=>{
+    const pairing=readFileSync(join(root,"supabase/sql/customer_portal_pos_admin_phase2_pairing_hardening.sql"),"utf8");
+    expect(pairing).toContain("get_byte(v_rand,0)::bigint");
+    expect(pairing).toContain("customer_display_pairing_conflict");
+    expect(pairing).toContain("extensions.digest");
+  });
   it("audits Customer Portal mutations",()=>{
     expect(sql).toContain("insert into public.audit_logs");
     expect(sql).toContain("'source','customer_portal'");
