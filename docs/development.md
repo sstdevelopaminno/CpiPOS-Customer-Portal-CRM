@@ -13,3 +13,7 @@ Required CI check: **CI Customer Portal / validate**. Repository administration 
 ## Security boundaries
 
 Never expose service-role/admin credentials under `src/`. Tenant/branch authorization stays server-side. Financial sale creation remains a POS responsibility. Device-local hardware settings remain read-only from CRM unless a safe control-plane API exists.
+
+## Next UI phase
+
+After this foundation is merged, the next UI iteration can map the POS main/submenu catalog into Customer Portal, especially the **เพิ่มเติม** and **ตั้งค่า** sections, without growing App.tsx or coupling menu UI to data-access code.
