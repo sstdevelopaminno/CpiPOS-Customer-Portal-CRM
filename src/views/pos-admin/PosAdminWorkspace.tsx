@@ -3,6 +3,10 @@ import { ArrowLeft, ChefHat, CircleAlert, LoaderCircle, Pencil, Plus, RefreshCw,
 import { Empty, ErrorPanel, Modal } from "../../components/common";
 import { loadPosAdminSnapshot, mutatePosAdmin } from "../../lib/api/pos-admin";
 import type { PortalContext } from "../../types/portal";
+import { FloorPlanEditor } from "./FloorPlanEditor";
+import { KitchenProductRouting } from "./KitchenProductRouting";
+import { PrinterWorkspace } from "./PrinterWorkspace";
+import { DisplayWorkspace } from "./DisplayWorkspace";
 import type {
   BuffetAdminSnapshot, BuffetProductAdmin, CashierDeviceAdmin, DevicesAdminSnapshot, DiningTableAdmin,
   KitchenAdminSnapshot, KitchenZoneAdmin, MemberAdmin, MembersAdminSnapshot, PosAdminModule,
@@ -99,6 +103,7 @@ function TablesWorkspace({context,branchId,onBack}:{context:PortalContext;branch
         {data?.tables.length?data.tables.map(t=><tr key={t.id}><td><strong>{t.table_code}</strong></td><td>{t.table_name||"—"}</td><td>{data.zones.find(z=>z.id===t.zone_id)?.zone_name||"—"}</td><td>{t.capacity}</td><td><span className={`status ${t.is_active?"status-success":"status-muted"}`}>{t.status}</span></td><td><div className="inlineActions"><button className="tableAction" onClick={()=>setTable(t)}><Pencil size={15}/>แก้ไข</button><button className="tableAction danger" onClick={()=>void remove("table.delete",t.id,`โต๊ะ ${t.table_code}`)}><Trash2 size={15}/>ลบ</button></div></td></tr>):<tr><td colSpan={6}><Empty>ยังไม่มีโต๊ะ</Empty></td></tr>}
       </tbody></table></div>
     </section>
+    {data?<FloorPlanEditor context={context} branchId={branchId} snapshot={data} onRefresh={refresh} onError={setError}/>:null}
     {zone!==undefined?<Modal title={zone?"แก้ไขโซน":"เพิ่มโซน"} onClose={()=>setZone(undefined)}>
       <form className="entityForm" onSubmit={saveZone}><div className="formGrid">
         <label className="span2"><span>ชื่อโซน</span><input name="zone_name" defaultValue={zone?.zone_name??""} required/></label>
@@ -178,6 +183,7 @@ function KitchenWorkspace({context,branchId,onBack}:{context:PortalContext;branc
       {data?.zones.length?data.zones.map(z=><tr key={z.id}><td className="monoCode">{z.access_code||"—"}</td><td><strong>{z.zone_name}</strong><br/><small>{z.zone_code}</small></td><td>{(categoryMap.get(z.id)??[]).join(", ")||"—"}</td><td><button className={`miniToggle ${z.kds_enabled?"on":""}`} onClick={()=>void action("kitchen.zone.kds",z,{kds_enabled:!z.kds_enabled})}>{z.kds_enabled?"ON":"OFF"}</button></td><td>{data.printers.find(p=>p.id===z.default_printer_id)?.printer_name||"—"}</td><td>{z.is_active?"ใช้งาน":"ปิด"}</td><td><div className="inlineActions"><button className="tableAction" onClick={()=>setZone(z)}><Pencil size={15}/>แก้ไข</button><button className="tableAction" onClick={()=>void action("kitchen.zone.rotate_access_code",z)}>เปลี่ยน ID</button><button className="tableAction danger" disabled={!z.is_active} onClick={()=>void action("kitchen.zone.disable",z)}>ปิด</button></div></td></tr>):<tr><td colSpan={7}><Empty>ยังไม่มีโซนครัว</Empty></td></tr>}
       </tbody></table></div>
     </section>
+    {data?<KitchenProductRouting context={context} branchId={branchId} snapshot={data} onRefresh={refresh} onError={setError}/>:null}
     {zone!==undefined?<Modal title={zone?"แก้ไขโซนครัว":"เพิ่มโซนครัว"} onClose={()=>setZone(undefined)} wide>
       <form className="entityForm" onSubmit={save}><div className="formGrid">
         <label><span>ชื่อโซนครัว</span><input name="zone_name" defaultValue={zone?.zone_name??""} required/></label>
@@ -282,8 +288,8 @@ export function PosAdminWorkspace({module,context,branchId,onBack}:WorkspaceProp
     kitchen:["จัดการครัว","จัดการโซนครัว KDS เครื่องพิมพ์ และเส้นทางหมวดหมู่อาหาร"],
     buffet:["ตั้งค่าราคาบุฟเฟ่","จัดการแพ็กเกจราคาแบบรายท่านและแบบชุดที่ POS ใช้ขายจริง"],
     devices:["เครื่องแคชเชียร์","เพิ่ม แก้ไข ลบเครื่อง POS พร้อมควบคุมโควตาและ revoke session"],
-    printers:["เครื่องพิมพ์","ข้อมูลเครื่องพิมพ์ POS"],
-    display:["จอลูกค้า","Customer Display"]
+    printers:["เครื่องพิมพ์","จัดการเครื่องพิมพ์ งานพิมพ์ และการผูกโซนครัวด้วย registry ชุดเดียวกับ POS"],
+    display:["จอลูกค้า","สร้างและยกเลิก Customer Display pairing ภายใต้ IT Policy เดียวกับ POS"]
   };
   const [title,subtitle]=titles[module];
   const childKey=`${module}:${scope}:${refreshKey}`;
@@ -295,6 +301,8 @@ export function PosAdminWorkspace({module,context,branchId,onBack}:WorkspaceProp
       {module==="kitchen"?<KitchenWorkspace context={context} branchId={scope} onBack={onBack}/>:null}
       {module==="buffet"?<BuffetWorkspace context={context} branchId={scope} onBack={onBack}/>:null}
       {module==="devices"?<DevicesWorkspace context={context} branchId={scope} onBack={onBack}/>:null}
+      {module==="printers"?<PrinterWorkspace context={context} branchId={scope}/>:null}
+      {module==="display"?<DisplayWorkspace context={context} branchId={scope}/>:null}
     </div>
   </>;
 }
