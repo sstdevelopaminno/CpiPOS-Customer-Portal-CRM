@@ -436,8 +436,8 @@ export async function loadSales(
   pageSize = 100
 ) {
   const { from, to } = getReportWindow(range, anchor);
-  const safePage = Math.max(0, page);
-  const safePageSize = Math.min(200, Math.max(25, pageSize));
+  const safePage = Math.max(0, Math.trunc(page));
+  const safePageSize = Math.min(200, Math.max(1, Math.trunc(pageSize)));
   const offset = safePage * safePageSize;
 
   let salesQuery = supabase
