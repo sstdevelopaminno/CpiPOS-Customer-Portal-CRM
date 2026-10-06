@@ -722,8 +722,9 @@ function billingStatusLabel(status:string){
 }
 
 function PackagePaymentModal({
-  info,cycle,onClose,onSaved
+  tenantId,info,cycle,onClose,onSaved
 }:{
+  tenantId:string;
   info:PackageInfo;
   cycle:PackageInfo["billingCycles"][number]|null;
   onClose:()=>void;
@@ -742,7 +743,7 @@ function PackagePaymentModal({
     setBusy(true);setError("");
     try{
       await submitPackagePayment({
-        tenantId:(window as unknown as {__tenantId?:string}).__tenantId??"",
+        tenantId,
         billingCycleId:cycle?.id??null,
         packageId,
         billingInterval:contract?.billing_interval??"monthly",
@@ -787,7 +788,6 @@ function PackageView({ context }: { context: PortalContext }) {
     try{
       const data=await loadPackage(context.tenantId,context.role);
       setInfo(data);
-      (window as unknown as {__tenantId?:string}).__tenantId=context.tenantId;
     }catch{setError("ไม่สามารถโหลดข้อมูลแพ็กเกจได้");}
     finally{setLoading(false);}
   },[context.tenantId,context.role]);
@@ -820,7 +820,7 @@ function PackageView({ context }: { context: PortalContext }) {
 
     {context.role==="owner"&&info?.requests.length?<article className="panel tablePanel"><div className="panelHeader"><div><p className="eyebrow">PAYMENT REQUESTS</p><h3>สถานะการชำระและคำขอ</h3></div></div><div className="tableWrap"><table><thead><tr><th>วันที่ส่ง</th><th>แพ็กเกจ</th><th>ประเภท</th><th>สถานะ</th><th>หลักฐาน</th></tr></thead><tbody>{info.requests.map(row=><tr key={row.id}><td>{dateTime.format(new Date(row.submitted_at))}</td><td>{row.package_name||"—"}</td><td>{row.request_type}</td><td><span className={["pending","under_review"].includes(row.status)?"status status-pending":"status"}>{billingStatusLabel(row.status)}</span></td><td>{row.has_evidence?"ส่งแล้ว":"—"}</td></tr>)}</tbody></table></div></article>:null}
     <div className="auditNote">CRM ส่งเฉพาะคำขอและหลักฐานไปยัง billing control plane เดิม การอนุมัติเงินจริง การออกใบเสร็จ และการเปลี่ยนสิทธิ์ยังดำเนินการโดย POS/IT ตามขั้นตอนเดิม</div>
-    {paying!==undefined&&info?<PackagePaymentModal info={info} cycle={paying} onClose={()=>setPaying(undefined)} onSaved={refresh}/>:null}
+    {paying!==undefined&&info?<PackagePaymentModal tenantId={context.tenantId} info={info} cycle={paying} onClose={()=>setPaying(undefined)} onSaved={refresh}/>:null}
   </>;
 }
 
