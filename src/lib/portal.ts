@@ -2,7 +2,7 @@ import { supabase, supabaseKey, supabaseUrl } from "./supabase";
 
 export type PortalRole = "owner" | "manager";
 export type PortalView = "dashboard" | "sales" | "products" | "stock" | "staff" | "package";
-export type ReportRange = "today" | "7d" | "30d";
+export type ReportRange = "day" | "month" | "year";
 
 export interface BranchSummary {
   id: string;
@@ -49,6 +49,7 @@ export interface OrderRow {
   order_type: string | null;
   channel: string | null;
   customer_name: string | null;
+  notes: string | null;
   subtotal: number | null;
   discount_amount: number | null;
   total_amount: number | null;
@@ -56,6 +57,7 @@ export interface OrderRow {
   tax_total: number | null;
   paid_total: number | null;
   status: string;
+  cancelled_reason: string | null;
   created_at: string;
 }
 
@@ -71,11 +73,31 @@ export interface OrderItemRow {
 export interface ProductRow {
   id: string;
   branch_id: string;
-  sku: string | null;
+  sku: string;
   name: string;
-  category: string | null;
+  category: string;
+  price: number;
+  is_combo: boolean;
+  is_active: boolean;
+  stock_deduction_mode: string;
+  sell_unit: string;
+  thumbnail_object_path: string | null;
+  display_object_path: string | null;
+  image_url: string | null;
+  available_quantity: number | null;
+  recipe_count: number;
+}
+
+export interface ProductDraft {
+  id?: string | null;
+  branch_id: string;
+  sku: string;
+  name: string;
+  category: string;
   price: number;
   is_active: boolean;
+  sell_unit: string;
+  stock_deduction_mode: string;
 }
 
 export interface StockRow {
@@ -84,7 +106,20 @@ export interface StockRow {
   name: string;
   base_unit: string;
   quantity_on_hand: number;
-  reorder_level: number | null;
+  reorder_level: number;
+  avg_unit_cost: number;
+  last_purchase_unit_cost: number;
+}
+
+export interface StockDraft {
+  id?: string | null;
+  branch_id: string;
+  name: string;
+  base_unit: string;
+  quantity_on_hand: number;
+  reorder_level: number;
+  avg_unit_cost: number;
+  last_purchase_unit_cost: number;
 }
 
 export interface StaffRow {
@@ -95,6 +130,17 @@ export interface StaffRow {
   permission_role: string | null;
   branch_id: string;
   branch_name: string;
+  branch_role: string;
+  is_active: boolean;
+}
+
+export interface StaffDraft {
+  user_id?: string | null;
+  branch_id: string;
+  full_name: string;
+  employee_code: string;
+  position_title: string;
+  permission_role: string;
   branch_role: string;
   is_active: boolean;
 }
@@ -125,18 +171,56 @@ export interface PackageInfo {
   }>;
 }
 
-export function getReportWindow(range: ReportRange) {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-  if (range === "7d") start.setDate(start.getDate() - 6);
-  if (range === "30d") start.setDate(start.getDate() - 29);
-  return { from: start.toISOString(), to: now.toISOString() };
+function localDateParts(anchor?: string) {
+  const base = anchor ? new Date(`${anchor}T12:00:00`) : new Date();
+  if (Number.isNaN(base.getTime())) return new Date();
+  return base;
 }
 
-export function reportRangeLabel(range: ReportRange) {
-  if (range === "7d") return "7 วัน";
-  if (range === "30d") return "30 วัน";
-  return "วันนี้";
+export function todayInputValue() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+export function getReportWindow(range: ReportRange, anchor?: string) {
+  const base = localDateParts(anchor);
+  let start: Date;
+  let end: Date;
+
+  if (range === "year") {
+    start = new Date(base.getFullYear(), 0, 1, 0, 0, 0, 0);
+    end = new Date(base.getFullYear() + 1, 0, 1, 0, 0, 0, 0);
+  } else if (range === "month") {
+    start = new Date(base.getFullYear(), base.getMonth(), 1, 0, 0, 0, 0);
+    end = new Date(base.getFullYear(), base.getMonth() + 1, 1, 0, 0, 0, 0);
+  } else {
+    start = new Date(base.getFullYear(), base.getMonth(), base.getDate(), 0, 0, 0, 0);
+    end = new Date(base.getFullYear(), base.getMonth(), base.getDate() + 1, 0, 0, 0, 0);
+  }
+
+  return { from: start.toISOString(), to: end.toISOString() };
+}
+
+export function reportRangeLabel(range: ReportRange, anchor?: string) {
+  const base = localDateParts(anchor);
+  if (range === "year") return `ปี ${base.getFullYear() + 543}`;
+  if (range === "month") return new Intl.DateTimeFormat("th-TH", { month: "long", year: "numeric" }).format(base);
+  return new Intl.DateTimeFormat("th-TH", { dateStyle: "medium" }).format(base);
+}
+
+function explainMutationError(message?: string) {
+  const value = String(message ?? "");
+  if (value.includes("duplicate_product_sku")) return "รหัสสินค้า (SKU) นี้มีอยู่แล้วในสาขา";
+  if (value.includes("duplicate_ingredient_name")) return "ชื่อวัตถุดิบนี้มีอยู่แล้วในสาขา";
+  if (value.includes("duplicate_employee_code")) return "รหัสพนักงานนี้มีอยู่แล้ว";
+  if (value.includes("ingredient_in_use_by_recipe")) return "ลบไม่ได้ เนื่องจากวัตถุดิบถูกใช้ในสูตรสินค้า";
+  if (value.includes("ingredient_has_stock_history")) return "ลบไม่ได้ เนื่องจากวัตถุดิบมีประวัติการเคลื่อนไหวสต๊อก";
+  if (value.includes("manager_cannot")) return "สิทธิ์ Manager ไม่สามารถแก้ไขหรือมอบสิทธิ์ระดับ Owner/Manager ได้";
+  if (value.includes("customer_portal_forbidden")) return "บัญชีนี้ไม่มีสิทธิ์ดำเนินการในสาขาที่เลือก";
+  return value || "ไม่สามารถบันทึกข้อมูลได้";
 }
 
 export async function loginWithStoreEmployeeCode(storeCode: string, employeeCode: string) {
@@ -208,6 +292,9 @@ export async function loadPortalContext(): Promise<PortalContext> {
   if (tenantError) throw tenantError;
   if (branchError) throw branchError;
 
+  const allBranches = (branches ?? []) as BranchSummary[];
+  const visibleBranches = role === "owner" ? allBranches : allBranches.filter((branch) => allowedBranchIds.includes(branch.id));
+
   return {
     userId: user.id,
     tenantId,
@@ -215,16 +302,18 @@ export async function loadPortalContext(): Promise<PortalContext> {
     tenantName: tenant.display_name || tenant.name,
     logoUrl: tenant.logo_url,
     role,
-    branches: (branches ?? []) as BranchSummary[],
+    branches: visibleBranches,
     allowedBranchIds
   };
 }
 
-export async function loadDashboard(tenantId: string, branchId: string | null, range: ReportRange) {
-  const { from, to } = getReportWindow(range);
+const orderSelect = "id,branch_id,order_no,order_type,channel,customer_name,notes,subtotal,discount_amount,total_amount,grand_total,tax_total,paid_total,status,cancelled_reason,created_at";
+
+export async function loadDashboard(tenantId: string, branchId: string | null, range: ReportRange, anchor: string) {
+  const { from, to } = getReportWindow(range, anchor);
   let recentQuery = supabase
     .from("orders")
-    .select("id,branch_id,order_no,order_type,channel,customer_name,subtotal,discount_amount,total_amount,grand_total,tax_total,paid_total,status,created_at")
+    .select(orderSelect)
     .eq("tenant_id", tenantId)
     .eq("status", "completed")
     .gte("created_at", from)
@@ -244,23 +333,23 @@ export async function loadDashboard(tenantId: string, branchId: string | null, r
   ]);
   if (summaryError) throw summaryError;
   if (ordersError) throw ordersError;
-  return { summary: summary as DashboardSummary, recentOrders: (orders ?? []) as OrderRow[] };
+  return { summary: summary as DashboardSummary, recentOrders: (orders ?? []) as unknown as OrderRow[] };
 }
 
-export async function loadSales(tenantId: string, branchId: string | null, range: ReportRange) {
-  const { from, to } = getReportWindow(range);
+export async function loadSales(tenantId: string, branchId: string | null, range: ReportRange, anchor: string) {
+  const { from, to } = getReportWindow(range, anchor);
   let query = supabase
     .from("orders")
-    .select("id,branch_id,order_no,order_type,channel,customer_name,subtotal,discount_amount,total_amount,grand_total,tax_total,paid_total,status,created_at")
+    .select(orderSelect)
     .eq("tenant_id", tenantId)
     .gte("created_at", from)
     .lt("created_at", to)
     .order("created_at", { ascending: false })
-    .limit(200);
+    .limit(1000);
   if (branchId) query = query.eq("branch_id", branchId);
   const { data, error } = await query;
   if (error) throw error;
-  return (data ?? []) as OrderRow[];
+  return (data ?? []) as unknown as OrderRow[];
 }
 
 export async function loadOrderItems(orderId: string) {
@@ -273,31 +362,105 @@ export async function loadOrderItems(orderId: string) {
   return (data ?? []) as OrderItemRow[];
 }
 
+export async function updateOrder(tenantId: string, order: OrderRow, customerName: string, notes: string) {
+  const { error } = await supabase.rpc("customer_portal_update_order", {
+    p_tenant_id: tenantId,
+    p_branch_id: order.branch_id,
+    p_order_id: order.id,
+    p_customer_name: customerName,
+    p_notes: notes
+  });
+  if (error) throw new Error(explainMutationError(error.message));
+}
+
+export async function cancelOrder(tenantId: string, order: OrderRow, reason: string) {
+  const { error } = await supabase.rpc("customer_portal_cancel_order", {
+    p_tenant_id: tenantId,
+    p_branch_id: order.branch_id,
+    p_order_id: order.id,
+    p_reason: reason
+  });
+  if (error) throw new Error(explainMutationError(error.message));
+}
+
 export async function loadProducts(tenantId: string, branchId: string | null) {
-  let query = supabase
-    .from("products")
-    .select("id,branch_id,sku,name,category,price,is_active")
-    .eq("tenant_id", tenantId)
-    .is("deleted_at", null)
-    .order("name")
-    .limit(300);
-  if (branchId) query = query.eq("branch_id", branchId);
-  const { data, error } = await query;
+  const { data, error } = await supabase.rpc("customer_portal_products_v2", {
+    p_tenant_id: tenantId,
+    p_branch_id: branchId
+  });
   if (error) throw error;
-  return (data ?? []) as ProductRow[];
+
+  return ((data ?? []) as Omit<ProductRow, "image_url">[]).map((row) => {
+    const path = row.thumbnail_object_path || row.display_object_path;
+    const image_url = path ? supabase.storage.from("product-media").getPublicUrl(path).data.publicUrl : null;
+    return { ...row, image_url } as ProductRow;
+  });
+}
+
+export async function saveProduct(tenantId: string, draft: ProductDraft) {
+  const { data, error } = await supabase.rpc("customer_portal_upsert_product", {
+    p_tenant_id: tenantId,
+    p_branch_id: draft.branch_id,
+    p_product_id: draft.id || null,
+    p_sku: draft.sku,
+    p_name: draft.name,
+    p_category: draft.category,
+    p_price: draft.price,
+    p_is_active: draft.is_active,
+    p_sell_unit: draft.sell_unit,
+    p_stock_deduction_mode: draft.stock_deduction_mode
+  });
+  if (error) throw new Error(explainMutationError(error.message));
+  return data as string;
+}
+
+export async function deleteProduct(tenantId: string, row: ProductRow) {
+  const { error } = await supabase.rpc("customer_portal_delete_product", {
+    p_tenant_id: tenantId,
+    p_branch_id: row.branch_id,
+    p_product_id: row.id,
+    p_reason: "ลบจาก CpiPOS Customer Portal"
+  });
+  if (error) throw new Error(explainMutationError(error.message));
 }
 
 export async function loadStock(tenantId: string, branchId: string | null) {
   let query = supabase
     .from("ingredients")
-    .select("id,branch_id,name,base_unit,quantity_on_hand,reorder_level")
+    .select("id,branch_id,name,base_unit,quantity_on_hand,reorder_level,avg_unit_cost,last_purchase_unit_cost")
     .eq("tenant_id", tenantId)
     .order("name")
-    .limit(300);
+    .limit(500);
   if (branchId) query = query.eq("branch_id", branchId);
   const { data, error } = await query;
   if (error) throw error;
   return (data ?? []) as StockRow[];
+}
+
+export async function saveStock(tenantId: string, draft: StockDraft) {
+  const { data, error } = await supabase.rpc("customer_portal_upsert_ingredient", {
+    p_tenant_id: tenantId,
+    p_branch_id: draft.branch_id,
+    p_ingredient_id: draft.id || null,
+    p_name: draft.name,
+    p_base_unit: draft.base_unit,
+    p_quantity_on_hand: draft.quantity_on_hand,
+    p_reorder_level: draft.reorder_level,
+    p_avg_unit_cost: draft.avg_unit_cost,
+    p_last_purchase_unit_cost: draft.last_purchase_unit_cost,
+    p_reason: "ปรับปรุงจาก CpiPOS Customer Portal"
+  });
+  if (error) throw new Error(explainMutationError(error.message));
+  return data as string;
+}
+
+export async function deleteStock(tenantId: string, row: StockRow) {
+  const { error } = await supabase.rpc("customer_portal_delete_ingredient", {
+    p_tenant_id: tenantId,
+    p_branch_id: row.branch_id,
+    p_ingredient_id: row.id
+  });
+  if (error) throw new Error(explainMutationError(error.message));
 }
 
 export async function loadStaff(tenantId: string, branchId: string | null) {
@@ -307,6 +470,52 @@ export async function loadStaff(tenantId: string, branchId: string | null) {
   });
   if (error) throw error;
   return (data ?? []) as StaffRow[];
+}
+
+export async function createStaff(tenantId: string, draft: StaffDraft) {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
+  if (!token) throw new Error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่");
+
+  const response = await fetch(`${supabaseUrl}/functions/v1/customer-portal-staff-admin`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      apikey: supabaseKey,
+      authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({
+      tenant_id: tenantId,
+      branch_id: draft.branch_id,
+      employee_code: draft.employee_code,
+      full_name: draft.full_name,
+      position_title: draft.position_title,
+      branch_role: draft.branch_role,
+      permission_role: draft.permission_role
+    })
+  });
+  const payload = await response.json().catch(() => ({})) as { error?: string };
+  if (!response.ok) {
+    if (payload.error === "duplicate_employee_code") throw new Error("รหัสพนักงานนี้มีอยู่แล้ว");
+    if (payload.error === "manager_cannot_grant_privileged_role") throw new Error("Manager ไม่สามารถสร้าง Owner หรือ Manager ได้");
+    throw new Error("ไม่สามารถสร้างพนักงานได้");
+  }
+}
+
+export async function updateStaff(tenantId: string, draft: StaffDraft) {
+  if (!draft.user_id) throw new Error("ไม่พบพนักงานที่ต้องการแก้ไข");
+  const { error } = await supabase.rpc("customer_portal_update_staff", {
+    p_tenant_id: tenantId,
+    p_branch_id: draft.branch_id,
+    p_user_id: draft.user_id,
+    p_full_name: draft.full_name,
+    p_employee_code: draft.employee_code,
+    p_position_title: draft.position_title,
+    p_branch_role: draft.branch_role,
+    p_permission_role: draft.permission_role,
+    p_is_active: draft.is_active
+  });
+  if (error) throw new Error(explainMutationError(error.message));
 }
 
 export async function loadPackage(tenantId: string, role: PortalRole): Promise<PackageInfo> {
@@ -324,7 +533,7 @@ export async function loadPackage(tenantId: string, role: PortalRole): Promise<P
       .select("period_start,period_end,amount_due,amount_paid,status")
       .eq("tenant_id", tenantId)
       .order("period_end", { ascending: false })
-      .limit(6);
+      .limit(12);
     if (!error) billingCycles = (data ?? []) as PackageInfo["billingCycles"];
   }
 
