@@ -153,7 +153,7 @@ export async function loginWithStoreEmployeeCode(storeCode: string, employeeCode
   const payload = await response.json().catch(() => ({})) as {
     error?: string;
     token_hash?: string;
-    tenant?: { id?: string };
+    tenant?: { id?: string; code?: string };
   };
 
   if (!response.ok || !payload.token_hash) {
@@ -166,11 +166,13 @@ export async function loginWithStoreEmployeeCode(storeCode: string, employeeCode
   if (error) throw new Error("ไม่สามารถสร้างเซสชันเข้าสู่ระบบได้");
 
   if (payload.tenant?.id) localStorage.setItem("cpipos-customer-portal-tenant", payload.tenant.id);
+  if (payload.tenant?.code) localStorage.setItem("cpipos-customer-portal-store-code", payload.tenant.code);
 }
 
 export async function logoutPortal() {
   localStorage.removeItem("cpipos-customer-portal-tenant");
   localStorage.removeItem("cpipos-customer-portal-branch");
+  localStorage.removeItem("cpipos-customer-portal-store-code");
   await supabase.auth.signOut();
 }
 
@@ -209,7 +211,7 @@ export async function loadPortalContext(): Promise<PortalContext> {
   return {
     userId: user.id,
     tenantId,
-    tenantCode: tenant.code,
+    tenantCode: localStorage.getItem("cpipos-customer-portal-store-code") || tenant.code,
     tenantName: tenant.display_name || tenant.name,
     logoUrl: tenant.logo_url,
     role,
