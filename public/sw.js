@@ -1,9 +1,11 @@
-const CACHE_NAME = "cpipos-customer-portal-shell-v3";
+const CACHE_NAME = "cpipos-customer-portal-shell-v4";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",
   "/cpipos-logo.png",
-  "/favicon-cpipos.png",
+  "/favicon-16x16.png",
+  "/favicon-32x32.png",
+  "/favicon-48x48.png",
   "/pwa-icon.svg",
   "/pwa-maskable.svg"
 ];
