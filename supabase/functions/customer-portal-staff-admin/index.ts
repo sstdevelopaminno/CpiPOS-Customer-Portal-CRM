@@ -74,30 +74,10 @@ Deno.serve(async(req)=>{
     if(branchError||!branch?.is_active)return json(req,{error:"branch_not_found"},404);
 
     if(action==="set_pin"){
-      const userId=String(body.user_id??"");
-      const pin=String(body.pin??"").trim();
-      if(!/^[0-9a-f-]{36}$/i.test(userId))return json(req,{error:"invalid_user"},400);
-      if(!/^\d{4,12}$/.test(pin))return json(req,{error:"invalid_pin"},422);
-
-      const {data:targetRole,error:targetError}=await admin
-        .from("user_branch_roles")
-        .select("role")
-        .eq("tenant_id",tenantId)
-        .eq("branch_id",branchId)
-        .eq("user_id",userId)
-        .maybeSingle();
-      if(targetError||!targetRole)return json(req,{error:"staff_not_found"},404);
-      if(!isOwner&&["owner","manager"].includes(String(targetRole.role)))return json(req,{error:"manager_cannot_edit_privileged_staff"},403);
-
-      const pinHash=await bcrypt.hash(pin,10);
-      const {data:updated,error:updateError}=await admin
-        .from("users_profiles")
-        .update({pin_hash:pinHash,updated_at:new Date().toISOString()})
-        .eq("id",userId)
-        .select("id")
-        .maybeSingle();
-      if(updateError||!updated)return json(req,{error:"pin_update_failed"},503);
-      return json(req,{ok:true,user_id:userId,action:"set_pin"});
+      // PIN edits are intentionally handled by customer_portal_update_staff_v2 so
+      // profile/role/PIN changes commit atomically and branch authority is checked
+      // inside one database transaction.
+      return json(req,{error:"pin_update_via_atomic_rpc_required"},409);
     }
 
     if(action!=="create")return json(req,{error:"invalid_action"},400);
