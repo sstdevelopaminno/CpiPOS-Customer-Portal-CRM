@@ -435,6 +435,8 @@ AS $function$
 declare
   v_actor uuid := (select auth.uid());
   v_id uuid;
+  v_sell_unit text := btrim(coalesce(p_sell_unit,'unit'));
+  v_stock_mode text := btrim(coalesce(p_stock_deduction_mode,'unit_only'));
 begin
   if v_actor is null or not exists(
     select 1 from public.user_branch_roles ubr
@@ -459,11 +461,11 @@ begin
   if p_price is null or p_price < 0 or p_price > 100000000 then
     raise exception using errcode='22023',message='invalid_price';
   end if;
-  if coalesce(p_sell_unit,'') not in ('unit','piece','item','serving','kg','g','ml','l','box','pack') then
-    p_sell_unit := 'unit';
+  if v_sell_unit='' or length(v_sell_unit)>40 then
+    raise exception using errcode='22023',message='invalid_sell_unit';
   end if;
-  if coalesce(p_stock_deduction_mode,'') not in ('unit_only','recipe_only','unit_and_recipe') then
-    p_stock_deduction_mode := 'unit_only';
+  if v_stock_mode not in ('unit_only','recipe_deduction') then
+    raise exception using errcode='22023',message='invalid_stock_deduction_mode';
   end if;
 
   if p_product_id is null then
@@ -472,7 +474,7 @@ begin
     )
     values(
       p_tenant_id,p_branch_id,btrim(p_sku),btrim(p_name),btrim(p_category),p_price,
-      coalesce(p_is_active,true),p_sell_unit,p_stock_deduction_mode
+      coalesce(p_is_active,true),v_sell_unit,v_stock_mode
     )
     returning id into v_id;
   else
@@ -482,8 +484,8 @@ begin
         category=btrim(p_category),
         price=p_price,
         is_active=coalesce(p_is_active,true),
-        sell_unit=p_sell_unit,
-        stock_deduction_mode=p_stock_deduction_mode,
+        sell_unit=v_sell_unit,
+        stock_deduction_mode=v_stock_mode,
         updated_at=now()
     where id=p_product_id
       and tenant_id=p_tenant_id

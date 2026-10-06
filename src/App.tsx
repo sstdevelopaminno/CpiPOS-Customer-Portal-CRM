@@ -410,7 +410,7 @@ function ProductForm({
         <label className="span2"><span>ชื่อสินค้า</span><input value={draft.name} onChange={e=>setDraft({...draft,name:e.target.value})} required/></label>
         <label><span>หมวดหมู่</span><input value={draft.category} onChange={e=>setDraft({...draft,category:e.target.value})} required/></label>
         <label><span>หน่วยขาย</span><input value={draft.sell_unit} onChange={e=>setDraft({...draft,sell_unit:e.target.value})}/></label>
-        <label className="span2"><span>การตัดสต๊อก</span><select value={draft.stock_deduction_mode} onChange={e=>setDraft({...draft,stock_deduction_mode:e.target.value})}><option value="unit_only">ตามหน่วยสินค้า</option><option value="recipe_only">ตามสูตรวัตถุดิบ</option><option value="unit_and_recipe">สินค้า + สูตร</option></select></label>
+        <label className="span2"><span>การตัดสต๊อก</span><select value={draft.stock_deduction_mode} onChange={e=>setDraft({...draft,stock_deduction_mode:e.target.value})}><option value="unit_only">ตามหน่วยสินค้า</option><option value="recipe_deduction">ตามสูตรวัตถุดิบ</option></select></label>
         <label className="switchField span2"><input type="checkbox" checked={draft.is_active} onChange={e=>setDraft({...draft,is_active:e.target.checked})}/><span>เปิดขายสินค้า</span></label>
       </div>
       <div className="modalActions"><button type="button" className="secondaryButton" onClick={onClose}>ยกเลิก</button><button className="primaryAction" disabled={busy}><Save size={17}/>{busy?"กำลังบันทึก...":"บันทึกสินค้า"}</button></div>
