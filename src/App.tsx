@@ -965,7 +965,7 @@ function SettingEditorModal({
     try{
       if(kind==="store")await saveSetting(context.tenantId,null,"update_store",storeDraft);
       if(kind==="branches")await saveSetting(context.tenantId,branchDraft.id||null,"save_branch",branchDraft);
-      if(kind==="payments")await saveSetting(context.tenantId,accountDraft.applies_to_all_branches?null:(scopeBranch||null),"save_payment_account",accountDraft);
+      if(kind==="payments")await saveSetting(context.tenantId,scopeBranch||null,"save_payment_account",accountDraft);
       if(kind==="taxes")await saveSetting(context.tenantId,scopeBranch||null,"save_tax",taxDraft);
       if(kind==="notifications")await saveSetting(context.tenantId,scopeBranch||null,"save_notifications",notificationDraft);
       await onSaved();onClose();
