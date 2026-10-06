@@ -1019,6 +1019,7 @@ function SettingEditorModal({
           <label><span>เลขบัญชี</span><input value={accountDraft.account_number} onChange={e=>setAccountDraft({...accountDraft,account_number:e.target.value})}/></label>
           <label><span>PromptPay</span><input value={accountDraft.promptpay_phone} onChange={e=>setAccountDraft({...accountDraft,promptpay_phone:e.target.value})}/></label>
           <label><span>รูปแบบ QR</span><select value={accountDraft.qr_mode} onChange={e=>setAccountDraft({...accountDraft,qr_mode:e.target.value})}><option value="promptpay_link">PromptPay</option><option value="qr_image">รูป QR</option></select></label>
+          {accountDraft.qr_mode==="qr_image"?<label className="span2"><span>URL / พาธรูป QR</span><input value={accountDraft.qr_image_url} onChange={e=>setAccountDraft({...accountDraft,qr_image_url:e.target.value})} placeholder="https://... หรือพาธรูป QR ที่ระบบ POS ใช้งาน" required/><small>ใช้รูป QR เดียวกับที่ POS อ่านจากบัญชีรับชำระ</small></label>:null}
           <label className="switchField"><input type="checkbox" checked={accountDraft.applies_to_all_branches} onChange={e=>setAccountDraft({...accountDraft,applies_to_all_branches:e.target.checked})}/><span>ใช้ทุกสาขา</span></label>
           <label className="switchField"><input type="checkbox" checked={accountDraft.is_active} onChange={e=>setAccountDraft({...accountDraft,is_active:e.target.checked})}/><span>เปิดใช้งาน</span></label>
         </>:null}
@@ -1049,15 +1050,23 @@ function SettingsView({context,branchId,onNavigate,onContextChanged}:{context:Po
   const [features,setFeatures]=useState<FeatureState|null>(null);
   const [error,setError]=useState("");
   const [editor,setEditor]=useState<EditableSettingKind|null>(null);
+  const refreshSeq=useRef(0);
 
   const refresh=useCallback(async()=>{
+    const requestId=++refreshSeq.current;
     setError("");
     try{
       const [s,f]=await Promise.all([loadSettingsSnapshot(context.tenantId,branchId),loadFeatureState(context.tenantId,branchId)]);
+      if(requestId!==refreshSeq.current)return;
       setSnapshot(s);setFeatures(f);
-    }catch{setError("ไม่สามารถโหลดการตั้งค่าร้านได้");}
+    }catch{
+      if(requestId===refreshSeq.current)setError("ไม่สามารถโหลดการตั้งค่าร้านได้");
+    }
   },[context.tenantId,branchId]);
-  useEffect(()=>{void refresh();},[refresh]);
+  useEffect(()=>{
+    void refresh();
+    return()=>{refreshSeq.current+=1;};
+  },[refresh]);
 
   const allowed=(key:string,feature:string)=>{
     if(features?.menu_policy?.[key]===false)return false;
@@ -1130,6 +1139,22 @@ export default function App() {
     try{setContext(await loadPortalContext());}
     catch(err){const message=err instanceof Error?err.message:"";if(message!=="not_authenticated")setFatal("ไม่สามารถตรวจสอบสิทธิ์ Customer Portal ได้");setContext(null);}
     finally{setChecking(false);}
+  },[]);
+
+  const refreshContextAfterMutation=useCallback(async()=>{
+    try{
+      const next=await loadPortalContext();
+      setContext(next);
+      setFatal("");
+    }catch(err){
+      const message=err instanceof Error?err.message:"";
+      if(message==="not_authenticated"){
+        setContext(null);
+        setFatal("");
+        return;
+      }
+      setFatal("บันทึกสำเร็จแล้ว แต่ไม่สามารถโหลดข้อมูลร้านล่าสุดได้ กรุณากดรีเฟรชอีกครั้ง");
+    }
   },[]);
 
   useEffect(()=>{
@@ -1236,7 +1261,7 @@ export default function App() {
       {view==="staff"?<StaffView context={context} branchId={branchId||null}/>:null}
       {view==="package"?<PackageView context={context}/>:null}
       {view==="more"?<MoreView context={context} branchId={branchId||null} onNavigate={chooseView}/>:null}
-      {view==="settings"?<SettingsView context={context} branchId={branchId||null} onNavigate={chooseView} onContextChanged={restore}/>:null}
+      {view==="settings"?<SettingsView context={context} branchId={branchId||null} onNavigate={chooseView} onContextChanged={refreshContextAfterMutation}/>:null}
 
       <footer>ข้อมูลและสิทธิ์ถูกจำกัดตามบัญชี {context.role==="owner"?"Owner":"Manager"} · {context.branches.length} สาขาที่เข้าถึงได้</footer>
     </main>
