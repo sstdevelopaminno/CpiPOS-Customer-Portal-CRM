@@ -47,7 +47,11 @@ Deno.serve(async(req)=>{
 
   const token=(req.headers.get("authorization")??"").replace(/^Bearer\s+/i,"").trim();
   if(!token)return json(req,{error:"unauthorized"},401);
-  const length=Number(req.headers.get("content-length")||0);
+
+  const rawLength=req.headers.get("content-length");
+  if(!rawLength)return json(req,{error:"content_length_required"},411);
+  const length=Number(rawLength);
+  if(!Number.isFinite(length)||length<=0)return json(req,{error:"invalid_content_length"},411);
   if(length>MAX_SLIP+32000)return json(req,{error:"upload_too_large"},413);
 
   const admin=createClient(Deno.env.get("SUPABASE_URL")??"",adminKey(),{auth:{persistSession:false,autoRefreshToken:false}});
