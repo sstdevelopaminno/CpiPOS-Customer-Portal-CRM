@@ -26,3 +26,7 @@ There are no Vercel API Routes, Server Actions, SSR pages, middleware, cron jobs
 - Products
 - Ingredient inventory / reorder warning
 - Subscription status and Owner billing cycles
+
+## PWA
+
+The production portal is installable as a Progressive Web App. The service worker is deliberately limited to the same-origin static shell. Cross-origin Supabase/Auth/API requests are never intercepted, so business data is not persisted in the PWA cache.
