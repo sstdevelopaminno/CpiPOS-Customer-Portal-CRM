@@ -62,12 +62,12 @@ Deno.serve(async(req)=>{
     const requestedKey=String(form.get("request_key")??"");
     const packageId=String(form.get("package_id")??"");
     const billingCycleId=String(form.get("billing_cycle_id")??"")||null;
-    const billingInterval=String(form.get("billing_interval")??"monthly");
+    const requestedBillingInterval=String(form.get("billing_interval")??"monthly");
     const slip=form.get("slip");
 
     if(!UUID.test(tenantId)||!UUID.test(requestedKey)||!UUID.test(packageId))return json(req,{error:"invalid_request"},422);
     if(billingCycleId&&!UUID.test(billingCycleId))return json(req,{error:"invalid_cycle"},422);
-    if(!["monthly","yearly"].includes(billingInterval))return json(req,{error:"invalid_interval"},422);
+    if(!["monthly","yearly"].includes(requestedBillingInterval))return json(req,{error:"invalid_interval"},422);
     if(!(slip instanceof File)||slip.size<=0||slip.size>MAX_SLIP||!FILE_EXT[slip.type])return json(req,{error:"slip_required"},422);
 
     const bytes=new Uint8Array(await slip.arrayBuffer());
@@ -87,6 +87,8 @@ Deno.serve(async(req)=>{
       .eq("tenant_id",tenantId).order("created_at",{ascending:false}).limit(1).maybeSingle();
     if(contractError||!contract)return json(req,{error:"contract_unavailable"},422);
     if(contract.package_id!==packageId)return json(req,{error:"package_mismatch"},409);
+    const billingInterval=contract.billing_interval==="yearly"?"yearly":"monthly";
+    if(requestedBillingInterval!==billingInterval)return json(req,{error:"billing_interval_mismatch"},409);
 
     let expected=Number(contract.amount_per_cycle??0);
     if(billingCycleId){
@@ -97,7 +99,11 @@ Deno.serve(async(req)=>{
       if(cycleError||!cycle)return json(req,{error:"cycle_not_found"},404);
       if(cycle.package_id&&cycle.package_id!==packageId)return json(req,{error:"cycle_package_mismatch"},409);
       expected=Math.max(0,Number(cycle.amount_due??0)-Number(cycle.amount_paid??0));
-      if(cycle.status==="paid"||expected<=0)return json(req,{error:"cycle_already_paid"},409);
+      const payableStatuses=new Set(["open","due","overdue","pending"]);
+      if(!payableStatuses.has(String(cycle.status??""))){
+        return json(req,{error:cycle.status==="paid"?"cycle_already_paid":"cycle_not_payable"},409);
+      }
+      if(expected<=0)return json(req,{error:"cycle_already_paid"},409);
     }
     if(!Number.isFinite(expected)||expected<=0)return json(req,{error:"amount_unavailable"},422);
 
