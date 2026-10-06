@@ -9,10 +9,10 @@ import {
 } from "lucide-react";
 import {
   cancelOrder, createStaff, deleteProduct, deleteStock, loadDashboard, loadFeatureState,
-  loadOrderItems, loadPackage, loadPortalContext, loadProducts, loadSales, loadSettingsSnapshot,
+  loadMoreSnapshot, loadOrderItems, loadPackage, loadPortalContext, loadProducts, loadSales, loadSettingsSnapshot,
   loadStaff, loadStock, loginWithStoreEmployeeCode, logoutPortal, reportRangeLabel, saveProduct,
   saveStock, submitPackagePayment, todayInputValue, updateOrder, updateStaff,
-  type DashboardSummary, type FeatureState, type OrderItemRow, type OrderRow, type PackageInfo,
+  type DashboardSummary, type FeatureState, type MoreSnapshot, type OrderItemRow, type OrderRow, type PackageInfo,
   type PortalContext, type PortalView, type ProductDraft, type ProductRow, type ReportRange,
   type SettingsSnapshot, type StaffDraft, type StaffRow, type StockDraft, type StockRow
 } from "./lib/portal";
@@ -840,8 +840,9 @@ const moreItems:MoreItem[]=[
 
 function MoreView({context,branchId,onNavigate}:{context:PortalContext;branchId:string|null;onNavigate:(view:PortalView)=>void}){
   const [state,setState]=useState<FeatureState|null>(null);
+  const [snapshot,setSnapshot]=useState<MoreSnapshot|null>(null);
   const [error,setError]=useState("");
-  useEffect(()=>{loadFeatureState(context.tenantId,branchId).then(setState).catch(()=>setError("ไม่สามารถตรวจสอบสิทธิ์เมนูเพิ่มเติมได้"));},[context.tenantId,branchId]);
+  useEffect(()=>{Promise.all([loadFeatureState(context.tenantId,branchId),loadMoreSnapshot(context.tenantId,branchId)]).then(([features,data])=>{setState(features);setSnapshot(data);}).catch(()=>setError("ไม่สามารถตรวจสอบสิทธิ์เมนูเพิ่มเติมได้"));},[context.tenantId,branchId]);
   const enabled=(item:MoreItem)=>{
     const menu=state?.menu_policy?.[item.key]!==false;
     const base=state?.package_features?.[item.feature]??false;
@@ -851,7 +852,7 @@ function MoreView({context,branchId,onNavigate}:{context:PortalContext;branchId:
   return <>
     <div className="pageHeading"><div><p className="eyebrow">MORE</p><h2>เพิ่มเติม</h2><p>เมนูชุดเดียวกับ POS โดยตรวจสิทธิ์แพ็กเกจและนโยบายจาก IT ก่อนแสดงการใช้งาน</p></div></div>
     {error?<ErrorPanel message={error}/>:null}
-    <div className="moduleGrid">{moreItems.map(item=>{const allowed=state?enabled(item):false;return <button key={item.key} className={`moduleCard ${allowed?"":"locked"}`} disabled={!allowed||!item.target} onClick={()=>item.target&&onNavigate(item.target)}><span className="moduleIcon">{item.icon}</span><div><strong>{item.label}</strong><span>{item.desc}</span><small>{!state?"กำลังตรวจสิทธิ์...":!allowed?"ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด":item.target?"พร้อมใช้งานใน CRM":"เชื่อมสิทธิ์แล้ว · โมดูลข้อมูล POS"}</small></div><ChevronRight size={18}/></button>;})}</div>
+    <div className="moduleGrid">{moreItems.map(item=>{const allowed=state?enabled(item):false;const count=item.key==="more.tables"?snapshot?.tables_count:item.key==="more.kitchen_manage"?snapshot?.kitchen_zones_count:item.key==="more.members"?snapshot?.members_count:item.key==="more.tax_invoices"?snapshot?.tax_invoices_count:item.key==="more.ai_documents"?snapshot?.ai_documents_count:null;return <button key={item.key} className={`moduleCard ${allowed?"":"locked"}`} disabled={!allowed||!item.target} onClick={()=>item.target&&onNavigate(item.target)}><span className="moduleIcon">{item.icon}</span><div><strong>{item.label}</strong><span>{item.desc}</span><small>{!state?"กำลังตรวจสิทธิ์...":!allowed?"ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด":item.target?"พร้อมใช้งานใน CRM":count==null?"เชื่อมข้อมูล POS แล้ว":`เชื่อมข้อมูล POS · ${number.format(Number(count))} รายการ`}</small></div><ChevronRight size={18}/></button>;})}</div>
     <div className="auditNote">เมนูที่ยังไม่มีหน้าจัดการเฉพาะใน CRM จะยังไม่เขียนข้อมูลลง POS โดยตรง เพื่อรักษา transaction และกติกาเดิมของ POS/IT</div>
   </>;
 }
