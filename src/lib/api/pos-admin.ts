@@ -20,18 +20,36 @@ function explain(error: unknown) {
   if(message.includes("customer_display_pairing_conflict"))return new Error("รหัส Pairing เกิดการชนกัน กรุณาสร้างรหัสใหม่อีกครั้ง");
   if(message.includes("pairing_not_found"))return new Error("ไม่พบการเชื่อมต่อ Customer Display");
   if(message.includes("layout_object_not_found"))return new Error("ไม่พบวัตถุในผังร้าน");
+  if(message.includes("pin_rejected"))return new Error("PIN Owner/Manager ไม่ถูกต้อง");
+  if(message.includes("invalid_inet_environment"))return new Error("Environment ของ INET QR ไม่ถูกต้อง");
+  if(message.includes("inet_merchant_id_required"))return new Error("Production INET QR ต้องระบุ Merchant ID");
+  if(message.includes("invalid_qr_policy_mode"))return new Error("รูปแบบอายุ QR โต๊ะไม่ถูกต้อง");
+  if(message.includes("invalid_qr_policy_ttl"))return new Error("อายุ QR ต้องอยู่ระหว่าง 15 นาที ถึง 24 ชั่วโมง");
+  if(message.includes("seller_tax_id_invalid"))return new Error("เลขประจำตัวผู้เสียภาษีของร้านไม่ถูกต้อง");
+  if(message.includes("seller_profile_incomplete"))return new Error("กรุณากรอกชื่อและที่อยู่ผู้ออกใบกำกับภาษี");
+  if(message.includes("seller_branch_invalid"))return new Error("เลขสาขาต้องเป็นตัวเลข 5 หลัก เช่น 00000");
+  if(message.includes("tax_invoice_selection_required"))return new Error("กรุณาเลือกผู้รับใบกำกับภาษีและบิล");
+  if(message.includes("tax_profile_not_found"))return new Error("ไม่พบข้อมูลผู้เสียภาษีที่เลือก");
+  if(message.includes("order_not_completed"))return new Error("ออกใบกำกับภาษีได้เฉพาะบิลที่ชำระแล้ว");
+  if(message.includes("seller_tax_profile_required"))return new Error("กรุณาตั้งค่าข้อมูลผู้ออกใบกำกับภาษีให้ครบก่อน");
+  if(message.includes("tax_invoice_already_issued"))return new Error("บิลนี้มีใบกำกับภาษีสำหรับผู้รับรายอื่นแล้ว");
   return new Error(message||"ไม่สามารถดำเนินการกับข้อมูล POS ได้");
 }
 
 export async function loadPosAdminSnapshot<T extends PosAdminSnapshot>(
-  tenantId:string, branchId:string, module:PosAdminModule
+  tenantId:string, branchId:string, module:PosAdminModule, payload:Record<string,unknown>={}
 ):Promise<T>{
-  const rpc=["tables","kitchen","printers","display"].includes(module)
-    ?"customer_portal_pos_admin_phase2_snapshot"
-    :"customer_portal_pos_admin_snapshot";
-  const {data,error}=await supabase.rpc(rpc,{
+  const phase3=["activity","inet","order_kitchen","table_qr","receipts","tax_invoices","product_sales"].includes(module);
+  const rpc=phase3
+    ?"customer_portal_pos_admin_phase3_snapshot"
+    :["tables","kitchen","printers","display"].includes(module)
+      ?"customer_portal_pos_admin_phase2_snapshot"
+      :"customer_portal_pos_admin_snapshot";
+  const args:Record<string,unknown>={
     p_tenant_id:tenantId,p_branch_id:branchId,p_module:module
-  });
+  };
+  if(phase3)args.p_payload=payload;
+  const {data,error}=await supabase.rpc(rpc,args);
   if(error)throw explain(error);
   return data as unknown as T;
 }
@@ -39,8 +57,10 @@ export async function loadPosAdminSnapshot<T extends PosAdminSnapshot>(
 export async function mutatePosAdmin<T=Record<string,unknown>>(
   tenantId:string, branchId:string, action:string, payload:Record<string,unknown>
 ):Promise<T>{
+  const phase3=action.startsWith("inet.")||action.startsWith("order_kitchen.")||action.startsWith("table_qr.")||action.startsWith("tax_invoice.");
   const phase2=action.startsWith("floor_plan.")||action.startsWith("layout_object.")||action.startsWith("printer.")||action.startsWith("display.");
-  const {data,error}=await supabase.rpc(phase2?"customer_portal_pos_admin_phase2_mutate":"customer_portal_pos_admin_mutate",{
+  const rpc=phase3?"customer_portal_pos_admin_phase3_mutate":phase2?"customer_portal_pos_admin_phase2_mutate":"customer_portal_pos_admin_mutate";
+  const {data,error}=await supabase.rpc(rpc,{
     p_tenant_id:tenantId,p_branch_id:branchId,p_action:action,p_payload:payload
   });
   if(error)throw explain(error);
