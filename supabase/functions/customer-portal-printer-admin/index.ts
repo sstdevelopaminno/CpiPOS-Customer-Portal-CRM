@@ -73,7 +73,8 @@ async function getPrinters(admin:ReturnType<typeof createClient>,tenantId:string
   if(error)throw error;return(data??[]) as PrinterRow[];
 }
 async function audit(admin:ReturnType<typeof createClient>,input:{tenantId:string;branchId:string;actorId:string;role:string;action:string;targetTable:string;targetId:string;metadata:JsonRecord;overrideId?:string|null}){
-  await admin.from("audit_logs").insert({tenant_id:input.tenantId,branch_id:input.branchId,actor_user_id:input.actorId,actor_role:input.role,action:input.action,target_table:input.targetTable,target_id:input.targetId,metadata:input.metadata,user_id:input.actorId,role:input.role,module:"customer_portal",entity_type:input.targetTable,entity_id:input.targetId,override_by_user_id:input.overrideId??null});
+  const {error}=await admin.from("audit_logs").insert({tenant_id:input.tenantId,branch_id:input.branchId,actor_user_id:input.actorId,actor_role:input.role,action:input.action,target_table:input.targetTable,target_id:input.targetId,metadata:input.metadata,user_id:input.actorId,role:input.role,module:"customer_portal",entity_type:input.targetTable,entity_id:input.targetId,override_by_user_id:input.overrideId??null});
+  if(error)throw error;
 }
 async function verifyPin(admin:ReturnType<typeof createClient>,tenantId:string,branchId:string,pin:string){
   if(!/^\d{4,12}$/.test(pin))return null;
@@ -153,8 +154,8 @@ Deno.serve(async(req)=>{
       if(meta.command||row.kitchen_ticket_id||(row.printer_role==="kitchen"&&!testPrint))return json(req,{error:"job_retry_not_allowed"},409);
       if(row.printer_id!==printerId)return json(req,{error:"job_printer_mismatch"},409);
       const nextMeta={...meta,manual_retry_by:actor.id,manual_retry_approved_by:approver.id,manual_retry_at:new Date().toISOString(),retry_after_epoch_ms:null,retry_backoff_seconds:null};
-      const {error:updateError}=await admin.from("print_jobs").update({status:"pending",retry_count:0,last_error:null,failed_at:null,claimed_by_agent_id:null,claimed_at:null,claim_expires_at:null,agent_attempt_id:null,agent_error_code:null,metadata:nextMeta,updated_at:new Date().toISOString()}).eq("id",jobId).eq("tenant_id",tenantId).eq("branch_id",branchId).eq("status","failed");
-      if(updateError)throw updateError;
+      const {data:updated,error:updateError}=await admin.from("print_jobs").update({status:"pending",retry_count:0,last_error:null,failed_at:null,claimed_by_agent_id:null,claimed_at:null,claim_expires_at:null,agent_attempt_id:null,agent_error_code:null,metadata:nextMeta,updated_at:new Date().toISOString()}).eq("id",jobId).eq("tenant_id",tenantId).eq("branch_id",branchId).eq("status","failed").select("id,status").maybeSingle();
+      if(updateError)throw updateError;if(!updated)return json(req,{error:"job_not_failed"},409);
       await audit(admin,{tenantId,branchId,actorId:actor.id,role,action:"printer_job_manual_retry",targetTable:"print_jobs",targetId:jobId,overrideId:approver.id,metadata:{source:"customer_portal",printer_id:printerId,previous_retry_count:row.retry_count}});
       return json(req,{ok:true,...await loadState(admin,tenantId,branchId)});
     }
