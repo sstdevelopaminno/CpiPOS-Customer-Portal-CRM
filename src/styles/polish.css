@@ -450,3 +450,27 @@ tbody tr:hover{background:#f8fbfe}
 .pairingCodeBody{display:grid;gap:14px;padding:22px;text-align:center}.pairingCodeBody p{margin:0;color:#62798e;font-size:12px;line-height:1.6}.pairingCodeBody>strong{font-size:44px;letter-spacing:.18em;color:#0e5d9d}.pairingCodeBody>span{font-size:11px;color:#7890a4}.pairingCodeBody>.secondaryButton{justify-self:center}
 @media(max-width:900px){.floorObjectList{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:680px){.floorObjectList{grid-template-columns:1fr}.printerZoneHead,.printerZoneRow{grid-template-columns:minmax(0,1fr) 52px 52px 52px}.pairingCodeBody>strong{font-size:36px}}
+
+
+/* POS admin phase 3 */
+.phase3GatePanel{margin-bottom:14px;padding:14px 16px}
+.phase3FilterGrid,.phase3FormGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:end}
+.phase3FilterGrid label,.phase3FormGrid label{display:grid;gap:5px;font-size:10px;font-weight:800;color:#60798f}
+.phase3FilterGrid input,.phase3FilterGrid select,.phase3FormGrid input,.phase3FormGrid select{width:100%;height:40px;border:1px solid #ccdbe7;border-radius:10px;background:#fff;padding:0 11px;color:#244d70}
+.phase3FormGrid{padding:16px}.phase3FormGrid .phase3Switch{display:flex;align-items:center;gap:8px;height:40px;padding:0 12px;border:1px solid #dce6ee;border-radius:10px;background:#f8fbfd}
+.phase3FormGrid .phase3Switch input{width:16px;height:16px}
+.phase3Actions{display:flex;justify-content:flex-end;padding:12px 16px;border-top:1px solid #edf2f6}
+.phase3InfoStrip{display:flex;align-items:flex-start;gap:10px;margin:0 16px 14px;padding:11px 12px;border:1px solid #d9e6f0;border-radius:11px;background:#f7fbfe;color:#315c7e}
+.phase3InfoStrip div{display:grid;gap:3px}.phase3InfoStrip strong{font-size:11px}.phase3InfoStrip span{font-size:9px;color:#74899b;line-height:1.5}
+.phase3PolicyList{display:grid;padding:4px 16px 16px}
+.phase3PolicyList>div{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid #edf2f6}
+.phase3PolicyList>div>div{display:grid;gap:3px}.phase3PolicyList strong{font-size:12px;color:#264d6e}.phase3PolicyList>div>div span{font-size:9px;color:#7c90a2}
+.phase3Override{padding:5px 8px;border-radius:999px;background:#eef4f8;color:#557086;font-size:9px;font-weight:900}.phase3Override.forced{background:#fff1dd;color:#9b5c00}
+.phase3Toggle{display:flex;align-items:center;gap:6px;font-size:10px;font-weight:800;color:#45637d}.phase3Toggle input{width:16px;height:16px}
+.phase3RadioCards{display:grid;grid-template-columns:1fr 1fr;gap:9px}.phase3RadioCards label{display:grid;grid-template-columns:auto 1fr;gap:3px 8px;padding:12px;border:1px solid #d8e3ec;border-radius:11px;background:#fafcfe;cursor:pointer}.phase3RadioCards label.active{border-color:#6cb3e6;background:#eef8ff}.phase3RadioCards input{grid-row:1/3}.phase3RadioCards strong{font-size:11px}.phase3RadioCards span{font-size:9px;color:#7b8ea0}
+.phase3Pager{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 14px;border-top:1px solid #e7eef4;font-size:10px;color:#72879a}.phase3Pager>div{display:flex;gap:7px}
+.phase3DangerText{color:#c13a32;font-weight:800}.phase3WarnText{color:#a06200;font-weight:800}
+.receiptSummaryGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:12px}.receiptSummaryGrid>div{display:grid;gap:3px;padding:10px;border:1px solid #e0e9f0;border-radius:10px;background:#fafcfe}.receiptSummaryGrid span{font-size:9px;color:#8092a2}.receiptSummaryGrid strong{font-size:12px;color:#244c6e}
+.productSalesList{display:grid}.productSalesList>div{display:grid;grid-template-columns:38px minmax(0,1fr) auto;align-items:center;gap:10px;padding:12px 14px;border-top:1px solid #edf2f6}.productSalesList>div:first-child{border-top:0}.productSalesList>div>div{display:grid;gap:3px}.productSalesList>div>div:last-child{text-align:right}.productSalesList strong{font-size:11px;color:#234d70}.productSalesList small{font-size:9px;color:#7e91a3}.productSalesRank{display:grid;place-items:center;width:28px;height:28px;border-radius:9px;background:#eef6fd;color:#1972b8;font-size:11px;font-weight:900}.productSalesBar{height:5px;margin-top:4px;border-radius:999px;background:#edf2f6;overflow:hidden}.productSalesBar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#2384ce,#67b9e8)}
+@media(max-width:900px){.phase3FilterGrid,.phase3FormGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.receiptSummaryGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.phase3FilterGrid,.phase3FormGrid,.receiptSummaryGrid{grid-template-columns:1fr}.phase3PolicyList>div{grid-template-columns:1fr auto}.phase3PolicyList>div>.phase3Toggle{grid-column:1/3}.phase3RadioCards{grid-template-columns:1fr}.productSalesList>div{grid-template-columns:32px minmax(0,1fr)}.productSalesList>div>div:last-child{grid-column:2;text-align:left}}

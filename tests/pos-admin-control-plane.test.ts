@@ -5,6 +5,7 @@ import { join } from "node:path";
 const root=process.cwd();
 const sql=readFileSync(join(root,"supabase/sql/customer_portal_pos_admin_crud_parity.sql"),"utf8");
 const phase2=readFileSync(join(root,"supabase/sql/customer_portal_pos_admin_phase2.sql"),"utf8");
+const phase3=readFileSync(join(root,"supabase/sql/customer_portal_pos_admin_phase3.sql"),"utf8");
 
 describe("POS admin control-plane",()=>{
   it("requires feature and menu policy before mutations",()=>{
@@ -36,6 +37,21 @@ describe("POS admin control-plane",()=>{
     expect(pairing).toContain("get_byte(v_rand,0)::bigint");
     expect(pairing).toContain("customer_display_pairing_conflict");
     expect(pairing).toContain("extensions.digest");
+  });
+  it("phase3 enforces PIN, IT overrides and shared POS document policy",()=>{
+    expect(phase3).toContain("customer_portal_verify_manager_pin");
+    expect(phase3).toContain("extensions.crypt");
+    expect(phase3).toContain("table_qr_popup_override");
+    expect(phase3).toContain("table_qr_sessions");
+    expect(phase3).toContain("pos_payment_provider_settings");
+    expect(phase3).toContain("pos_tax_invoices");
+    expect(phase3).toContain("receipt_reprint_history");
+    expect(phase3).not.toContain("service_role_key");
+  });
+  it("keeps internal phase3 helpers unavailable to browser roles",()=>{
+    expect(phase3).toContain("customer_portal_verify_manager_pin(uuid,uuid,text) from public,anon,authenticated");
+    expect(phase3).toContain("customer_portal_thai_tax_id_valid(text) from public,anon,authenticated");
+    expect(phase3).toContain("customer_portal_pos_admin_phase3_snapshot(uuid,uuid,text,jsonb) to authenticated");
   });
   it("audits Customer Portal mutations",()=>{
     expect(sql).toContain("insert into public.audit_logs");

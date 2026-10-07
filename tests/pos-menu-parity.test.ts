@@ -21,7 +21,8 @@ describe("POS menu parity",()=>{
     ]);
     expect(POS_MORE_MENU_ITEMS.some(item=>item.key==="more.ai_documents")).toBe(false);
     expect(Object.fromEntries(POS_MORE_MENU_ITEMS.filter(item=>item.adminModule).map(item=>[item.key,item.adminModule]))).toEqual({
-      "more.tables":"tables","more.kitchen_manage":"kitchen","more.buffet":"buffet","more.members":"members"
+      "more.receipts":"receipts","more.tables":"tables","more.kitchen_manage":"kitchen","more.buffet":"buffet",
+      "more.members":"members","more.tax_invoices":"tax_invoices","more.product_sales":"product_sales"
     });
   });
 
@@ -34,5 +35,9 @@ describe("POS menu parity",()=>{
     expect(POS_SETTINGS_MENU_ITEMS.find(item=>item.kind==="devices")?.adminModule).toBe("devices");
     expect(POS_SETTINGS_MENU_ITEMS.find(item=>item.kind==="printers")?.adminModule).toBe("printers");
     expect(POS_SETTINGS_MENU_ITEMS.find(item=>item.kind==="display")?.adminModule).toBe("display");
+    expect(POS_SETTINGS_MENU_ITEMS.find(item=>item.kind==="activity")?.adminModule).toBe("activity");
+    expect(POS_SETTINGS_MENU_ITEMS.find(item=>item.kind==="inet")?.adminModule).toBe("inet");
+    expect(POS_SETTINGS_MENU_ITEMS.find(item=>item.kind==="orderKitchen")?.adminModule).toBe("order_kitchen");
+    expect(POS_SETTINGS_MENU_ITEMS.find(item=>item.kind==="tableQr")?.adminModule).toBe("table_qr");
   });
 });
