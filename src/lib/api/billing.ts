@@ -10,6 +10,7 @@ export async function loadPackage(tenantId: string, _role: PortalRole): Promise<
   return {
     runtime: value.runtime ?? null,
     contract: value.contract ?? null,
+    currentDue: value.currentDue ?? null,
     billingCycles: Array.isArray(value.billingCycles) ? value.billingCycles : [],
     requests: Array.isArray(value.requests) ? value.requests : [],
     issuer: value.issuer ?? null,

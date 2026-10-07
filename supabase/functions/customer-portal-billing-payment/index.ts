@@ -91,11 +91,15 @@ Deno.serve(async(req)=>{
       .eq("tenant_id",tenantId).order("created_at",{ascending:false}).limit(1).maybeSingle();
     if(contractError||!contract)return json(req,{error:"contract_unavailable"},422);
     if(contract.package_id!==packageId)return json(req,{error:"package_mismatch"},409);
-    const billingInterval=contract.billing_interval==="yearly"?"yearly":"monthly";
+    const {data:dueState,error:dueError}=await admin.rpc("subscription_billing_due_state",{p_tenant_id:tenantId});
+    if(dueError||!dueState)return json(req,{error:"billing_due_state_unavailable"},503);
+    const due=(dueState??{}) as Record<string,unknown>;
+    const billingInterval=String(due.billing_interval??contract.billing_interval??"monthly")==="yearly"?"yearly":"monthly";
     if(requestedBillingInterval!==billingInterval)return json(req,{error:"billing_interval_mismatch"},409);
+    if(typeof due.package_id==="string"&&due.package_id!==packageId)return json(req,{error:"package_mismatch"},409);
 
     const payableStatuses=new Set(["open","due","overdue","pending"]);
-    let expected=Number(contract.amount_per_cycle??0);
+    let expected=Number(due.amount_due??contract.amount_per_cycle??0);
     if(billingCycleId){
       const {data:cycle,error:cycleError}=await admin
         .from("tenant_billing_cycles")
@@ -109,29 +113,16 @@ Deno.serve(async(req)=>{
       }
       if(expected<=0)return json(req,{error:"cycle_already_paid"},409);
     }else{
-      const [{data:runtime,error:runtimeError},{data:cycles,error:cyclesError}]=await Promise.all([
-        admin.from("tenant_subscription_runtime")
-          .select("expires_at")
-          .eq("tenant_id",tenantId)
-          .maybeSingle(),
-        admin.from("tenant_billing_cycles")
-          .select("id,status,amount_due,amount_paid")
-          .eq("tenant_id",tenantId)
-          .in("status",Array.from(payableStatuses))
-          .limit(50)
-      ]);
-      if(runtimeError||cyclesError)return json(req,{error:"renewal_check_failed"},503);
-
-      const hasPayableCycle=(cycles??[]).some(row=>
-        payableStatuses.has(String(row.status??""))
-        && Number(row.amount_due??0)>Number(row.amount_paid??0)
-      );
+      const {data:cycles,error:cyclesError}=await admin.from("tenant_billing_cycles")
+        .select("id,status,amount_due,amount_paid")
+        .eq("tenant_id",tenantId)
+        .in("status",Array.from(payableStatuses))
+        .limit(50);
+      if(cyclesError)return json(req,{error:"renewal_check_failed"},503);
+      const hasPayableCycle=(cycles??[]).some(row=>payableStatuses.has(String(row.status??""))&&Number(row.amount_due??0)>Number(row.amount_paid??0));
       if(hasPayableCycle)return json(req,{error:"payable_cycle_exists"},409);
-
-      const expiryRaw=runtime?.expires_at??contract.ended_at;
-      const expiryMs=expiryRaw?new Date(expiryRaw).getTime():Number.NaN;
-      const daysRemaining=Number.isFinite(expiryMs)?Math.ceil((expiryMs-Date.now())/86400000):Number.POSITIVE_INFINITY;
-      if(daysRemaining>7)return json(req,{error:"renewal_not_due"},409);
+      if(due.payable_now!==true)return json(req,{error:"renewal_not_due",status:String(due.status??"")},409);
+      expected=Number(due.amount_due??0);
     }
     if(!Number.isFinite(expected)||expected<=0)return json(req,{error:"amount_unavailable"},422);
 
@@ -153,7 +144,7 @@ Deno.serve(async(req)=>{
       const metadata=(row.metadata??{}) as Record<string,unknown>;
       const metadataCycle=typeof metadata.billing_cycle_id==="string"?metadata.billing_cycle_id:null;
       return row.status==="pending"
-        && row.request_type==="renewal"
+        && row.request_type===(String(due.kind??"")==="trial"?"trial_conversion":"renewal")
         && row.requested_package_id===packageId
         && !row.evidence_url
         && metadataCycle===billingCycleId;
@@ -163,6 +154,7 @@ Deno.serve(async(req)=>{
       return json(req,{error:"open_request_exists",request_id:openCandidates[0]?.id??null},409);
     }
 
+    const requestType=String(due.kind??"")==="trial"?"trial_conversion":"renewal";
     const requestId=open?.id??requestedKey;
     const filePath=`${tenantId}/${requestId}/slip.${FILE_EXT[slip.type]}`;
     const upload=await admin.storage.from("subscription-payment-evidence").upload(filePath,bytes,{
@@ -178,6 +170,9 @@ Deno.serve(async(req)=>{
       billing_cycle_id:billingCycleId,
       source:"customer_portal_crm",
       submitted_by:actor.id,
+      due_at:typeof due.due_at==="string"?due.due_at:null,
+      next_period_start:typeof due.next_period_start==="string"?due.next_period_start:null,
+      next_period_end:typeof due.next_period_end==="string"?due.next_period_end:null,
       note:"Customer Portal package payment"
     };
 
@@ -187,7 +182,7 @@ Deno.serve(async(req)=>{
         })
         .eq("id",requestId)
         .eq("tenant_id",tenantId)
-        .eq("request_type","renewal")
+        .eq("request_type",requestType)
         .eq("requested_package_id",packageId)
         .eq("status","pending")
         .is("evidence_url",null)
@@ -195,7 +190,7 @@ Deno.serve(async(req)=>{
         .maybeSingle()
       : await admin.from("tenant_subscription_payment_requests").insert({
           id:requestId,tenant_id:tenantId,requested_package_id:packageId,
-          request_type:"renewal",amount_reported:null,currency:String(contract.currency??"THB"),
+          request_type:requestType,amount_reported:null,currency:String(contract.currency??"THB"),
           evidence_url:filePath,status:"pending",metadata
         }).select("id,status").maybeSingle();
 
