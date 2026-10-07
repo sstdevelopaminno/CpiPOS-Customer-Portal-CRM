@@ -13,9 +13,9 @@ async function call(payload:Record<string,unknown>){
   const {data}=await supabase.auth.getSession();
   const token=data.session?.access_token;
   if(!token)throw new Error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่");
-  const response=await fetch(\`\${supabaseUrl}/functions/v1/customer-portal-tax-profile\`,{
+  const response=await fetch(`${supabaseUrl}/functions/v1/customer-portal-tax-profile`,{
     method:"POST",
-    headers:{apikey:supabaseKey,authorization:\`Bearer \${token}\`,"content-type":"application/json"},
+    headers:{apikey:supabaseKey,authorization:`Bearer ${token}`,"content-type":"application/json"},
     body:JSON.stringify(payload)
   });
   const body=await response.json().catch(()=>({})) as {error?:string;options?:ThaiAddressOption[];profile?:Record<string,unknown>};
