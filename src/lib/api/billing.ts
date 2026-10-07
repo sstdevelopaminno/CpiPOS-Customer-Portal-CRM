@@ -58,11 +58,13 @@ export async function submitPackagePayment(input:{
     headers:{apikey:supabaseKey,authorization:`Bearer ${token}`},
     body:form
   });
-  const payload=await response.json().catch(()=>({})) as {error?:string;status?:string};
+  const payload=await response.json().catch(()=>({})) as {error?:string;status?:string;scan_status?:string;provisional_access?:boolean;review_deadline?:string|null};
   if(!response.ok){
     if(payload.error==="open_request_exists") throw new Error("มีรายการแพ็กเกจที่กำลังรอตรวจสอบอยู่แล้ว");
     if(payload.error==="payable_cycle_exists") throw new Error("มีรอบบิลที่ต้องชำระอยู่ กรุณาชำระจากรายการรอบบิลนั้น");
     if(payload.error==="renewal_not_due") throw new Error("ยังไม่ถึงช่วงเวลาที่เปิดให้ชำระรอบถัดไป");
+    if(payload.error==="payment_support_required") throw new Error("เกินกำหนดชำระด้วยตนเองแล้ว กรุณาติดต่อฝ่าย Support");
+    if(payload.error==="billing_cycle_mismatch"||payload.error==="billing_cycle_unavailable") throw new Error("รอบบิลมีการเปลี่ยนแปลง กรุณารีเฟรชแล้วลองใหม่");
     if(payload.error==="slip_required") throw new Error("กรุณาแนบสลิป JPG, PNG หรือ WebP ขนาดไม่เกิน 4 MB");
     throw new Error("ไม่สามารถส่งหลักฐานการชำระเงินได้");
   }
