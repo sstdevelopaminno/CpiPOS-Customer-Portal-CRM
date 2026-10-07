@@ -30,6 +30,33 @@ function headers(req:Request){
   };
 }
 function json(req:Request,body:unknown,status=200){return new Response(JSON.stringify(body),{status,headers:headers(req)});}
+async function scanBridgeToken(){
+  const raw=new TextEncoder().encode("cpipos:internal-subscription-slip-scan:v1|"+adminKey());
+  const hash=new Uint8Array(await crypto.subtle.digest("SHA-256",raw));
+  return Array.from(hash).map(value=>value.toString(16).padStart(2,"0")).join("");
+}
+async function scanSlip(input:{
+  tenantId:string;requestId:string;storagePath:string;expectedAmount:number;
+  payeeName:string;accountNumber:string;promptPayId:string;
+}){
+  const base=(Deno.env.get("CPIPOS_PRODUCTION_URL")??"https://cp-ipos-web.vercel.app").replace(/\/$/,"");
+  const token=await scanBridgeToken();
+  const response=await fetch(base+"/api/internal/subscription-slip-scan",{
+    method:"POST",
+    headers:{authorization:"Bearer "+token,"content-type":"application/json"},
+    body:JSON.stringify({
+      tenant_id:input.tenantId,request_id:input.requestId,storage_path:input.storagePath,
+      expected_amount:input.expectedAmount,expected_payee_name:input.payeeName,
+      expected_account_number:input.accountNumber,expected_promptpay_id:input.promptPayId
+    }),
+    signal:AbortSignal.timeout(35000)
+  });
+  const payload=await response.json().catch(()=>null) as {data?:{scan?:Record<string,unknown>};error?:{message?:string}}|null;
+  if(!response.ok||!payload?.data?.scan){
+    return {status:"error",parsed:{},checks:{passed:false,amount_match:null,payee_match:false,datetime_present:false,confidence_pass:false,issues:[payload?.error?.message??"scan_unavailable"]},model:"primary-cpipos-slip-scanner",error_message:payload?.error?.message??"scan_unavailable"} as Record<string,unknown>;
+  }
+  return payload.data.scan;
+}
 function validMagic(bytes:Uint8Array,mime:string){
   if(mime==="image/jpeg")return bytes.length>3&&bytes[0]===0xff&&bytes[1]===0xd8&&bytes[2]===0xff;
   if(mime==="image/png")return bytes.length>8&&bytes[0]===0x89&&bytes[1]===0x50&&bytes[2]===0x4e&&bytes[3]===0x47;
@@ -85,6 +112,9 @@ Deno.serve(async(req)=>{
     const isOwner=(roles??[]).some(row=>row.role==="owner");
     if(!isOwner)return json(req,{error:"owner_required"},403);
 
+    const ensured=await admin.rpc("ensure_tenant_subscription_billing_cycle",{p_tenant_id:tenantId});
+    if(ensured.error)return json(req,{error:"billing_cycle_sync_failed"},503);
+
     const {data:contract,error:contractError}=await admin
       .from("tenant_subscription_contracts")
       .select("id,package_id,status,billing_interval,amount_per_cycle,currency,ended_at")
@@ -94,40 +124,30 @@ Deno.serve(async(req)=>{
     const {data:dueState,error:dueError}=await admin.rpc("subscription_billing_due_state",{p_tenant_id:tenantId});
     if(dueError||!dueState)return json(req,{error:"billing_due_state_unavailable"},503);
     const due=(dueState??{}) as Record<string,unknown>;
+    if(due.support_required===true||due.self_service_payment_allowed!==true){
+      return json(req,{error:due.support_required===true?"payment_support_required":"renewal_not_due",status:String(due.status??"")},409);
+    }
+    const canonicalCycleId=typeof due.billing_cycle_id==="string"?due.billing_cycle_id:null;
+    if(!canonicalCycleId)return json(req,{error:"billing_cycle_unavailable"},503);
+    if(billingCycleId&&billingCycleId!==canonicalCycleId)return json(req,{error:"billing_cycle_mismatch"},409);
     const billingInterval=String(due.billing_interval??contract.billing_interval??"monthly")==="yearly"?"yearly":"monthly";
     if(requestedBillingInterval!==billingInterval)return json(req,{error:"billing_interval_mismatch"},409);
     if(typeof due.package_id==="string"&&due.package_id!==packageId)return json(req,{error:"package_mismatch"},409);
 
-    const payableStatuses=new Set(["open","due","overdue","pending"]);
-    let expected=Number(due.amount_due??contract.amount_per_cycle??0);
-    if(billingCycleId){
-      const {data:cycle,error:cycleError}=await admin
-        .from("tenant_billing_cycles")
-        .select("id,package_id,amount_due,amount_paid,status")
-        .eq("id",billingCycleId).eq("tenant_id",tenantId).maybeSingle();
-      if(cycleError||!cycle)return json(req,{error:"cycle_not_found"},404);
-      if(cycle.package_id&&cycle.package_id!==packageId)return json(req,{error:"cycle_package_mismatch"},409);
-      expected=Math.max(0,Number(cycle.amount_due??0)-Number(cycle.amount_paid??0));
-      if(!payableStatuses.has(String(cycle.status??""))){
-        return json(req,{error:cycle.status==="paid"?"cycle_already_paid":"cycle_not_payable"},409);
-      }
-      if(expected<=0)return json(req,{error:"cycle_already_paid"},409);
-    }else{
-      const {data:cycles,error:cyclesError}=await admin.from("tenant_billing_cycles")
-        .select("id,status,amount_due,amount_paid")
-        .eq("tenant_id",tenantId)
-        .in("status",Array.from(payableStatuses))
-        .limit(50);
-      if(cyclesError)return json(req,{error:"renewal_check_failed"},503);
-      const hasPayableCycle=(cycles??[]).some(row=>payableStatuses.has(String(row.status??""))&&Number(row.amount_due??0)>Number(row.amount_paid??0));
-      if(hasPayableCycle)return json(req,{error:"payable_cycle_exists"},409);
-      if(due.payable_now!==true)return json(req,{error:"renewal_not_due",status:String(due.status??"")},409);
-      expected=Number(due.amount_due??0);
-    }
+    const payableStatuses=new Set(["open","due","overdue"]);
+    let expected=Number(due.outstanding??due.amount_due??contract.amount_per_cycle??0);
+    const {data:cycle,error:cycleError}=await admin
+      .from("tenant_billing_cycles")
+      .select("id,package_id,amount_due,amount_paid,status")
+      .eq("id",canonicalCycleId).eq("tenant_id",tenantId).maybeSingle();
+    if(cycleError||!cycle)return json(req,{error:"cycle_not_found"},404);
+    if(cycle.package_id&&cycle.package_id!==packageId)return json(req,{error:"cycle_package_mismatch"},409);
+    expected=Math.max(0,Number(cycle.amount_due??0)-Number(cycle.amount_paid??0));
+    if(!payableStatuses.has(String(cycle.status??"")))return json(req,{error:"cycle_not_payable",status:cycle.status},409);
     if(!Number.isFinite(expected)||expected<=0)return json(req,{error:"amount_unavailable"},422);
 
     const {data:issuer}=await admin.from("it_communication_settings")
-      .select("billing_bank_account_number,billing_promptpay_id").eq("id","default").maybeSingle();
+      .select("billing_bank_account_name,billing_bank_account_number,billing_promptpay_id").eq("id","default").maybeSingle();
     if(!issuer?.billing_bank_account_number&&!issuer?.billing_promptpay_id)return json(req,{error:"receiving_account_not_configured"},422);
 
     const {data:openRows,error:openError}=await admin
@@ -147,7 +167,7 @@ Deno.serve(async(req)=>{
         && row.request_type===(String(due.kind??"")==="trial"?"trial_conversion":"renewal")
         && row.requested_package_id===packageId
         && !row.evidence_url
-        && metadataCycle===billingCycleId;
+        && metadataCycle===canonicalCycleId;
     });
     const open=openCandidates.length===1&&matching.length===1?matching[0]:null;
     if(openCandidates.length>0&&!open){
@@ -167,7 +187,7 @@ Deno.serve(async(req)=>{
       kind:"payment_notice",
       billing_interval:billingInterval,
       expected_amount:expected,
-      billing_cycle_id:billingCycleId,
+      billing_cycle_id:canonicalCycleId,
       source:"customer_portal_crm",
       submitted_by:actor.id,
       due_at:typeof due.due_at==="string"?due.due_at:null,
@@ -200,7 +220,33 @@ Deno.serve(async(req)=>{
       return json(req,{error:"request_save_failed"},503);
     }
 
-    return json(req,{ok:true,id:result.data.id,status:result.data.status,expected_amount:expected},201);
+    const scan=await scanSlip({
+      tenantId,requestId:result.data.id,storagePath:filePath,expectedAmount:expected,
+      payeeName:String(issuer?.billing_bank_account_name??""),
+      accountNumber:String(issuer?.billing_bank_account_number??""),
+      promptPayId:String(issuer?.billing_promptpay_id??"")
+    });
+    const provisionalResult=await admin.rpc("grant_provisional_subscription_access",{
+      p_request_id:result.data.id,p_scan:scan,p_actor_id:null
+    });
+    let provisional:Record<string,unknown>|null=null;
+    if(!provisionalResult.error&&provisionalResult.data&&typeof provisionalResult.data==="object"){
+      provisional=provisionalResult.data as Record<string,unknown>;
+    }else if(provisionalResult.error){
+      await admin.from("tenant_subscription_payment_requests").update({
+        auto_check_status:"failed",
+        auto_check_reason:("provisional_grant_failed:"+provisionalResult.error.message).slice(0,240),
+        metadata:{...metadata,slip_ai:scan}
+      }).eq("id",result.data.id);
+    }
+    return json(req,{
+      ok:true,id:result.data.id,
+      status:provisional?.granted===true?"under_review":result.data.status,
+      expected_amount:expected,
+      scan_status:String(scan.status??"error"),
+      provisional_access:provisional?.granted===true,
+      review_deadline:provisional?.review_deadline??provisional?.provisional_access_expires_at??null
+    },201);
   }catch(error){
     console.error("[customer-portal-billing-payment]",error instanceof Error?error.message:"unknown");
     return json(req,{error:"billing_payment_unavailable"},503);
