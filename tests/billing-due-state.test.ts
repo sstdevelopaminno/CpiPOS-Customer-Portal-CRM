@@ -14,7 +14,7 @@ describe("CRM canonical package due state",()=>{
     expect(view).toContain("ประวัติรอบบิลจาก Settlement");
   });
   it("uses payable-now state",()=>{
-    expect(view).toContain("currentDue?.payable_now");
+    expect(view).toContain("currentDue?.self_service_payment_allowed");
     expect(view).toContain("คำนวณจากวันสิ้นสุดสิทธิ์ปัจจุบัน");
   });
 });
