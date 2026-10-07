@@ -17,6 +17,11 @@ function explain(error: unknown) {
   if(message.includes("printer_purpose_required"))return new Error("กรุณาเลือกหน้าที่ของเครื่องพิมพ์อย่างน้อย 1 รายการ");
   if(message.includes("lan_ip_required"))return new Error("เครื่องพิมพ์ LAN ต้องระบุ IP Address");
   if(message.includes("printer_zone_invalid"))return new Error("โซนครัวที่เลือกไม่ถูกต้องหรือถูกปิดใช้งาน");
+  if(message.includes("discovered_printer_not_found"))return new Error("เครื่องพิมพ์ที่ตรวจพบไม่อยู่ในสาขานี้แล้ว กรุณารีเฟรช Wizard");
+  if(message.includes("printer_physical_target_already_claimed"))return new Error("เครื่องพิมพ์ physical นี้ถูกผูกใช้งานแล้ว กรุณาเลือกรายการอื่น");
+  if(message.includes("printer_physical_target_disconnected"))return new Error("เครื่องพิมพ์นี้ถูกยกเลิกการเชื่อมต่อไว้ กรุณาเปิด/เชื่อมต่อจาก POS ก่อน");
+  if(message.includes("printer_physical_target_mode_mismatch"))return new Error("โหมด USB/Bluetooth ไม่ตรงกับอุปกรณ์ที่ตรวจพบ");
+  if(message.includes("printer_physical_target_runtime_mismatch"))return new Error("เครื่องพิมพ์นี้ถูกตรวจพบจาก Print Agent คนละเครื่อง กรุณาเลือก Agent ที่ถูกต้อง");
   if(message.includes("customer_display_pairing_conflict"))return new Error("รหัส Pairing เกิดการชนกัน กรุณาสร้างรหัสใหม่อีกครั้ง");
   if(message.includes("pairing_not_found"))return new Error("ไม่พบการเชื่อมต่อ Customer Display");
   if(message.includes("layout_object_not_found"))return new Error("ไม่พบวัตถุในผังร้าน");

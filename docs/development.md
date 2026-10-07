@@ -50,3 +50,10 @@ Remote receipt and tax-invoice printing uses the same \`print_jobs\` queue and r
 Printer Health is served by the authenticated \`customer-portal-printer-admin\` Edge Function. It returns only safe Print Agent fields, Printer Profile health, and recent queue/attempt status; Print Agent API key hashes are never selected or returned.
 
 Printer-to-Agent binding updates only routing metadata on the shared \`printer_profiles\` control plane. A profile can be pinned to one Agent or left in branch-wide failover mode. Test Print creates a normal \`print_jobs\` row so the existing Agent claim/ACK flow executes it. Manual Retry requires an Owner/Manager PIN and is limited to failed, replay-safe jobs; kitchen-ticket and device-command jobs cannot be replayed from CRM.
+
+
+## POS administration phase 6
+
+Printer Setup Wizard now mirrors the safe parts of POS Printer Settings v3. It begins with a recently-online Print Agent, reads USB/Bluetooth physical candidates created by the POS Android MDM auto registry, requires the auto-verification state before allowing a candidate to be configured, supports manual LAN IP/Port setup, then writes the same printer profile/device assignments and Agent routing used by POS.
+
+The phase-2 printer mutation accepts a scoped \`discovered_device_id\`. The function locks that physical device row, validates tenant/branch, active state, transport mode, runtime device code and unclaimed state, then claims the existing row instead of inserting a duplicate. Discovery metadata and verification history are preserved. Final verification uses the normal \`print_jobs\` + Print Agent claim/ACK path through Test Print.

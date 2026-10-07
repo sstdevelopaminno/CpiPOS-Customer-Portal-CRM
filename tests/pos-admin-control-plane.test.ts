@@ -7,6 +7,8 @@ const sql=readFileSync(join(root,"supabase/sql/customer_portal_pos_admin_crud_pa
 const phase2=readFileSync(join(root,"supabase/sql/customer_portal_pos_admin_phase2.sql"),"utf8");
 const phase3=readFileSync(join(root,"supabase/sql/customer_portal_pos_admin_phase3.sql"),"utf8");
 const phase4=readFileSync(join(root,"supabase/sql/customer_portal_pos_admin_phase4.sql"),"utf8");
+const phase6=readFileSync(join(root,"supabase/sql/customer_portal_pos_admin_phase6.sql"),"utf8");
+const printerWizard=readFileSync(join(root,"src/views/pos-admin/PrinterSetupWizard.tsx"),"utf8");
 const taxProfileEdge=readFileSync(join(root,"supabase/functions/customer-portal-tax-profile/index.ts"),"utf8");
 const printerAdminEdge=readFileSync(join(root,"supabase/functions/customer-portal-printer-admin/index.ts"),"utf8");
 
@@ -93,6 +95,22 @@ describe("POS admin control-plane",()=>{
     expect(printerAdminEdge).toContain("row.printer_role===\"kitchen\"&&!testPrint");
     expect(printerAdminEdge).toContain("meta.command");
     expect(printerAdminEdge).toContain('status:"pending",retry_count:0');
+  });
+  it("phase6 claims an auto-discovered physical printer instead of duplicating it",()=>{
+    expect(phase6).toContain("v_discovered_device_id");
+    expect(phase6).toContain("discovered_printer_not_found");
+    expect(phase6).toContain("printer_physical_target_already_claimed");
+    expect(phase6).toContain("printer_physical_target_runtime_mismatch");
+    expect(phase6).toContain("for update");
+    expect(phase6).toContain("coalesce(public.printer_devices.metadata");
+  });
+  it("phase6 wizard requires verified discovery before USB/Bluetooth setup",()=>{
+    expect(printerAdminEdge).toContain("ready_for_setup");
+    expect(printerAdminEdge).toContain("verification_state");
+    expect(printerWizard).toContain("discovered_device_id");
+    expect(printerWizard).toContain("candidate?.ready_for_setup");
+    expect(printerWizard).toContain("queuePrinterTest");
+    expect(printerWizard).toContain("bindPrinterAgent");
   });
   it("audits Customer Portal mutations",()=>{
     expect(sql).toContain("insert into public.audit_logs");

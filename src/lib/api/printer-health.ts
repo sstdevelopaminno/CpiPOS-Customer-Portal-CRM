@@ -9,14 +9,20 @@ export type PrinterHealthProfile={
   bound_agent_id:string|null;bound_device_code:string|null;binding_mode:"specific"|"branch_any";matching_agent_count:number;online_agent_count:number;ready:boolean;
   device:Record<string,unknown>|null;
 };
+export type PrinterDiscoveryCandidate={
+  id:string;display_name:string;brand:string|null;model:string|null;connection_mode:"usb"|"bluetooth";paper_width_mm:58|80;
+  runtime_device_code:string|null;status:string;last_seen_at:string|null;agent_id:string|null;agent_name:string|null;agent_online:boolean;
+  verification_state:string;verification_attempts:number;verification_code:string|null;source:string;ready_for_setup:boolean;
+  capabilities:Record<string,unknown>;
+};
 export type PrinterHealthJob={
   id:string;order_id:string|null;printer_id:string|null;printer_name:string|null;printer_role:string;connection_type:string;status:string;retry_count:number;max_retry_count:number;
   last_error:string|null;printed_at:string|null;failed_at:string|null;created_at:string;updated_at:string;claimed_by_agent_id:string|null;claimed_at:string|null;claim_expires_at:string|null;
   agent_error_code:string|null;request_source:string;document_type:string;document_id:string|null;test_print:boolean;retry_allowed:boolean;last_attempt:Record<string,unknown>|null;
 };
 export type PrinterHealthState={
-  agents:PrinterHealthAgent[];printers:PrinterHealthProfile[];jobs:PrinterHealthJob[];
-  summary:{online_agents:number;total_agents:number;ready_printers:number;total_printers:number;queued_jobs:number;failed_jobs:number};
+  agents:PrinterHealthAgent[];printers:PrinterHealthProfile[];candidates:PrinterDiscoveryCandidate[];jobs:PrinterHealthJob[];
+  summary:{online_agents:number;total_agents:number;ready_printers:number;total_printers:number;discovered_printers:number;setup_ready_printers:number;queued_jobs:number;failed_jobs:number};
 };
 
 function explain(code:string){
