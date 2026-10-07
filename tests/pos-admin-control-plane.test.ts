@@ -8,6 +8,7 @@ const phase2=readFileSync(join(root,"supabase/sql/customer_portal_pos_admin_phas
 const phase3=readFileSync(join(root,"supabase/sql/customer_portal_pos_admin_phase3.sql"),"utf8");
 const phase4=readFileSync(join(root,"supabase/sql/customer_portal_pos_admin_phase4.sql"),"utf8");
 const taxProfileEdge=readFileSync(join(root,"supabase/functions/customer-portal-tax-profile/index.ts"),"utf8");
+const printerAdminEdge=readFileSync(join(root,"supabase/functions/customer-portal-printer-admin/index.ts"),"utf8");
 
 describe("POS admin control-plane",()=>{
   it("requires feature and menu policy before mutations",()=>{
@@ -76,6 +77,22 @@ describe("POS admin control-plane",()=>{
     expect(taxProfileEdge).toContain("admin.auth.getUser(token)");
     expect(taxProfileEdge).toContain("customer_portal_feature_state");
     expect(taxProfileEdge).toContain("tax_invoice_profile_created");
+  });
+  it("phase5 keeps printer health and retry behind authenticated server control",()=>{
+    expect(printerAdminEdge).toContain("admin.auth.getUser(token)");
+    expect(printerAdminEdge).toContain("customer_portal_feature_state");
+    expect(printerAdminEdge).toContain("settings.printers");
+    expect(printerAdminEdge).not.toContain("api_key_hash");
+    expect(printerAdminEdge).toContain("printer_agent_offline");
+    expect(printerAdminEdge).toContain("customer_portal_printer_test");
+    expect(printerAdminEdge).toContain("job_retry_not_allowed");
+    expect(printerAdminEdge).toContain("bcrypt.compare");
+  });
+  it("phase5 never replays unsafe kitchen or device command jobs",()=>{
+    expect(printerAdminEdge).toContain("row.kitchen_ticket_id");
+    expect(printerAdminEdge).toContain("row.printer_role===\"kitchen\"&&!testPrint");
+    expect(printerAdminEdge).toContain("meta.command");
+    expect(printerAdminEdge).toContain('status:"pending",retry_count:0');
   });
   it("audits Customer Portal mutations",()=>{
     expect(sql).toContain("insert into public.audit_logs");
