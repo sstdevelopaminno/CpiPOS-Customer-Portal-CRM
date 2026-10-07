@@ -7,6 +7,10 @@ import { FloorPlanEditor } from "./FloorPlanEditor";
 import { KitchenProductRouting } from "./KitchenProductRouting";
 import { PrinterWorkspace } from "./PrinterWorkspace";
 import { DisplayWorkspace } from "./DisplayWorkspace";
+import {
+  ActivityWorkspace,InetWorkspace,OrderKitchenWorkspace,ProductSalesWorkspace,
+  ReceiptsWorkspace,TableQrWorkspace,TaxInvoicesWorkspace
+} from "./Phase3Workspaces";
 import type {
   BuffetAdminSnapshot, BuffetProductAdmin, CashierDeviceAdmin, DevicesAdminSnapshot, DiningTableAdmin,
   KitchenAdminSnapshot, KitchenZoneAdmin, MemberAdmin, MembersAdminSnapshot, PosAdminModule,
@@ -289,7 +293,14 @@ export function PosAdminWorkspace({module,context,branchId,onBack}:WorkspaceProp
     buffet:["ตั้งค่าราคาบุฟเฟ่","จัดการแพ็กเกจราคาแบบรายท่านและแบบชุดที่ POS ใช้ขายจริง"],
     devices:["เครื่องแคชเชียร์","เพิ่ม แก้ไข ลบเครื่อง POS พร้อมควบคุมโควตาและ revoke session"],
     printers:["เครื่องพิมพ์","จัดการเครื่องพิมพ์ งานพิมพ์ และการผูกโซนครัวด้วย registry ชุดเดียวกับ POS"],
-    display:["จอลูกค้า","สร้างและยกเลิก Customer Display pairing ภายใต้ IT Policy เดียวกับ POS"]
+    display:["จอลูกค้า","สร้างและยกเลิก Customer Display pairing ภายใต้ IT Policy เดียวกับ POS"],
+    activity:["ตรวจสอบพฤติกรรมการใช้งาน","Audit Log สำหรับ Owner/Manager พร้อม PIN approval แบบเดียวกับ POS"],
+    inet:["INET QR","ตั้งค่า Dynamic QR ของ INET NOPS ตามแพ็กเกจและสาขา"],
+    order_kitchen:["การแจ้งเตือนออเดอร์และครัว","ตั้งค่าร้าน พร้อมแสดง IT override และผลใช้งานจริง"],
+    table_qr:["ตั้งค่า QR โต๊ะ","กำหนดอายุ QR รายโต๊ะและ revoke QR เดิมเมื่อ policy เปลี่ยน"],
+    receipts:["ใบเสร็จย้อนหลัง","ค้นหาและตรวจรายละเอียดใบเสร็จจากข้อมูล POS ชุดเดียวกัน"],
+    tax_invoices:["ออกใบกำกับภาษี","จัดการข้อมูลผู้ขายและออกทะเบียนใบกำกับภาษีจากบิลที่ชำระแล้ว"],
+    product_sales:["รายการขายสินค้า","สรุปยอดขาย จำนวน และอันดับสินค้าตามช่วงเวลา"]
   };
   const [title,subtitle]=titles[module];
   const childKey=`${module}:${scope}:${refreshKey}`;
@@ -303,6 +314,13 @@ export function PosAdminWorkspace({module,context,branchId,onBack}:WorkspaceProp
       {module==="devices"?<DevicesWorkspace context={context} branchId={scope} onBack={onBack}/>:null}
       {module==="printers"?<PrinterWorkspace context={context} branchId={scope}/>:null}
       {module==="display"?<DisplayWorkspace context={context} branchId={scope}/>:null}
+      {module==="activity"?<ActivityWorkspace context={context} branchId={scope}/>:null}
+      {module==="inet"?<InetWorkspace context={context} branchId={scope}/>:null}
+      {module==="order_kitchen"?<OrderKitchenWorkspace context={context} branchId={scope}/>:null}
+      {module==="table_qr"?<TableQrWorkspace context={context} branchId={scope}/>:null}
+      {module==="receipts"?<ReceiptsWorkspace context={context} branchId={scope}/>:null}
+      {module==="tax_invoices"?<TaxInvoicesWorkspace context={context} branchId={scope}/>:null}
+      {module==="product_sales"?<ProductSalesWorkspace context={context} branchId={scope}/>:null}
     </div>
   </>;
 }
