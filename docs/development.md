@@ -36,3 +36,10 @@ Customer Portal now manages the shared table floor plan, floor objects, product-
 ## POS administration phase 3
 
 Customer Portal now exposes the POS Activity/Audit view with Owner/Manager PIN approval, INET NOPS QR configuration, Order/Kitchen store preferences with IT overrides, per-table QR expiry policy, receipt history/detail, tax-invoice seller/issuance registry, and product-sales aggregation. Hardware receipt/tax printing remains routed by the POS/Print Agent because it depends on a registered runtime device/session. Customer Portal never receives the INET Merchant Key; provider connection testing remains on the POS server control-plane.
+
+
+## POS administration phase 4
+
+Customer Portal can create Thai tax-invoice buyer profiles through the authenticated \`customer-portal-tax-profile\` Edge Function. Postal-code lookup and the selected subdistrict/district/province tuple are revalidated against the Thailand geography dataset before a profile is inserted.
+
+Remote receipt and tax-invoice printing uses the same \`print_jobs\` queue and registered Print Agent claim/ACK flow as POS. The browser never receives a Print Agent API key. Customer Portal requires Owner/Manager PIN approval, a branch-scoped enabled receipt printer, a recently-online matching Print Agent, package/menu access, and a unique request ID before it enqueues a print job.
