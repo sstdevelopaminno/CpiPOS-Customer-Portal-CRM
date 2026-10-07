@@ -33,7 +33,7 @@ export function RemotePrintDialog(props:{
       <label><span>เครื่องพิมพ์</span><select value={printerId} onChange={e=>setPrinterId(e.target.value)} disabled={!readyPrinters.length}>{readyPrinters.length?readyPrinters.map(p=><option key={p.id} value={p.id}>{p.printer_name+" · "+p.paper_width_mm+"mm · "+p.connection_type}</option>):<option value="">ยังไม่มีเครื่องพร้อม</option>}</select></label>
       <label><span>PIN Owner/Manager</span><input type="password" inputMode="numeric" value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,"").slice(0,12))} placeholder="ยืนยันก่อนส่งเข้าคิว"/></label>
       {success?<p className="phase4Success">{success}</p>:null}
-      {recent.length?<div className="remotePrintRecent"><strong>งานล่าสุด</strong>{recent.map(j=><span key={j.id}>{j.printer_name||"Printer"}+" · "+{j.status}+" · "+{new Date(j.created_at).toLocaleString("th-TH")}</span>)}</div>:null}
+      {recent.length?<div className="remotePrintRecent"><strong>งานล่าสุด</strong>{recent.map(j=><span key={j.id}>{(j.printer_name||"Printer")+" · "+j.status+" · "+new Date(j.created_at).toLocaleString("th-TH")}</span>)}</div>:null}
       <div className="modalActions"><button className="secondaryButton" type="button" onClick={onClose}>ปิด</button><button className="primaryAction" type="button" disabled={busy||!printerId||pin.length<4} onClick={()=>void submit()}>{busy?<LoaderCircle className="spin" size={16}/>:<Printer size={16}/>}ส่งงานพิมพ์</button></div>
     </div>
   </Modal>;
