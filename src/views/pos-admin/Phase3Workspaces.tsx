@@ -140,7 +140,7 @@ export function ReceiptsWorkspace({context,branchId}:BaseProps){
     {selected?<Modal title={"ใบเสร็จ "+selected.order_no} onClose={()=>setSelected(null)} wide><div className="receiptDetail">
       <div className="receiptSummaryGrid"><div><span>ลูกค้า</span><strong>{selected.customer_name||"—"}</strong></div><div><span>ยอดสุทธิ</span><strong>{money(selected.total_amount)}</strong></div><div><span>ชำระแล้ว</span><strong>{money(selected.paid_total)}</strong></div><div><span>วันที่</span><strong>{dateTime(selected.created_at)}</strong></div></div>
       <div className="tableWrap"><table><thead><tr><th>สินค้า</th><th>SKU</th><th>จำนวน</th><th>ราคา</th><th>รวม</th></tr></thead><tbody>{selected.items.map(item=><tr key={item.id}><td>{item.name}</td><td>{item.sku||"—"}</td><td>{item.quantity}</td><td>{money(item.unit_price)}</td><td>{money(item.line_total)}</td></tr>)}</tbody></table></div>
-      <div className="modalActions"><button className="secondaryButton" onClick={()=>setSelected(null)}>ปิด</button><button className="primaryAction" onClick={()=>setPrintTarget(selected)}>พิมพ์ผ่าน Print Agent</button></div>
+      <div className="modalActions"><button className="secondaryButton" onClick={()=>setSelected(null)}>ปิด</button><button className="primaryAction" onClick={()=>{setPrintTarget(selected);setSelected(null);}}>พิมพ์ผ่าน Print Agent</button></div>
     </div></Modal>:null}
     {printTarget?<RemotePrintDialog context={context} branchId={branchId} documentType="receipt" documentId={printTarget.id} documentLabel={printTarget.order_no} onClose={()=>setPrintTarget(null)}/>:null}
   </>;

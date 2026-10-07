@@ -116,6 +116,7 @@ begin
       from (
         select pj.id,pj.order_id,pj.printer_id,p.printer_name,pj.status::text as status,
                pj.payload_json->>'document_type' as document_type,
+               pj.payload_json->>'document_id' as document_id,
                pj.retry_count,pj.last_error,pj.printed_at,pj.failed_at,pj.created_at,
                pj.claimed_by_agent_id,pj.claimed_at,pj.claim_expires_at
         from public.print_jobs pj
@@ -143,6 +144,7 @@ declare
   v_approver_role text;
   v_printer record;
   v_order record;
+  v_order_id uuid;
   v_invoice record;
   v_items text:='';
   v_payload text;
@@ -195,6 +197,7 @@ begin
     select o.* into v_order from public.orders o
     where o.id=p_document_id and o.tenant_id=p_tenant_id and o.branch_id=p_branch_id;
     if not found then raise exception using errcode='P0002',message='order_not_found'; end if;
+    v_order_id:=v_order.id;
 
     select coalesce(string_agg(
       coalesce(oi.name,p.name,'สินค้า')||' x'||trim(to_char(coalesce(oi.quantity,0),'FM999999990.##'))||
@@ -248,7 +251,7 @@ begin
       'ยอดสุทธิ: '||coalesce(v_invoice.order_snapshot->>'grand_total','0')||E'\n'||
       'ภาษี: '||coalesce(v_invoice.tax_snapshot->>'tax_total','0')||E'\n'||
       'เอกสารอ้างอิงจากข้อมูล CpIPOS';
-    v_order.id:=v_invoice.order_id;
+    v_order_id:=v_invoice.order_id;
   end if;
 
   v_idempotency:=left('crm:'||v_document_type||':'||p_document_id::text||':'||p_printer_id::text||':'||p_request_id::text,180);
@@ -256,7 +259,7 @@ begin
     tenant_id,branch_id,order_id,printer_id,printer_role,connection_type,status,
     payload_text,payload_json,max_retry_count,created_by,idempotency_key,metadata
   ) values(
-    p_tenant_id,p_branch_id,v_order.id,p_printer_id,'receipt',v_printer.connection_type,'pending',
+    p_tenant_id,p_branch_id,v_order_id,p_printer_id,'receipt',v_printer.connection_type,'pending',
     v_payload,
     jsonb_build_object(
       'document_type',v_document_type,'document_id',p_document_id,'printer_name',v_printer.printer_name,

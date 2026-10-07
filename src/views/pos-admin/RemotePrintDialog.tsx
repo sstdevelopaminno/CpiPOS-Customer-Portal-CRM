@@ -14,7 +14,7 @@ export function RemotePrintDialog(props:{
   const refresh=useCallback(async()=>{setBusy(true);setError("");try{const next=await loadRemotePrintState(context.tenantId,branchId);setState(next);const ready=next.printers.find(p=>p.ready);setPrinterId(current=>next.printers.some(p=>p.id===current&&p.ready)?current:ready?.id??"");}catch(e){setError(e instanceof Error?e.message:"โหลดสถานะ Print Agent ไม่สำเร็จ");}finally{setBusy(false);}},[context.tenantId,branchId]);
   useEffect(()=>{void refresh();},[refresh]);
   const readyPrinters=useMemo(()=>state?.printers.filter(p=>p.ready)??[],[state]);
-  const recent=state?.recent_jobs.filter(j=>j.document_type===documentType&&j.order_id===documentId).slice(0,3)??[];
+  const recent=state?.recent_jobs.filter(j=>j.document_type===documentType&&j.document_id===documentId).slice(0,3)??[];
   async function submit(){
     if(!printerId||pin.length<4)return;
     setBusy(true);setError("");setSuccess("");

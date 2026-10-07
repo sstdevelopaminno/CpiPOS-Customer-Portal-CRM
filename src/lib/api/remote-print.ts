@@ -8,7 +8,7 @@ export type RemotePrintPrinter={
   online_agent_count:number;last_agent_seen_at:string|null;ready:boolean;
 };
 export type RemotePrintJob={
-  id:string;order_id:string|null;printer_id:string|null;printer_name:string|null;status:string;document_type:string|null;
+  id:string;order_id:string|null;document_id:string|null;printer_id:string|null;printer_name:string|null;status:string;document_type:string|null;
   retry_count:number;last_error:string|null;printed_at:string|null;failed_at:string|null;created_at:string;
   claimed_by_agent_id:string|null;claimed_at:string|null;claim_expires_at:string|null;
 };
