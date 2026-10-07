@@ -38,6 +38,25 @@ function safeProfile(profile:PrinterRow,agents:AgentRow[],device:JsonRecord|null
   const boundDevice=String(metadata.agent_device_code??metadata.device_code??"").trim()||null;
   return {id:profile.id,printer_name:profile.printer_name,printer_role:profile.printer_role,connection_type:profile.connection_type,paper_width_mm:profile.paper_width_mm,enabled:profile.enabled,ip_address:profile.ip_address,port:profile.port,bound_agent_id:boundId,bound_device_code:boundDevice,binding_mode:boundId||boundDevice?"specific":"branch_any",matching_agent_count:matching.length,online_agent_count:online.length,ready:profile.enabled&&online.length>0,device};
 }
+function safeCandidate(device:JsonRecord,agents:AgentRow[]){
+  const metadata=asRecord(device.metadata);const verification=asRecord(metadata.auto_verification);
+  const runtimeCode=String(device.runtime_device_code??"").trim();
+  const agent=agents.find(a=>a.device_code.toUpperCase()===runtimeCode.toUpperCase())??null;
+  const source=String(metadata.source??"");
+  const verificationState=String(verification.state??(source==="android_mdm_auto_registry_v1"?"pending":"not_required"));
+  const verified=verificationState==="verified"||source!=="android_mdm_auto_registry_v1";
+  const mode=String(device.connection_mode??"");
+  return {
+    id:String(device.id??""),display_name:String(device.display_name??"Printer"),brand:device.brand?String(device.brand):null,
+    model:device.model?String(device.model):null,connection_mode:mode,paper_width_mm:Number(device.paper_width_mm??80),
+    runtime_device_code:runtimeCode||null,status:String(device.status??""),last_seen_at:device.last_seen_at?String(device.last_seen_at):null,
+    agent_id:agent?.id??null,agent_name:agent?.agent_name??null,agent_online:Boolean(agent&&isOnline(agent)),
+    verification_state:verificationState,verification_attempts:Number(verification.attempts??0),
+    verification_code:verification.last_code?String(verification.last_code):null,
+    source,ready_for_setup:Boolean(device.is_active)&&!device.printer_profile_id&&Boolean(device.device_fingerprint)&&["usb","bluetooth"].includes(mode)&&Boolean(agent&&isOnline(agent))&&verified,
+    capabilities:asRecord(device.capabilities)
+  };
+}
 function safeJob(job:JobRow,printerName:string|null,lastAttempt:JsonRecord|null){
   const metadata=asRecord(job.metadata);const payload=asRecord(job.payload_json);
   const command=String(metadata.command??"");
@@ -88,18 +107,20 @@ async function verifyPin(admin:ReturnType<typeof createClient>,tenantId:string,b
 async function loadState(admin:ReturnType<typeof createClient>,tenantId:string,branchId:string){
   const [agents,printers,deviceResult,jobResult]=await Promise.all([
     getAgents(admin,tenantId,branchId),getPrinters(admin,tenantId,branchId),
-    admin.from("printer_devices").select("id,printer_profile_id,display_name,status,runtime_device_code,last_seen_at,is_active,connection_mode,paper_width_mm").eq("tenant_id",tenantId).eq("branch_id",branchId),
+    admin.from("printer_devices").select("id,printer_profile_id,display_name,brand,model,status,runtime_device_code,last_seen_at,is_active,connection_mode,paper_width_mm,device_fingerprint,capabilities,metadata").eq("tenant_id",tenantId).eq("branch_id",branchId),
     admin.from("print_jobs").select("id,order_id,printer_id,printer_role,connection_type,status,retry_count,max_retry_count,last_error,printed_at,failed_at,created_at,updated_at,claimed_by_agent_id,claimed_at,claim_expires_at,agent_error_code,kitchen_ticket_id,metadata,payload_json").eq("tenant_id",tenantId).eq("branch_id",branchId).order("created_at",{ascending:false}).limit(50)
   ]);
   if(deviceResult.error)throw deviceResult.error;if(jobResult.error)throw jobResult.error;
   const jobs=(jobResult.data??[]) as JobRow[];const ids=jobs.map(j=>j.id);let attempts:JsonRecord[]=[];
   if(ids.length){const r=await admin.from("print_job_attempts").select("id,print_job_id,agent_id,attempt_no,status,claimed_at,completed_at,error_code,error_message,provider_job_id,bytes_sent").eq("tenant_id",tenantId).eq("branch_id",branchId).in("print_job_id",ids).order("attempt_no",{ascending:false});if(r.error)throw r.error;attempts=(r.data??[]) as JsonRecord[];}
   const attemptByJob=new Map<string,JsonRecord>();for(const a of attempts){const id=String(a.print_job_id??"");if(id&&!attemptByJob.has(id))attemptByJob.set(id,a);}
-  const deviceByPrinter=new Map((deviceResult.data??[]).filter(d=>d.printer_profile_id).map(d=>[String(d.printer_profile_id),d as JsonRecord]));
+  const deviceRows=(deviceResult.data??[]) as JsonRecord[];
+  const deviceByPrinter=new Map(deviceRows.filter(d=>d.printer_profile_id).map(d=>[String(d.printer_profile_id),d]));
   const nameByPrinter=new Map(printers.map(p=>[p.id,p.printer_name]));
   const safeProfiles=printers.map(p=>safeProfile(p,agents,deviceByPrinter.get(p.id)??null));
   const safeJobs=jobs.map(j=>safeJob(j,j.printer_id?nameByPrinter.get(j.printer_id)??null:null,attemptByJob.get(j.id)??null));
-  return {agents:agents.map(safeAgent),printers:safeProfiles,jobs:safeJobs,summary:{online_agents:agents.filter(isOnline).length,total_agents:agents.length,ready_printers:safeProfiles.filter(p=>p.ready).length,total_printers:printers.length,queued_jobs:safeJobs.filter(j=>["pending","printing","retrying"].includes(j.status)).length,failed_jobs:safeJobs.filter(j=>j.status==="failed").length}};
+  const candidates=deviceRows.filter(d=>d.is_active&&!d.printer_profile_id&&["usb","bluetooth"].includes(String(d.connection_mode??""))).map(d=>safeCandidate(d,agents));
+  return {agents:agents.map(safeAgent),printers:safeProfiles,candidates,jobs:safeJobs,summary:{online_agents:agents.filter(isOnline).length,total_agents:agents.length,ready_printers:safeProfiles.filter(p=>p.ready).length,total_printers:printers.length,discovered_printers:candidates.length,setup_ready_printers:candidates.filter(c=>c.ready_for_setup).length,queued_jobs:safeJobs.filter(j=>["pending","printing","retrying"].includes(j.status)).length,failed_jobs:safeJobs.filter(j=>j.status==="failed").length}};
 }
 
 Deno.serve(async(req)=>{
