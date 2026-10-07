@@ -175,6 +175,9 @@ export interface PackageInfo {
     next_period_start:string|null;next_period_end:string|null;amount_due:number;amount_paid:number;outstanding:number;
     currency:string;billing_interval:string;package_id:string|null;package_code:string|null;package_name:string|null;
     open_request_id:string|null;open_request_status:string|null;prepaid_activation:boolean;source:string;
+    billing_cycle_id:string|null;self_service_payment_allowed:boolean;support_required:boolean;
+    access_locked:boolean;lock_reason:string|null;grace_until:string|null;auto_check_status:string|null;
+    provisional_access_granted_at:string|null;provisional_access_expires_at:string|null;provisional_access_active:boolean;
   } | null;
   billingCycles: Array<{
     id: string;
@@ -199,6 +202,10 @@ export interface PackageInfo {
     review_note: string | null;
     has_evidence: boolean;
     metadata: Record<string, unknown> | null;
+    auto_check_status?: string | null;
+    provisional_access_granted_at?: string | null;
+    provisional_access_expires_at?: string | null;
+    provisional_access_revoked_at?: string | null;
   }>;
   issuer: {
     billing_legal_name_th: string | null;
