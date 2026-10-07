@@ -31,3 +31,8 @@ Migration `customer_portal_pos_admin_crud_parity` adds authenticated Owner/Manag
 ## POS administration phase 2
 
 Customer Portal now manages the shared table floor plan, floor objects, product-level kitchen routing, printer profiles/registry assignments, and Customer Display pairing lifecycle. Customer Display device limits and inactivity policy remain IT-owned. USB/Bluetooth physical discovery remains a local POS/Print Agent responsibility; the portal manages the shared configuration after registration.
+
+
+## POS administration phase 3
+
+Customer Portal now exposes the POS Activity/Audit view with Owner/Manager PIN approval, INET NOPS QR configuration, Order/Kitchen store preferences with IT overrides, per-table QR expiry policy, receipt history/detail, tax-invoice seller/issuance registry, and product-sales aggregation. Hardware receipt/tax printing remains routed by the POS/Print Agent because it depends on a registered runtime device/session. Customer Portal never receives the INET Merchant Key; provider connection testing remains on the POS server control-plane.
