@@ -43,3 +43,10 @@ Customer Portal now exposes the POS Activity/Audit view with Owner/Manager PIN a
 Customer Portal can create Thai tax-invoice buyer profiles through the authenticated \`customer-portal-tax-profile\` Edge Function. Postal-code lookup and the selected subdistrict/district/province tuple are revalidated against the Thailand geography dataset before a profile is inserted.
 
 Remote receipt and tax-invoice printing uses the same \`print_jobs\` queue and registered Print Agent claim/ACK flow as POS. The browser never receives a Print Agent API key. Customer Portal requires Owner/Manager PIN approval, a branch-scoped enabled receipt printer, a recently-online matching Print Agent, package/menu access, and a unique request ID before it enqueues a print job.
+
+
+## POS administration phase 5
+
+Printer Health is served by the authenticated \`customer-portal-printer-admin\` Edge Function. It returns only safe Print Agent fields, Printer Profile health, and recent queue/attempt status; Print Agent API key hashes are never selected or returned.
+
+Printer-to-Agent binding updates only routing metadata on the shared \`printer_profiles\` control plane. A profile can be pinned to one Agent or left in branch-wide failover mode. Test Print creates a normal \`print_jobs\` row so the existing Agent claim/ACK flow executes it. Manual Retry requires an Owner/Manager PIN and is limited to failed, replay-safe jobs; kitchen-ticket and device-command jobs cannot be replayed from CRM.
