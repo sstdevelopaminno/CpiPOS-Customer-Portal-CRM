@@ -1,6 +1,8 @@
 import { useCallback,useEffect,useMemo,useState,type FormEvent } from "react";
 import { CircleAlert,FileText,LoaderCircle,RefreshCw,Save,Search,ShieldCheck } from "lucide-react";
 import { Empty,ErrorPanel,Modal } from "../../components/common";
+import { RemotePrintDialog } from "./RemotePrintDialog";
+import { TaxProfileCreateModal } from "./TaxProfileCreateModal";
 import { loadPosAdminSnapshot,mutatePosAdmin } from "../../lib/api/pos-admin";
 import type { PortalContext } from "../../types/portal";
 import type {
@@ -117,7 +119,7 @@ export function TableQrWorkspace({context,branchId}:BaseProps){
 export function ReceiptsWorkspace({context,branchId}:BaseProps){
   const [data,setData]=useState<ReceiptsAdminSnapshot|null>(null); const [error,setError]=useState(""); const [busy,setBusy]=useState(false);
   const [period,setPeriod]=useState("day"); const [date,setDate]=useState(todayBangkok()); const [search,setSearch]=useState(""); const [status,setStatus]=useState("completed"); const [page,setPage]=useState(1);
-  const [selected,setSelected]=useState<ReceiptAdmin|null>(null);
+  const [selected,setSelected]=useState<ReceiptAdmin|null>(null); const [printTarget,setPrintTarget]=useState<ReceiptAdmin|null>(null);
   const load=useCallback(async(targetPage=page)=>{setBusy(true);setError("");try{setData(await loadPosAdminSnapshot<ReceiptsAdminSnapshot>(context.tenantId,branchId,"receipts",{period,date,q:search,status,page:targetPage,page_size:20}));setPage(targetPage);}catch(e){setError(e instanceof Error?e.message:"โหลดใบเสร็จไม่สำเร็จ");}finally{setBusy(false);}},[context.tenantId,branchId,period,date,search,status,page]);
   useEffect(()=>{void load(1);},[context.tenantId,branchId]);
   return <>
@@ -138,34 +140,37 @@ export function ReceiptsWorkspace({context,branchId}:BaseProps){
     {selected?<Modal title={"ใบเสร็จ "+selected.order_no} onClose={()=>setSelected(null)} wide><div className="receiptDetail">
       <div className="receiptSummaryGrid"><div><span>ลูกค้า</span><strong>{selected.customer_name||"—"}</strong></div><div><span>ยอดสุทธิ</span><strong>{money(selected.total_amount)}</strong></div><div><span>ชำระแล้ว</span><strong>{money(selected.paid_total)}</strong></div><div><span>วันที่</span><strong>{dateTime(selected.created_at)}</strong></div></div>
       <div className="tableWrap"><table><thead><tr><th>สินค้า</th><th>SKU</th><th>จำนวน</th><th>ราคา</th><th>รวม</th></tr></thead><tbody>{selected.items.map(item=><tr key={item.id}><td>{item.name}</td><td>{item.sku||"—"}</td><td>{item.quantity}</td><td>{money(item.unit_price)}</td><td>{money(item.line_total)}</td></tr>)}</tbody></table></div>
-      <div className="modalActions"><button className="primaryAction" onClick={()=>setSelected(null)}>ปิด</button></div>
+      <div className="modalActions"><button className="secondaryButton" onClick={()=>setSelected(null)}>ปิด</button><button className="primaryAction" onClick={()=>setPrintTarget(selected)}>พิมพ์ผ่าน Print Agent</button></div>
     </div></Modal>:null}
+    {printTarget?<RemotePrintDialog context={context} branchId={branchId} documentType="receipt" documentId={printTarget.id} documentLabel={printTarget.order_no} onClose={()=>setPrintTarget(null)}/>:null}
   </>;
 }
 
 export function TaxInvoicesWorkspace({context,branchId}:BaseProps){
   const [data,setData]=useState<TaxInvoicesAdminSnapshot|null>(null); const [error,setError]=useState(""); const [busy,setBusy]=useState(false);
-  const [sellerOpen,setSellerOpen]=useState(false); const [issueTarget,setIssueTarget]=useState<TaxReceiptAdmin|null>(null); const [profileId,setProfileId]=useState(""); const [pin,setPin]=useState("");
+  const [sellerOpen,setSellerOpen]=useState(false); const [taxProfileOpen,setTaxProfileOpen]=useState(false); const [issueTarget,setIssueTarget]=useState<TaxReceiptAdmin|null>(null); const [printTarget,setPrintTarget]=useState<TaxReceiptAdmin|null>(null); const [profileId,setProfileId]=useState(""); const [pin,setPin]=useState("");
   const refresh=useCallback(async()=>{setBusy(true);setError("");try{setData(await loadPosAdminSnapshot<TaxInvoicesAdminSnapshot>(context.tenantId,branchId,"tax_invoices"));}catch(e){setError(e instanceof Error?e.message:"โหลดใบกำกับภาษีไม่สำเร็จ");}finally{setBusy(false);}},[context.tenantId,branchId]);
   useEffect(()=>{void refresh();},[refresh]);
   async function saveSeller(e:FormEvent<HTMLFormElement>){e.preventDefault();setBusy(true);setError("");const f=new FormData(e.currentTarget);try{await mutatePosAdmin(context.tenantId,branchId,"tax_invoice.seller.save",{seller_display_name:String(f.get("name")??""),seller_tax_id:String(f.get("tax_id")??""),seller_branch_no:String(f.get("branch_no")??""),seller_address:String(f.get("address")??"")});setSellerOpen(false);await refresh();}catch(err){setError(err instanceof Error?err.message:"บันทึกข้อมูลผู้ออกไม่สำเร็จ");setBusy(false);}}
   function openIssue(row:TaxReceiptAdmin){setIssueTarget(row);setProfileId(data?.profiles[0]?.id??"");setPin("");}
-  async function issue(){if(!issueTarget)return;setBusy(true);setError("");try{const r=await mutatePosAdmin<{invoice_no:string;already_issued:boolean;print_required_in_pos:boolean}>(context.tenantId,branchId,"tax_invoice.issue",{order_id:issueTarget.id,profile_id:profileId,manager_pin:pin});setIssueTarget(null);await refresh();window.alert((r.already_issued?"มีเอกสารแล้ว: ":"ออกใบกำกับภาษีแล้ว: ")+r.invoice_no+"\\nการพิมพ์จริงให้สั่งผ่าน POS/Print Agent");}catch(e){setError(e instanceof Error?e.message:"ออกใบกำกับภาษีไม่สำเร็จ");setBusy(false);}}
+  async function issue(){if(!issueTarget)return;setBusy(true);setError("");try{const r=await mutatePosAdmin<{invoice_no:string;already_issued:boolean;print_required_in_pos:boolean}>(context.tenantId,branchId,"tax_invoice.issue",{order_id:issueTarget.id,profile_id:profileId,manager_pin:pin});setIssueTarget(null);await refresh();window.alert((r.already_issued?"มีเอกสารแล้ว: ":"ออกใบกำกับภาษีแล้ว: ")+r.invoice_no+"\\nหาก Print Agent พร้อม สามารถสั่งพิมพ์จากรายการนี้ได้ทันที");}catch(e){setError(e instanceof Error?e.message:"ออกใบกำกับภาษีไม่สำเร็จ");setBusy(false);}}
   return <>
     {error?<ErrorPanel message={error}/>:null}
     <div className="adminKpis"><div><span>ข้อมูลผู้ขาย</span><strong>{data?.seller.ready?"พร้อม":"ยังไม่ครบ"}</strong></div><div><span>ทะเบียนผู้เสียภาษี</span><strong>{data?.profiles.length??"—"}</strong></div><div><span>ใบกำกับที่ออกแล้ว</span><strong>{data?.invoices.length??"—"}</strong></div></div>
-    <section className="panel adminPanel"><div className="panelHeader"><div><p className="eyebrow">TAX SELLER</p><h3>ข้อมูลผู้ออกใบกำกับภาษี</h3><small>{data?.seller.display_name||"ยังไม่ได้ตั้งค่า"} · {data?.seller.tax_id||"ไม่มีเลขผู้เสียภาษี"}</small></div><button className="secondaryButton" onClick={()=>setSellerOpen(true)}>แก้ไขข้อมูลผู้ขาย</button></div></section>
+    <section className="panel adminPanel"><div className="panelHeader"><div><p className="eyebrow">TAX SELLER</p><h3>ข้อมูลผู้ออกใบกำกับภาษี</h3><small>{data?.seller.display_name||"ยังไม่ได้ตั้งค่า"} · {data?.seller.tax_id||"ไม่มีเลขผู้เสียภาษี"}</small></div><div className="inlineActions"><button className="secondaryButton" onClick={()=>setTaxProfileOpen(true)}>เพิ่มผู้เสียภาษี</button><button className="secondaryButton" onClick={()=>setSellerOpen(true)}>แก้ไขข้อมูลผู้ขาย</button></div></div></section>
     <section className="panel adminPanel"><div className="panelHeader"><div><p className="eyebrow">PAID RECEIPTS</p><h3>ออกใบกำกับภาษีจากบิลที่ชำระแล้ว</h3><small>ใช้ทะเบียนผู้เสียภาษีที่ผ่านการตรวจสอบจาก POS; เอกสารจาก CRM ใช้ snapshot ชุดเดียวกัน</small></div></div>
       <div className="tableWrap boundedTable"><table><thead><tr><th>บิล</th><th>วันที่</th><th>ลูกค้า</th><th>ยอด</th><th>ใบกำกับภาษี</th><th></th></tr></thead><tbody>
-      {data?.receipts.length?data.receipts.map(row=><tr key={row.id}><td><strong>{row.order_no}</strong></td><td>{dateTime(row.created_at)}</td><td>{row.customer_name||"—"}</td><td>{money(row.total)}</td><td>{row.invoice_no||"ยังไม่ออก"}</td><td>{row.invoice_id?<span className="status status-success">ออกแล้ว</span>:<button className="tableAction" disabled={!data.seller.ready||!data.profiles.length} onClick={()=>openIssue(row)}>ออกเอกสาร</button>}</td></tr>):<tr><td colSpan={6}><Empty>ไม่พบบิลที่ชำระแล้ว</Empty></td></tr>}
+      {data?.receipts.length?data.receipts.map(row=><tr key={row.id}><td><strong>{row.order_no}</strong></td><td>{dateTime(row.created_at)}</td><td>{row.customer_name||"—"}</td><td>{money(row.total)}</td><td>{row.invoice_no||"ยังไม่ออก"}</td><td>{row.invoice_id?<div className="inlineActions"><span className="status status-success">ออกแล้ว</span><button className="tableAction" onClick={()=>setPrintTarget(row)}>พิมพ์</button></div>:<button className="tableAction" disabled={!data.seller.ready||!data.profiles.length} onClick={()=>openIssue(row)}>ออกเอกสาร</button>}</td></tr>):<tr><td colSpan={6}><Empty>ไม่พบบิลที่ชำระแล้ว</Empty></td></tr>}
       </tbody></table></div>
     </section>
+    {taxProfileOpen?<TaxProfileCreateModal context={context} branchId={branchId} onClose={()=>setTaxProfileOpen(false)} onCreated={refresh}/>:null}
     {sellerOpen&&data?<Modal title="ข้อมูลผู้ออกใบกำกับภาษี" onClose={()=>setSellerOpen(false)}><form className="entityForm" onSubmit={saveSeller}><div className="formGrid">
       <label className="span2"><span>ชื่อร้าน/บริษัท</span><input name="name" defaultValue={data.seller.display_name} required/></label>
       <label><span>เลขผู้เสียภาษี 13 หลัก</span><input name="tax_id" inputMode="numeric" defaultValue={data.seller.tax_id} required/></label>
       <label><span>เลขสาขา</span><input name="branch_no" inputMode="numeric" defaultValue={data.seller.branch_no} placeholder="00000"/></label>
       <label className="span2"><span>ที่อยู่</span><textarea name="address" rows={3} defaultValue={data.seller.address} required/></label>
     </div><div className="modalActions"><button type="button" className="secondaryButton" onClick={()=>setSellerOpen(false)}>ยกเลิก</button><button className="primaryAction" disabled={busy}>บันทึก</button></div></form></Modal>:null}
+    {printTarget?.invoice_id?<RemotePrintDialog context={context} branchId={branchId} documentType="tax_invoice" documentId={printTarget.invoice_id} documentLabel={printTarget.invoice_no||printTarget.order_no} onClose={()=>setPrintTarget(null)}/>:null}
     {issueTarget&&data?<Modal title={"ออกใบกำกับภาษี · "+issueTarget.order_no} onClose={()=>setIssueTarget(null)}><div className="entityForm"><label><span>ผู้รับใบกำกับภาษี</span><select value={profileId} onChange={e=>setProfileId(e.target.value)}>{data.profiles.map(p=><option key={p.id} value={p.id}>{p.display_name+" · "+p.tax_id}</option>)}</select></label><label><span>PIN Owner/Manager</span><input type="password" inputMode="numeric" value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,"").slice(0,12))}/></label><div className="phase3InfoStrip"><FileText size={18}/><div><strong>CRM จะออกทะเบียนเอกสารและ snapshot ให้ครบ</strong><span>การพิมพ์กระดาษจริงยัง route ผ่าน POS/Print Agent เพื่อรักษา device/session control</span></div></div><div className="modalActions"><button className="secondaryButton" onClick={()=>setIssueTarget(null)}>ยกเลิก</button><button className="primaryAction" disabled={busy||!profileId||pin.length<4} onClick={()=>void issue()}>ยืนยันออกเอกสาร</button></div></div></Modal>:null}
   </>;
 }
