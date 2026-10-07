@@ -6,6 +6,8 @@ const root=process.cwd();
 const sql=readFileSync(join(root,"supabase/sql/customer_portal_pos_admin_crud_parity.sql"),"utf8");
 const phase2=readFileSync(join(root,"supabase/sql/customer_portal_pos_admin_phase2.sql"),"utf8");
 const phase3=readFileSync(join(root,"supabase/sql/customer_portal_pos_admin_phase3.sql"),"utf8");
+const phase4=readFileSync(join(root,"supabase/sql/customer_portal_pos_admin_phase4.sql"),"utf8");
+const taxProfileEdge=readFileSync(join(root,"supabase/functions/customer-portal-tax-profile/index.ts"),"utf8");
 
 describe("POS admin control-plane",()=>{
   it("requires feature and menu policy before mutations",()=>{
@@ -52,6 +54,28 @@ describe("POS admin control-plane",()=>{
     expect(phase3).toContain("customer_portal_verify_manager_pin(uuid,uuid,text) from public,anon,authenticated");
     expect(phase3).toContain("customer_portal_thai_tax_id_valid(text) from public,anon,authenticated");
     expect(phase3).toContain("customer_portal_pos_admin_phase3_snapshot(uuid,uuid,text,jsonb) to authenticated");
+  });
+  it("phase4 queues remote print only through registered online Print Agent paths",()=>{
+    expect(phase4).toContain("customer_portal_pos_admin_phase4_print_state");
+    expect(phase4).toContain("customer_portal_pos_admin_phase4_queue_print");
+    expect(phase4).toContain("customer_portal_verify_manager_pin");
+    expect(phase4).toContain("customer_portal_printer_matches_agent");
+    expect(phase4).toContain("last_seen_at>=now()-interval '5 minutes'");
+    expect(phase4).toContain("'customer_portal_remote_print'");
+    expect(phase4).toContain("idempotency_key");
+  });
+  it("phase4 keeps print routing browser-safe",()=>{
+    expect(phase4).toContain("from public,anon,authenticated");
+    expect(phase4).toContain("to service_role");
+    expect(phase4).toContain("to authenticated");
+    expect(phase4).not.toContain("api_key_hash");
+  });
+  it("validates Thai tax addresses in the authenticated Edge Function",()=>{
+    expect(taxProfileEdge).toContain("thailand-geography-json");
+    expect(taxProfileEdge).toContain("thai_address_selection_invalid");
+    expect(taxProfileEdge).toContain("admin.auth.getUser(token)");
+    expect(taxProfileEdge).toContain("customer_portal_feature_state");
+    expect(taxProfileEdge).toContain("tax_invoice_profile_created");
   });
   it("audits Customer Portal mutations",()=>{
     expect(sql).toContain("insert into public.audit_logs");
