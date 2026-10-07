@@ -170,6 +170,12 @@ export interface PackageInfo {
     max_devices?: number | null;
     max_users?: number | null;
   } | null;
+  currentDue: {
+    kind:string;status:string;payable_now:boolean;days_until_due:number|null;due_at:string|null;current_service_end:string|null;
+    next_period_start:string|null;next_period_end:string|null;amount_due:number;amount_paid:number;outstanding:number;
+    currency:string;billing_interval:string;package_id:string|null;package_code:string|null;package_name:string|null;
+    open_request_id:string|null;open_request_status:string|null;prepaid_activation:boolean;source:string;
+  } | null;
   billingCycles: Array<{
     id: string;
     package_id: string | null;
