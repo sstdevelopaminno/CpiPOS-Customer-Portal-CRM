@@ -1,3 +1,4 @@
+import { TopicHub } from "../components/TopicHub";
 import { useCallback, useEffect, useState } from "react";
 import { Boxes, LoaderCircle, Pencil, Plus, Save, Search, Trash2 } from "lucide-react";
 import { deleteProduct, loadProducts, saveProduct, type PortalContext, type ProductDraft, type ProductRow } from "../lib/portal";
@@ -91,7 +92,9 @@ export function ProductsView({ context, branchId }: { context: PortalContext; br
 
   return <>
     <div className="pageHeading"><div><p className="eyebrow">PRODUCTS</p><h2>สินค้า</h2><p>ตรวจสอบรหัสสินค้า รูป ราคา จำนวนพร้อมขาย สาขา และสถานะในตารางเดียว</p></div><button className="primaryAction" onClick={()=>setEditing(null)}><Plus size={18}/>เพิ่มสินค้า</button></div>
-    <div className="toolbar"><label className="searchBox"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="ค้นหา SKU ชื่อสินค้า หมวดหมู่..."/></label><span className="toolbarCount">{filtered.length} รายการ</span></div>
+    <TopicHub label="หัวข้อจัดการสินค้า" items={[
+      {id:"records",title:"รายการสินค้า",description:"ค้นหาสินค้า ดูราคาและสถานะ พร้อมแก้ไขหรือลบ",count:`${filtered.length} รายการ`,content:<>
+        <div className="toolbar"><label className="searchBox"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="ค้นหา SKU ชื่อสินค้า หมวดหมู่..."/></label><span className="toolbarCount">{filtered.length} รายการ</span></div>
     {error?<ErrorPanel message={error}/>:null}
     <article className="panel tablePanel productTablePanel">{loading?<div className="loadingPanel"><LoaderCircle className="spin"/>กำลังโหลดสินค้า...</div>:visible.length?
       <div className="tableWrap boundedTable"><table className="productTable"><thead><tr><th>รูป</th><th>รหัสสินค้า</th><th>ชื่อสินค้า</th><th>หมวดหมู่</th><th>สาขา</th><th className="right">ราคา</th><th className="right">จำนวน</th><th>หน่วย</th><th>สถานะ</th><th></th></tr></thead><tbody>
@@ -110,6 +113,9 @@ export function ProductsView({ context, branchId }: { context: PortalContext; br
       </tbody></table></div>:<Empty>ยังไม่มีสินค้า</Empty>}
       <Pagination page={page} pageCount={pageCount} onPageChange={setPage} disabled={loading}/>
     </article>
+      </>},
+      {id:"create",title:"เพิ่มสินค้า",description:"เปิดแบบฟอร์มเพิ่มสินค้า",onSelect:()=>setEditing(null)}
+    ]}/>
     {editing!==undefined?<ProductForm context={context} initial={editing} defaultBranch={branchId??""} onClose={()=>setEditing(undefined)} onSaved={refresh}/>:null}
   </>;
 }
