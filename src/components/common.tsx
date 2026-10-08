@@ -34,16 +34,18 @@ export function Modal({
   subtitle,
   onClose,
   children,
-  wide=false
+  wide=false,
+  workspace=false
 }: {
   title: string;
   subtitle?: string;
   onClose: () => void;
   children: React.ReactNode;
   wide?: boolean;
+  workspace?: boolean;
 }) {
   return <div className="modalBackdrop" role="presentation" onMouseDown={(event)=>{if(event.target===event.currentTarget)onClose();}}>
-    <section className={`formModal ${wide?"wide":""}`} role="dialog" aria-modal="true">
+    <section className={`formModal ${wide?"wide":""} ${workspace?"topicWorkspaceModal":""}`} role="dialog" aria-label={title} aria-modal="true" onKeyDown={event=>{if(event.key==="Escape"){event.stopPropagation();onClose();}}}>
       <div className="modalHeader">
         <div><h3>{title}</h3>{subtitle?<span>{subtitle}</span>:null}</div>
         <button className="iconButton" aria-label="ปิด" onClick={onClose}><X size={20}/></button>
