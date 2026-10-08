@@ -1,3 +1,4 @@
+import { TopicHub } from "../components/TopicHub";
 import { useCallback, useEffect, useState } from "react";
 import { Clock3, CreditCard, LoaderCircle, RefreshCw } from "lucide-react";
 import { loadPackage, submitPackagePayment, type PackageInfo, type PortalContext } from "../lib/portal";
@@ -12,7 +13,7 @@ function billingStatusLabel(status:string){
     active:"ใช้งาน",trial:"ทดลองใช้งาน",trial_due:"Trial ใกล้หมด · รอชำระ",upcoming:"ยังไม่ถึงกำหนด",prepaid:"ชำระล่วงหน้าแล้ว",not_payable:"ไม่เรียกเก็บ",locked:"ระงับใช้งาน"
   } as Record<string,string>)[status]??status;
 }
-const PAYABLE_BILLING_STATUSES=new Set(["open","due","overdue","pending"]);
+const PAYABLE_BILLING_STATUSES=new Set(["open","due","overdue"]);
 
 function PackagePaymentModal({
   tenantId,info,cycle,onClose,onSaved
@@ -91,7 +92,6 @@ export function PackageView({ context }: { context: PortalContext }) {
   const expiry=info?.runtime?.expires_at||info?.contract?.ended_at;
   const daysRemaining=info?.currentDue?.days_until_due??(expiry?Math.ceil((new Date(expiry).getTime()-Date.now())/86400000):null);
   const openRequest=info?.requests.find(row=>["pending","under_review"].includes(row.status));
-  const dueCycles=(info?.billingCycles??[]).filter(cycle=>PAYABLE_BILLING_STATUSES.has(cycle.status)&&Number(cycle.amount_due)>Number(cycle.amount_paid));
   const currentDue=info?.currentDue??null;
   const canUpcoming=Boolean(context.role==="owner"&&!openRequest&&currentDue?.self_service_payment_allowed&&Number(currentDue.outstanding??currentDue.amount_due)>0);
   const supportRequired=Boolean(currentDue?.support_required||currentDue?.status==="support_required");
@@ -116,10 +116,15 @@ export function PackageView({ context }: { context: PortalContext }) {
     {currentDue?.provisional_access_active&&currentDue.provisional_access_expires_at?<small>เปิดใช้งานชั่วคราวถึง {dateTime.format(new Date(currentDue.provisional_access_expires_at))} · IT ต้องยืนยันเงินจริงภายใน 3 วัน มิฉะนั้นระบบจะล็อกอัตโนมัติ</small>:null}
     </div>:null}
 
-    {context.role==="owner"?<article className="panel tablePanel"><div className="panelHeader"><div><p className="eyebrow">BILLING HISTORY</p><h3>ประวัติรอบบิลจาก Settlement</h3><small>รายการชำระเงินจริงในอดีต แยกจากรอบที่ต้องชำระปัจจุบันด้านบน</small></div></div>{info?.billingCycles.length?<div className="tableWrap boundedTable"><table><thead><tr><th>ช่วงรอบบิล</th><th>สถานะ</th><th className="right">ยอดเรียกเก็บ</th><th className="right">ชำระแล้ว</th><th className="right">คงค้าง</th><th></th></tr></thead><tbody>{info.billingCycles.map(cycle=>{const outstanding=Math.max(0,Number(cycle.amount_due)-Number(cycle.amount_paid));const payable=PAYABLE_BILLING_STATUSES.has(cycle.status)&&outstanding>0&&!openRequest;return <tr key={cycle.id}><td>{dateOnly.format(new Date(cycle.period_start))} – {dateOnly.format(new Date(cycle.period_end))}</td><td><span className={cycle.status==="paid"?"status status-completed":"status status-pending"}>{cycle.status==="paid"?"ชำระแล้ว (ประวัติ)":billingStatusLabel(cycle.status)}</span></td><td className="right">{formatCurrency(Number(cycle.amount_due),billingCurrency)}</td><td className="right">{formatCurrency(Number(cycle.amount_paid),billingCurrency)}</td><td className="right"><strong>{formatCurrency(outstanding,billingCurrency)}</strong></td><td className="right">{payable?<button className="tableAction payAction" onClick={()=>setPaying(cycle)}><CreditCard size={15}/>ชำระเงิน</button>:null}</td></tr>;})}</tbody></table></div>:<Empty>ยังไม่มีประวัติรอบบิลที่แสดงได้</Empty>}</article>:<div className="infoBox">Manager ดูสถานะแพ็กเกจได้ ส่วนการชำระเงินและประวัติหลักฐานสงวนสำหรับ Owner</div>}
-
-    {context.role==="owner"&&info?.requests.length?<article className="panel tablePanel"><div className="panelHeader"><div><p className="eyebrow">PAYMENT REQUESTS</p><h3>สถานะการชำระและคำขอ</h3></div></div><div className="tableWrap"><table><thead><tr><th>วันที่ส่ง</th><th>แพ็กเกจ</th><th>ประเภท</th><th>สถานะ</th><th>หลักฐาน</th></tr></thead><tbody>{info.requests.map(row=><tr key={row.id}><td>{dateTime.format(new Date(row.submitted_at))}</td><td>{row.package_name||"—"}</td><td>{row.request_type}</td><td><span className={["pending","under_review"].includes(row.status)?"status status-pending":"status"}>{billingStatusLabel(row.status)}</span></td><td>{row.has_evidence?"ส่งแล้ว":"—"}</td></tr>)}</tbody></table></div></article>:null}
-    <div className="auditNote">ระบบสแกนสลิปใช้เพื่อเปิดสิทธิ์ชั่วคราวเท่านั้น ไม่ถือเป็นการรับชำระเงินจริงและไม่ออกใบเสร็จจนกว่า IT จะตรวจรายการธนาคารและกดยืนยันภายใน 3 วัน</div>
+    <TopicHub label="การจัดการแพ็กเกจและเอกสาร" items={[
+      {id:"cycles",title:"ประวัติรอบบิล",description:"รายการชำระย้อนหลังและรอบที่ต้องชำระจริง",count:`${info?.billingCycles.length??0} รอบบิล`,content:<>
+        {context.role==="owner"?<article className="panel tablePanel"><div className="panelHeader"><div><p className="eyebrow">BILLING HISTORY</p><h3>ประวัติรอบบิลจาก Settlement</h3><small>รายการชำระเงินจริงในอดีต แยกจากรอบที่ต้องชำระปัจจุบันด้านบน</small></div></div>{info?.billingCycles.length?<div className="tableWrap boundedTable"><table><thead><tr><th>ช่วงรอบบิล</th><th>สถานะ</th><th className="right">ยอดเรียกเก็บ</th><th className="right">ชำระแล้ว</th><th className="right">คงค้าง</th><th></th></tr></thead><tbody>{info.billingCycles.map(cycle=>{const outstanding=Math.max(0,Number(cycle.amount_due)-Number(cycle.amount_paid));const payable=canUpcoming&&cycle.id===currentDue?.billing_cycle_id&&PAYABLE_BILLING_STATUSES.has(cycle.status)&&outstanding>0;return <tr key={cycle.id}><td>{dateOnly.format(new Date(cycle.period_start))} – {dateOnly.format(new Date(cycle.period_end))}</td><td><span className={cycle.status==="paid"?"status status-completed":"status status-pending"}>{cycle.status==="paid"?"ชำระแล้ว (ประวัติ)":billingStatusLabel(cycle.status)}</span></td><td className="right">{formatCurrency(Number(cycle.amount_due),billingCurrency)}</td><td className="right">{formatCurrency(Number(cycle.amount_paid),billingCurrency)}</td><td className="right"><strong>{formatCurrency(outstanding,billingCurrency)}</strong></td><td className="right">{payable?<button className="tableAction payAction" onClick={()=>setPaying(cycle)}><CreditCard size={15}/>ชำระเงิน</button>:null}</td></tr>;})}</tbody></table></div>:<Empty>ยังไม่มีประวัติรอบบิลที่แสดงได้</Empty>}</article>:<div className="infoBox">Manager ดูสถานะแพ็กเกจได้ ส่วนการชำระเงินและประวัติหลักฐานสงวนสำหรับ Owner</div>}
+      </>},
+      {id:"requests",title:"หลักฐานและสถานะคำขอ",description:"ติดตามสลิปที่ส่งและผลการตรวจสอบ",count:`${info?.requests.length??0} คำขอ`,content:<>
+        {context.role==="owner"&&info?.requests.length?<article className="panel tablePanel"><div className="panelHeader"><div><p className="eyebrow">PAYMENT REQUESTS</p><h3>สถานะการชำระและคำขอ</h3></div></div><div className="tableWrap"><table><thead><tr><th>วันที่ส่ง</th><th>แพ็กเกจ</th><th>ประเภท</th><th>สถานะ</th><th>หลักฐาน</th></tr></thead><tbody>{info.requests.map(row=><tr key={row.id}><td>{dateTime.format(new Date(row.submitted_at))}</td><td>{row.package_name||"—"}</td><td>{row.request_type}</td><td><span className={["pending","under_review"].includes(row.status)?"status status-pending":"status"}>{billingStatusLabel(row.status)}</span></td><td>{row.has_evidence?"ส่งแล้ว":"—"}</td></tr>)}</tbody></table></div></article>:null}
+      </>},
+      {id:"conditions",title:"เงื่อนไขการชำระเงิน",description:"สิทธิ์ชั่วคราว 3 วัน และการยืนยันการชำระจริง",content:<div className="auditNote">ระบบสแกนสลิปใช้เพื่อเปิดสิทธิ์ชั่วคราวเท่านั้น ไม่ถือเป็นการรับชำระเงินจริงและไม่ออกใบเสร็จจนกว่า IT จะตรวจรายการธนาคารและกดยืนยันภายใน 3 วัน</div>}
+    ]}/>
     {paying!==undefined&&info?<PackagePaymentModal tenantId={context.tenantId} info={info} cycle={paying} onClose={()=>setPaying(undefined)} onSaved={refresh}/>:null}
   </>;
 }

@@ -17,7 +17,9 @@ function allowedOrigin(req:Request){
   const origin=req.headers.get("origin")??"";
   if(!origin)return "";
   if(origin==="http://localhost:5173"||origin==="http://127.0.0.1:5173")return origin;
-  if(/^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin))return origin;
+  if(/^https:\/\/cpi-pos-crm(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(origin))return origin;
+  const configured=(Deno.env.get("CRM_ALLOWED_ORIGINS")??"").split(",").map(value=>value.trim()).filter(Boolean);
+  if(configured.includes(origin))return origin;
   return "";
 }
 function headers(req:Request){

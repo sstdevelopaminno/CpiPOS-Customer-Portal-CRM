@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Banknote, Boxes, Clock3, LoaderCircle, ReceiptText, RefreshCw, Store, TrendingUp, Warehouse } from "lucide-react";
 import { loadDashboard, reportRangeLabel, type DashboardSummary, type OrderRow, type PortalContext, type ReportRange } from "../lib/portal";
 import { MetricCard, Empty, ErrorPanel } from "../components/common";
+import { TopicHub } from "../components/TopicHub";
 import { money, number, dateTime, amount } from "../lib/formatters";
 
 export function DashboardView({ context, branchId, range, anchor }: { context: PortalContext; branchId: string | null; range: ReportRange; anchor: string }) {
@@ -45,22 +46,20 @@ export function DashboardView({ context, branchId, range, anchor }: { context: P
       <MetricCard icon={<Clock3/>} label="กะที่เปิดอยู่" value={number.format(summary?.open_shifts??0)} helper="สถานะปัจจุบัน"/>
     </section>
 
-    <section className="splitGrid">
-      <article className="panel">
+    <TopicHub label="รายละเอียดและรายงาน" items={[
+      {id:"recent",title:"บิลล่าสุด",description:"รายการขายและยอดเงินตามช่วงเวลา",icon:<ReceiptText size={22}/>,count:`${orders.length} บิลล่าสุด`,content:<article className="panel">
         <div className="panelHeader"><div><p className="eyebrow">RECENT SALES</p><h3>บิลล่าสุด</h3></div></div>
         {orders.length ? <div className="rows dashboardScroll">{orders.map(order=><div className="dataRow" key={order.id}><div><strong>{order.order_no||"รายการขาย"}</strong><span>{dateTime.format(new Date(order.created_at))}</span></div><div className="rowAmount"><strong>{money.format(amount(order))}</strong><span>{order.order_type||order.channel||"POS"}</span></div></div>)}</div> : <Empty>ยังไม่มีรายการขายในช่วงเวลานี้</Empty>}
-      </article>
-      <article className="panel">
+      </article>},
+      {id:"health",title:"สถานะร้าน",description:"สาขา สินค้า และวัตถุดิบที่ต้องสั่งซื้อ",icon:<Store size={22}/>,content:<article className="panel">
         <div className="panelHeader"><div><p className="eyebrow">STORE HEALTH</p><h3>สถานะร้าน</h3></div></div>
         <div className="healthList">
           <div><span><Store size={19}/>สาขาที่เปิดใช้งาน</span><strong>{summary?.active_branches??0}</strong></div>
           <div><span><Boxes size={19}/>สินค้าที่เปิดขาย</span><strong>{summary?.active_products??0}</strong></div>
           <div className={(summary?.low_stock_count??0)>0?"warn":""}><span><Warehouse size={19}/>วัตถุดิบถึงจุดสั่งซื้อ</span><strong>{summary?.low_stock_count??0}</strong></div>
         </div>
-      </article>
-    </section>
-
-    <article className="panel topProductsPanel">
+      </article>},
+      {id:"top",title:"สินค้าขายดี",description:"อันดับยอดขายและจำนวนสินค้า",icon:<TrendingUp size={22}/>,count:`${topProducts.length} รายการ`,content:<article className="panel topProductsPanel">
       <div className="panelHeader"><div><p className="eyebrow">TOP PRODUCTS</p><h3>สินค้าขายดี</h3></div></div>
       {topProducts.length ? <div className="topProductsList dashboardScroll">{topProducts.map((item,index)=>{
         const width=Math.max(8,(Number(item.sales_total||0)/maxTopSale)*100);
@@ -72,6 +71,7 @@ export function DashboardView({ context, branchId, range, anchor }: { context: P
           </div>
         </div>;
       })}</div> : <Empty>ยังไม่มีข้อมูลสินค้าขายดีในช่วงเวลานี้</Empty>}
-    </article>
+    </article>}
+    ]}/>
   </>;
 }

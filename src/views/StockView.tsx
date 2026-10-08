@@ -1,3 +1,4 @@
+import { TopicHub } from "../components/TopicHub";
 import { useCallback, useEffect, useState } from "react";
 import { LoaderCircle, Pencil, Plus, Save, Search, Trash2 } from "lucide-react";
 import { deleteStock, loadStock, saveStock, type PortalContext, type StockDraft, type StockRow } from "../lib/portal";
@@ -87,7 +88,9 @@ export function StockView({ context, branchId }: { context: PortalContext; branc
 
   return <>
     <div className="pageHeading"><div><p className="eyebrow">INVENTORY</p><h2>วัตถุดิบ</h2><p>ตรวจสอบรหัส ชื่อ สาขา หน่วย คงเหลือ จุดสั่งซื้อ ต้นทุนเฉลี่ย และสถานะ</p></div><button className="primaryAction" onClick={()=>setEditing(null)}><Plus size={18}/>เพิ่มวัตถุดิบ</button></div>
-    <div className="toolbar"><label className="searchBox"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="ค้นหารหัสหรือชื่อวัตถุดิบ..."/></label><span className="toolbarCount">{filtered.length} รายการ</span></div>
+    <TopicHub label="หัวข้อจัดการวัตถุดิบและสต๊อก" items={[
+      {id:"records",title:"รายการวัตถุดิบและสต๊อก",description:"ดูคงเหลือ จุดสั่งซื้อ และต้นทุน พร้อมปรับข้อมูล",count:`${filtered.length} รายการ`,content:<>
+        <div className="toolbar"><label className="searchBox"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="ค้นหารหัสหรือชื่อวัตถุดิบ..."/></label><span className="toolbarCount">{filtered.length} รายการ</span></div>
     {error?<ErrorPanel message={error}/>:null}
     <article className="panel tablePanel">{loading?<div className="loadingPanel"><LoaderCircle className="spin"/>กำลังโหลดวัตถุดิบ...</div>:visible.length?
       <div className="tableWrap boundedTable"><table><thead><tr><th>รหัสสินค้า</th><th>ชื่อสินค้า</th><th>สาขา</th><th>หน่วย</th><th className="right">คงเหลือ</th><th className="right">จุดสั่งซื้อ</th><th className="right">ต้นทุนเฉลี่ย</th><th>สถานะ</th><th></th></tr></thead><tbody>
@@ -103,6 +106,9 @@ export function StockView({ context, branchId }: { context: PortalContext; branc
       </tbody></table></div>:<Empty>ยังไม่มีข้อมูลวัตถุดิบ</Empty>}
       <Pagination page={page} pageCount={pageCount} onPageChange={setPage} disabled={loading}/>
     </article>
+      </>},
+      {id:"create",title:"เพิ่มวัตถุดิบ",description:"เปิดแบบฟอร์มบันทึกวัตถุดิบ",onSelect:()=>setEditing(null)}
+    ]}/>
     {editing!==undefined?<StockForm context={context} initial={editing} defaultBranch={branchId??""} onClose={()=>setEditing(undefined)} onSaved={refresh}/>:null}
   </>;
 }

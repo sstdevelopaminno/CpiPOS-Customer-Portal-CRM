@@ -1,3 +1,4 @@
+import { TopicHub } from "../components/TopicHub";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Eye, LoaderCircle, Pencil, Save, Search, Trash2 } from "lucide-react";
 import { cancelOrder, loadOrderItems, loadSales, updateOrder, type OrderItemRow, type OrderRow, type PortalContext, type ReportRange } from "../lib/portal";
@@ -134,7 +135,9 @@ export function SalesView({ context, branchId, range, anchor }: { context: Porta
       <div><p className="eyebrow">SALES</p><h2>รายการขาย</h2><p>ดูรายวัน รายเดือน หรือรายปี พร้อมแก้ข้อมูลประกอบและยกเลิกบิลแบบคืนสต๊อก</p></div>
       <div className="headingStat"><span>ยอดขายรวมช่วงนี้</span><strong>{money.format(salesTotal)}</strong></div>
     </div>
-    <div className="toolbar"><label className="searchBox"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="ค้นหาในหน้าปัจจุบัน..."/></label><span className="toolbarCount">{pageLabel}</span></div>
+    <TopicHub label="หัวข้อรายการขาย" items={[
+      {id:"bills",title:"ค้นหาและจัดการบิล",description:"รายการขายตามสาขาและวันที่ เลือกบิลเพื่อดู แก้ไข หรือยกเลิก",count:pageLabel,content:<>
+        <div className="toolbar"><label className="searchBox"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="ค้นหาในหน้าปัจจุบัน..."/></label><span className="toolbarCount">{pageLabel}</span></div>
     {error?<ErrorPanel message={error}/>:null}
     <article className="panel tablePanel">
       {loading?<div className="loadingPanel"><LoaderCircle className="spin"/>กำลังโหลดรายการขาย...</div>:filtered.length?
@@ -143,7 +146,9 @@ export function SalesView({ context, branchId, range, anchor }: { context: Porta
       </tbody></table></div>:<Empty>ยังไม่มีข้อมูลรายการขายในช่วงเวลานี้</Empty>}
       <Pagination page={page} pageCount={pageCount} onPageChange={setPage} disabled={loading}/>
     </article>
-    <div className="auditNote">รายการขายใหม่สร้างจาก POS เพื่อรักษา payment/shift/stock transaction ให้ถูกต้อง; Customer Portal รองรับแก้ไขข้อมูลประกอบและยกเลิกบิลอย่างปลอดภัย</div>
+      </>},
+      {id:"policy",title:"เงื่อนไขการจัดการรายการขาย",description:"ขอบเขตการแก้ไขและการคืนสต๊อก",content:<div className="auditNote">รายการขายใหม่สร้างจาก POS เพื่อรักษา payment/shift/stock transaction ให้ถูกต้อง; Customer Portal รองรับแก้ไขข้อมูลประกอบและยกเลิกบิลอย่างปลอดภัย</div>}
+    ]}/>
     {selectedOrder?<OrderDetailModal order={selectedOrder} context={context} onClose={()=>setSelectedOrder(null)} onChanged={refresh}/>:null}
   </>;
 }

@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 const JSON_HEADERS={"content-type":"application/json; charset=utf-8","cache-control":"no-store"};
 function adminKey(){const set=Deno.env.get("SUPABASE_SECRET_KEYS");if(set){try{const p=JSON.parse(set) as Record<string,string>;if(p.default)return p.default;}catch{}}const legacy=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");if(legacy)return legacy;throw new Error("admin_key_missing");}
-function allowedOrigin(req:Request){const o=req.headers.get("origin")??"";if(!o)return "";if(o==="http://localhost:5173"||o==="http://127.0.0.1:5173")return o;if(/^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(o))return o;return "";}
+function allowedOrigin(req:Request){const o=req.headers.get("origin")??"";if(!o)return "";if(o==="http://localhost:5173"||o==="http://127.0.0.1:5173")return o;if(/^https:\/\/cpi-pos-crm(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(o))return o;const configured=(Deno.env.get("CRM_ALLOWED_ORIGINS")??"").split(",").map(v=>v.trim()).filter(Boolean);if(configured.includes(o))return o;return "";}
 function headers(req:Request){const o=allowedOrigin(req);return{...JSON_HEADERS,...(o?{"access-control-allow-origin":o,vary:"origin"}:{}),"access-control-allow-headers":"authorization, apikey, content-type, x-client-info","access-control-allow-methods":"POST, OPTIONS"};}
 function json(req:Request,body:unknown,status=200){return new Response(JSON.stringify(body),{status,headers:headers(req)});}
 async function sha256(input:string){const d=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(input));return Array.from(new Uint8Array(d)).map(v=>v.toString(16).padStart(2,"0")).join("");}
