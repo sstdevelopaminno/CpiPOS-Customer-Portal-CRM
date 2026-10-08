@@ -183,3 +183,26 @@ th,td{padding:13px 15px}
 .paginationBar{display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:12px 14px;border-top:1px solid #edf2f7;background:#fbfdff}
 .paginationBar>span{font-size:11px;font-weight:800;color:#6e8297;min-width:88px;text-align:center}
 @media(max-width:640px){.paginationBar{justify-content:space-between}.paginationBar .secondaryButton{min-width:0;flex:1}.paginationBar>span{font-size:10px}}
+
+
+/* CRM topic-based navigation: compact dashboard, accessible pop-up details. */
+.topicHub{margin:16px 0 22px}
+.topicHubIntro{margin:0 0 13px}
+.topicHubIntro h3{margin:0;font-size:16px;color:#173b61}
+.topicHubIntro p{margin:5px 0 0;color:#71869b;font-size:12px;line-height:1.55}
+.topicHubGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(238px,1fr));gap:12px}
+.topicCard{display:grid;grid-template-columns:42px minmax(0,1fr) 18px;gap:12px;align-items:center;text-align:left;min-height:104px;padding:14px;background:#fff;border:1px solid #dce6f0;border-radius:15px;color:#245377;cursor:pointer;box-shadow:0 4px 14px rgba(25,67,105,.04)}
+.topicCard:hover,.topicCard:focus-visible{border-color:#73b7e4;box-shadow:0 8px 22px rgba(25,67,105,.11);outline-offset:3px}
+.topicCardIcon{width:42px;height:42px;display:grid;place-items:center;color:#2075b4;background:#eaf5fe;border-radius:12px}
+.topicCardCopy{display:grid;gap:4px;min-width:0}
+.topicCardCopy strong{font-size:14px;color:#153f67}
+.topicCardCopy small{font-size:11px;color:#6e8395;line-height:1.45}
+.topicCardCopy em{font-size:10px;font-style:normal;font-weight:700;color:#2181b9}
+.topicCardArrow{color:#9aafbf}
+.topicModalBody{padding:15px 18px 20px;max-height:calc(92dvh - 94px);overflow-y:auto;overscroll-behavior:contain}
+.topicModalBody>.panel,.topicModalBody>.adminPanel,.topicModalBody>.tablePanel{margin:0}
+.topicModalBody>.toolbar{margin-bottom:12px}
+.topicHub+.auditNote{margin-top:12px}
+.formModal.topicWorkspaceModal{width:min(1120px,100%);max-height:95dvh}
+.topicModalBody .moduleGrid{margin-bottom:0}
+@media(max-width:700px){.topicHubGrid{grid-template-columns:1fr}.topicCard{min-height:88px;padding:12px}.topicModalBody{padding:12px;max-height:calc(94dvh - 86px)}}
