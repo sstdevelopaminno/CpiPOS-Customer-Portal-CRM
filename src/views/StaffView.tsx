@@ -1,3 +1,4 @@
+import { TopicHub } from "../components/TopicHub";
 import { useCallback, useEffect, useState } from "react";
 import { LoaderCircle, Pencil, Plus, Save, Search, Trash2 } from "lucide-react";
 import { createStaff, loadStaff, updateStaff, type PortalContext, type StaffDraft, type StaffRow } from "../lib/portal";
@@ -92,7 +93,9 @@ export function StaffView({ context, branchId }: { context: PortalContext; branc
 
   return <>
     <div className="pageHeading"><div><p className="eyebrow">TEAM</p><h2>พนักงาน</h2><p>เพิ่ม แก้ไข PIN ปิดใช้งาน และกำหนดบทบาทตามสิทธิ์ Owner/Manager</p></div><button className="primaryAction" onClick={()=>setEditing(null)}><Plus size={18}/>เพิ่มพนักงาน</button></div>
-    <div className="toolbar"><label className="searchBox"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="ค้นหาชื่อ รหัสพนักงาน ตำแหน่ง..."/></label><span className="toolbarCount">{filtered.length} รายการ</span></div>
+    <TopicHub label="หัวข้อจัดการพนักงานและสิทธิ์" items={[
+      {id:"records",title:"รายการพนักงานและสิทธิ์",description:"ค้นหาพนักงาน แก้ไข PIN บทบาทและสถานะ",count:`${filtered.length} รายการ`,content:<>
+        <div className="toolbar"><label className="searchBox"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="ค้นหาชื่อ รหัสพนักงาน ตำแหน่ง..."/></label><span className="toolbarCount">{filtered.length} รายการ</span></div>
     {error?<ErrorPanel message={error}/>:null}
     <article className="panel tablePanel">{loading?<div className="loadingPanel"><LoaderCircle className="spin"/>กำลังโหลดข้อมูลพนักงาน...</div>:visible.length?
       <div className="tableWrap boundedTable"><table><thead><tr><th>ชื่อ</th><th>สาขา</th><th>ตำแหน่ง</th><th>บทบาท</th><th>รหัสพนักงาน</th><th>สถานะ</th><th></th></tr></thead><tbody>
@@ -100,6 +103,9 @@ export function StaffView({ context, branchId }: { context: PortalContext; branc
       </tbody></table></div>:<Empty>ยังไม่มีข้อมูลพนักงานในสาขาที่เลือก</Empty>}
       <Pagination page={page} pageCount={pageCount} onPageChange={setPage} disabled={loading}/>
     </article>
+      </>},
+      {id:"create",title:"เพิ่มพนักงาน",description:"เปิดแบบฟอร์มเพิ่มพนักงาน",onSelect:()=>setEditing(null)}
+    ]}/>
     {editing!==undefined?<StaffForm context={context} initial={editing} defaultBranch={branchId??""} onClose={()=>setEditing(undefined)} onSaved={refresh}/>:null}
   </>;
 }
