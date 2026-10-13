@@ -27,6 +27,7 @@ export async function loadFeatureState(tenantId: string, branchId: string | null
   const value=(data??{}) as Record<string,unknown>;
   return {
     package_id: typeof value.package_id==="string"?value.package_id:null,
+    is_custom: value.is_custom === true,
     package_features: (value.package_features??{}) as Record<string,boolean>,
     feature_overrides: (value.feature_overrides??{}) as Record<string,boolean>,
     menu_policy: (value.menu_policy??{}) as Record<string,boolean>

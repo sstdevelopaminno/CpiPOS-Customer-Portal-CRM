@@ -4,6 +4,7 @@ import { Activity, Bell, Building2, ChefHat, ChevronRight, CreditCard, Languages
 import { loadFeatureState, loadMoreSnapshot, loadSettingsSnapshot, saveSetting, type FeatureState, type MoreSnapshot, type PortalContext, type PortalView, type SettingsSnapshot } from "../lib/portal";
 import { ConnectedPosModuleModal, ErrorPanel, Modal } from "../components/common";
 import { number } from "../lib/formatters";
+import { isCustomMenuVisible } from "../lib/custom-menu-access";
 import { POS_SETTINGS_MENU_ITEMS, type PosMenuIcon, type PosSettingsEditorKind, type PosSettingsMenuItem } from "../config/pos-menu-catalog";
 import { PosAdminWorkspace } from "./pos-admin/PosAdminWorkspace";
 import type { PosAdminModule } from "../types/pos-admin";
@@ -217,7 +218,7 @@ export function SettingsView({context,branchId,onNavigate,onContextChanged}:{con
   },[refresh]);
 
   const allowed=(key:string,feature:string)=>{
-    if(features?.menu_policy?.[key]===false)return false;
+    if(features && !isCustomMenuVisible(features,key))return false;
     const base=features?.package_features?.[feature]??false;
     const override=features?.feature_overrides?.[feature];
     return override===undefined?base:override;
@@ -250,7 +251,7 @@ export function SettingsView({context,branchId,onNavigate,onContextChanged}:{con
   };
 
   const renderSettingsGroup=(keys:readonly string[])=>(
-    <div className="moduleGrid settingsGrid posMenuGrid">{POS_SETTINGS_MENU_ITEMS.filter(item=>keys.includes(item.kind)).map(item=>{const isAllowed=features?allowed(item.key,item.feature):false;const editable=canEdit(item);const directlyManaged=Boolean(item.target||item.adminModule||editable);return <button key={item.key} className={`moduleCard posMenuCard ${isAllowed?"":"locked"} ${isAllowed&&!directlyManaged?"linkedOnly":""}`} disabled={!features||!isAllowed} onClick={()=>activate(item)}><span className="moduleIcon"><SettingsMenuIcon name={item.icon}/></span><div><strong>{item.label}</strong><span>{item.desc}</span><small>{!features?"กำลังตรวจสิทธิ์...":!isAllowed?"ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด":item.adminModule?"จัดการเพิ่ม แก้ไข ลบจาก Customer Portal":editable?"กดเพื่อจัดการ":item.target?"เปิดใช้งานใน Customer Portal":detail(item)}</small></div><ChevronRight size={18}/></button>;})}</div>
+    <div className="moduleGrid settingsGrid posMenuGrid">{POS_SETTINGS_MENU_ITEMS.filter(item=>keys.includes(item.kind) && (!features?.is_custom || isCustomMenuVisible(features,item.key))).map(item=>{const isAllowed=features?allowed(item.key,item.feature):false;const editable=canEdit(item);const directlyManaged=Boolean(item.target||item.adminModule||editable);return <button key={item.key} className={`moduleCard posMenuCard ${isAllowed?"":"locked"} ${isAllowed&&!directlyManaged?"linkedOnly":""}`} disabled={!features||!isAllowed} onClick={()=>activate(item)}><span className="moduleIcon"><SettingsMenuIcon name={item.icon}/></span><div><strong>{item.label}</strong><span>{item.desc}</span><small>{!features?"กำลังตรวจสิทธิ์...":!isAllowed?"ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด":item.adminModule?"จัดการเพิ่ม แก้ไข ลบจาก Customer Portal":editable?"กดเพื่อจัดการ":item.target?"เปิดใช้งานใน Customer Portal":detail(item)}</small></div><ChevronRight size={18}/></button>;})}</div>
   );
 
   return <>

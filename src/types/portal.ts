@@ -222,6 +222,7 @@ export interface PackageInfo {
 
 export interface FeatureState {
   package_id: string | null;
+  is_custom: boolean;
   package_features: Record<string, boolean>;
   feature_overrides: Record<string, boolean>;
   menu_policy: Record<string, boolean>;

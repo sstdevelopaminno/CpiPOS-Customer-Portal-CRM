@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Boxes, ChevronRight, Download, LayoutDashboard, LoaderCircle, LogOut, Menu, MoreHorizontal, PackageCheck, PanelLeftClose, PanelLeftOpen, ReceiptText, Settings, ShieldCheck, Store, UsersRound, Warehouse, WifiOff } from "lucide-react";
-import { loadPortalContext, logoutPortal, todayInputValue, type PortalContext, type PortalView, type ReportRange } from "./lib/portal";
+import { loadFeatureState, loadPortalContext, logoutPortal, todayInputValue, type FeatureState, type PortalContext, type PortalView, type ReportRange } from "./lib/portal";
 import { supabase } from "./lib/supabase";
+import { isCustomMenuVisible } from "./lib/custom-menu-access";
 import { FilterBar } from "./components/common";
 import { Login } from "./views/Login";
 import { DashboardView } from "./views/DashboardView";
@@ -29,8 +30,16 @@ const nav: Array<{ id: PortalView; label: string; icon: React.ReactNode }> = [
   { id:"settings",label:"ตั้งค่า",icon:<Settings size={21}/> }
 ];
 
+const PORTAL_VIEW_MENU: Record<PortalView,string> = {
+  dashboard:"more.sales_summary", sales:"main.sales_list", products:"more.stock",
+  stock:"more.stock", staff:"settings.users", package:"main.package_payment",
+  more:"main.more", settings:"main.settings"
+};
+
 export default function App() {
   const [context,setContext]=useState<PortalContext|null>(null);
+  const [menuAccess,setMenuAccess]=useState<FeatureState|null>(null);
+  const [menuAccessError,setMenuAccessError]=useState(false);
   const [checking,setChecking]=useState(true);
   const [view,setView]=useState<PortalView>("dashboard");
   const [branchId,setBranchId]=useState(()=>localStorage.getItem("cpipos-customer-portal-branch")??"");
@@ -71,6 +80,17 @@ export default function App() {
     const{data}=supabase.auth.onAuthStateChange(event=>{if(event==="SIGNED_OUT")setContext(null);});
     return()=>data.subscription.unsubscribe();
   },[restore]);
+
+  useEffect(()=>{
+    if(!context){setMenuAccess(null);setMenuAccessError(false);return;}
+    let cancelled=false;
+    setMenuAccess(null);
+    setMenuAccessError(false);
+    loadFeatureState(context.tenantId,branchId||null)
+      .then(state=>{if(!cancelled){setMenuAccess(state);setMenuAccessError(false);}})
+      .catch(()=>{if(!cancelled){setMenuAccess(null);setMenuAccessError(true);}});
+    return()=>{cancelled=true;};
+  },[context,branchId]);
 
   useEffect(()=>{
     if(!context)return;
@@ -126,13 +146,27 @@ export default function App() {
     });
   },[]);
 
-  const chooseView=(next:PortalView)=>{setView(next);setMobileOpen(false);};
+  const chooseView=(next:PortalView)=>{
+    if(menuAccess?.is_custom && !isCustomMenuVisible(menuAccess,PORTAL_VIEW_MENU[next]))return;
+    setView(next);setMobileOpen(false);
+  };
 
   if(checking)return <div className="bootScreen"><img className="bootLogo" src="/cpipos-logo.png" alt="CpiPOS"/><LoaderCircle className="spin"/><span>กำลังเตรียมข้อมูลร้าน...</span></div>;
   if(!context)return <Login onSuccess={restore} canInstall={Boolean(installPrompt)&&!standalone} onInstall={installApp}/>;
 
-  const showFilters=view!=="package";
-  const showPeriod=view==="dashboard"||view==="sales";
+  // Never render unrestricted navigation before an authoritative feature
+  // snapshot arrives. This prevents CUSTOM menus flashing or becoming usable on
+  // an API failure; fixed plans resume their legacy behavior after load.
+  const availableNav = !menuAccess ? []
+    : menuAccess.is_custom
+      ? nav.filter(item=>isCustomMenuVisible(menuAccess,PORTAL_VIEW_MENU[item.id]))
+      : nav;
+  const activeView = !menuAccess ? null
+    : menuAccess.is_custom && !isCustomMenuVisible(menuAccess,PORTAL_VIEW_MENU[view])
+      ? availableNav[0]?.id ?? null
+      : view;
+  const showFilters=activeView!=="package";
+  const showPeriod=activeView==="dashboard"||activeView==="sales";
   const canInstall=Boolean(installPrompt)&&!standalone;
 
   return <div className={`appShell ${collapsed?"sidebarCollapsed":""}`}>
@@ -143,7 +177,7 @@ export default function App() {
         <button className="collapseButton" aria-label={collapsed?"ขยายเมนู":"ย่อเมนู"} onClick={toggleCollapsed}>{collapsed?<PanelLeftOpen size={20}/>:<PanelLeftClose size={20}/>}</button>
       </div>
       <div className="storeCard"><div className="storeAvatar">{context.logoUrl?<img src={context.logoUrl} alt=""/>:<Store size={22}/>}</div><div><strong>{context.tenantName}</strong><span>ร้าน {context.tenantCode}</span></div></div>
-      <nav aria-label="เมนูหลัก">{nav.map(item=><button key={item.id} aria-current={view===item.id?"page":undefined} title={collapsed?item.label:undefined} className={view===item.id?"active":""} onClick={()=>chooseView(item.id)}>{item.icon}<span>{item.label}</span><ChevronRight size={17}/></button>)}</nav>
+      <nav aria-label="เมนูหลัก">{availableNav.map(item=><button key={item.id} aria-current={activeView===item.id?"page":undefined} title={collapsed?item.label:undefined} className={activeView===item.id?"active":""} onClick={()=>chooseView(item.id)}>{item.icon}<span>{item.label}</span><ChevronRight size={17}/></button>)}</nav>
       <div className="sidebarBottom">
         {canInstall?<button className="sidebarInstallButton" onClick={()=>void installApp()}><Download size={17}/><span>ติดตั้งเว็บแอป</span></button>:null}
         <div className="roleBadge"><ShieldCheck size={17}/><span>{context.role==="owner"?"Owner":"Manager"}</span></div>
@@ -163,14 +197,18 @@ export default function App() {
 
       {showFilters?<FilterBar context={context} branchId={branchId} onBranchChange={changeBranch} range={range} onRangeChange={setRange} anchor={anchor} onAnchorChange={setAnchor} showPeriod={showPeriod}/>:null}
 
-      {view==="dashboard"?<DashboardView context={context} branchId={branchId||null} range={range} anchor={anchor}/>:null}
-      {view==="sales"?<SalesView context={context} branchId={branchId||null} range={range} anchor={anchor}/>:null}
-      {view==="products"?<ProductsView context={context} branchId={branchId||null}/>:null}
-      {view==="stock"?<StockView context={context} branchId={branchId||null}/>:null}
-      {view==="staff"?<StaffView context={context} branchId={branchId||null}/>:null}
-      {view==="package"?<PackageView context={context}/>:null}
-      {view==="more"?<MoreView context={context} branchId={branchId||null} onNavigate={chooseView}/>:null}
-      {view==="settings"?<SettingsView context={context} branchId={branchId||null} onNavigate={chooseView} onContextChanged={refreshContextAfterMutation}/>:null}
+      {!menuAccess ? <div role="status" className="emptyState">
+        <p>{menuAccessError ? "ไม่สามารถโหลดสิทธิ์เมนูได้ กรุณาลองอีกครั้ง" : "กำลังโหลดสิทธิ์เมนูจาก IT..."}</p>
+        {menuAccessError ? <button type="button" onClick={()=>{setMenuAccessError(false);loadFeatureState(context.tenantId,branchId||null).then(state=>setMenuAccess(state)).catch(()=>setMenuAccessError(true));}}>ลองใหม่</button> : null}
+      </div> : null}
+      {activeView==="dashboard"?<DashboardView context={context} branchId={branchId||null} range={range} anchor={anchor}/>:null}
+      {activeView==="sales"?<SalesView context={context} branchId={branchId||null} range={range} anchor={anchor}/>:null}
+      {activeView==="products"?<ProductsView context={context} branchId={branchId||null}/>:null}
+      {activeView==="stock"?<StockView context={context} branchId={branchId||null}/>:null}
+      {activeView==="staff"?<StaffView context={context} branchId={branchId||null}/>:null}
+      {activeView==="package"?<PackageView context={context}/>:null}
+      {activeView==="more"?<MoreView context={context} branchId={branchId||null} onNavigate={chooseView}/>:null}
+      {activeView==="settings"?<SettingsView context={context} branchId={branchId||null} onNavigate={chooseView} onContextChanged={refreshContextAfterMutation}/>:null}
 
       <footer>ข้อมูลและสิทธิ์ถูกจำกัดตามบัญชี {context.role==="owner"?"Owner":"Manager"} · {context.branches.length} สาขาที่เข้าถึงได้</footer>
     </main>
