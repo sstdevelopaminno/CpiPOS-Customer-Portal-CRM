@@ -39,6 +39,7 @@ const PORTAL_VIEW_MENU: Record<PortalView,string> = {
 export default function App() {
   const [context,setContext]=useState<PortalContext|null>(null);
   const [menuAccess,setMenuAccess]=useState<FeatureState|null>(null);
+  const [menuAccessError,setMenuAccessError]=useState(false);
   const [checking,setChecking]=useState(true);
   const [view,setView]=useState<PortalView>("dashboard");
   const [branchId,setBranchId]=useState(()=>localStorage.getItem("cpipos-customer-portal-branch")??"");
@@ -81,12 +82,13 @@ export default function App() {
   },[restore]);
 
   useEffect(()=>{
-    if(!context){setMenuAccess(null);return;}
+    if(!context){setMenuAccess(null);setMenuAccessError(false);return;}
     let cancelled=false;
     setMenuAccess(null);
+    setMenuAccessError(false);
     loadFeatureState(context.tenantId,branchId||null)
-      .then(state=>{if(!cancelled)setMenuAccess(state);})
-      .catch(()=>{if(!cancelled)setMenuAccess(null);});
+      .then(state=>{if(!cancelled){setMenuAccess(state);setMenuAccessError(false);}})
+      .catch(()=>{if(!cancelled){setMenuAccess(null);setMenuAccessError(true);}});
     return()=>{cancelled=true;};
   },[context,branchId]);
 
@@ -152,12 +154,17 @@ export default function App() {
   if(checking)return <div className="bootScreen"><img className="bootLogo" src="/cpipos-logo.png" alt="CpiPOS"/><LoaderCircle className="spin"/><span>กำลังเตรียมข้อมูลร้าน...</span></div>;
   if(!context)return <Login onSuccess={restore} canInstall={Boolean(installPrompt)&&!standalone} onInstall={installApp}/>;
 
-  const availableNav = menuAccess?.is_custom
-    ? nav.filter(item=>isCustomMenuVisible(menuAccess,PORTAL_VIEW_MENU[item.id]))
-    : nav;
-  const activeView = menuAccess?.is_custom && !isCustomMenuVisible(menuAccess,PORTAL_VIEW_MENU[view])
-    ? availableNav[0]?.id ?? null
-    : view;
+  // Never render unrestricted navigation before an authoritative feature
+  // snapshot arrives. This prevents CUSTOM menus flashing or becoming usable on
+  // an API failure; fixed plans resume their legacy behavior after load.
+  const availableNav = !menuAccess ? []
+    : menuAccess.is_custom
+      ? nav.filter(item=>isCustomMenuVisible(menuAccess,PORTAL_VIEW_MENU[item.id]))
+      : nav;
+  const activeView = !menuAccess ? null
+    : menuAccess.is_custom && !isCustomMenuVisible(menuAccess,PORTAL_VIEW_MENU[view])
+      ? availableNav[0]?.id ?? null
+      : view;
   const showFilters=activeView!=="package";
   const showPeriod=activeView==="dashboard"||activeView==="sales";
   const canInstall=Boolean(installPrompt)&&!standalone;
@@ -190,6 +197,10 @@ export default function App() {
 
       {showFilters?<FilterBar context={context} branchId={branchId} onBranchChange={changeBranch} range={range} onRangeChange={setRange} anchor={anchor} onAnchorChange={setAnchor} showPeriod={showPeriod}/>:null}
 
+      {!menuAccess ? <div role="status" className="emptyState">
+        <p>{menuAccessError ? "ไม่สามารถโหลดสิทธิ์เมนูได้ กรุณาลองอีกครั้ง" : "กำลังโหลดสิทธิ์เมนูจาก IT..."}</p>
+        {menuAccessError ? <button type="button" onClick={()=>{setMenuAccessError(false);loadFeatureState(context.tenantId,branchId||null).then(state=>setMenuAccess(state)).catch(()=>setMenuAccessError(true));}}>ลองใหม่</button> : null}
+      </div> : null}
       {activeView==="dashboard"?<DashboardView context={context} branchId={branchId||null} range={range} anchor={anchor}/>:null}
       {activeView==="sales"?<SalesView context={context} branchId={branchId||null} range={range} anchor={anchor}/>:null}
       {activeView==="products"?<ProductsView context={context} branchId={branchId||null}/>:null}
