@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { isCustomMenuVisible } from "../src/lib/custom-menu-access";
 
-const custom = (policy: Record<string,boolean>) => ({ is_custom:true, menu_policy:policy });
-const fixed = (policy: Record<string,boolean>) => ({ is_custom:false, menu_policy:policy });
+const custom = (policy: Record<string,boolean>) => ({ is_custom:true, is_internal_test_full:false, menu_policy:policy });
+const fixed = (policy: Record<string,boolean>) => ({ is_custom:false, is_internal_test_full:false, menu_policy:policy });
 
 describe("CUSTOM menu access parity with POS and IT", () => {
   it("does not expose a CUSTOM menu without explicit IT grant", () => {
@@ -12,6 +12,12 @@ describe("CUSTOM menu access parity with POS and IT", () => {
     expect(isCustomMenuVisible(custom({"main.more":true,"more.stock":false}),"more.stock")).toBe(false);
     expect(isCustomMenuVisible(custom({}),"main.shift")).toBe(true);
     expect(isCustomMenuVisible(custom({}),"not.registered")).toBe(false);
+  });
+  it("internal test full access grants absent menus but respects IT OFF and parent OFF", () => {
+    const full = { is_custom:false, is_internal_test_full:true, menu_policy:{} };
+    expect(isCustomMenuVisible(full,"more.stock")).toBe(true);
+    expect(isCustomMenuVisible({ ...full, menu_policy:{"more.stock":false} },"more.stock")).toBe(false);
+    expect(isCustomMenuVisible({ ...full, menu_policy:{"main.more":false} },"more.stock")).toBe(false);
   });
   it("preserves legacy fixed-plan behavior", () => {
     expect(isCustomMenuVisible(fixed({}),"more.stock")).toBe(true);
