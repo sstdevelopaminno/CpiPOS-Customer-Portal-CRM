@@ -147,7 +147,7 @@ export default function App() {
   },[]);
 
   const chooseView=(next:PortalView)=>{
-    if(menuAccess?.is_custom && !isCustomMenuVisible(menuAccess,PORTAL_VIEW_MENU[next]))return;
+    if((menuAccess?.is_custom || menuAccess?.is_internal_test_full) && !isCustomMenuVisible(menuAccess,PORTAL_VIEW_MENU[next]))return;
     setView(next);setMobileOpen(false);
   };
 
@@ -158,11 +158,11 @@ export default function App() {
   // snapshot arrives. This prevents CUSTOM menus flashing or becoming usable on
   // an API failure; fixed plans resume their legacy behavior after load.
   const availableNav = !menuAccess ? []
-    : menuAccess.is_custom
+    : (menuAccess.is_custom || menuAccess.is_internal_test_full)
       ? nav.filter(item=>isCustomMenuVisible(menuAccess,PORTAL_VIEW_MENU[item.id]))
       : nav;
   const activeView = !menuAccess ? null
-    : menuAccess.is_custom && !isCustomMenuVisible(menuAccess,PORTAL_VIEW_MENU[view])
+    : (menuAccess.is_custom || menuAccess.is_internal_test_full) && !isCustomMenuVisible(menuAccess,PORTAL_VIEW_MENU[view])
       ? availableNav[0]?.id ?? null
       : view;
   const showFilters=activeView!=="package";
