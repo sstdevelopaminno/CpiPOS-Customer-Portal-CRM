@@ -1,6 +1,6 @@
 -- Proposed CUSTOM menu policy alignment for POS / IT / CRM.
--- Apply ONLY after Supabase migration-history reconciliation and a staging rehearsal.
--- This script is intentionally not executed as part of the GitHub PR.
+-- Production release SQL for the CUSTOM policy; changes only two existing functions.
+-- Must run before the CRM UI is promoted, and verify unchanged fixed-plan grants.
 -- Fixed packages: unchanged behavior; CUSTOM: explicit menu and parent allow, on
 -- top of existing subscription, feature-override and role checks.
 
@@ -88,5 +88,5 @@ begin
     v_parent_enabled := true;
   end if;
   return coalesce(v_override,v_package,false) and v_menu and v_parent_enabled;
-end
+end;
 $function$;
