@@ -4,6 +4,7 @@ import { loadFeatureState, loadMoreSnapshot, type FeatureState, type MoreSnapsho
 import { ConnectedPosModuleModal, ErrorPanel, Modal } from "../components/common";
 import { TopicHub } from "../components/TopicHub";
 import { number } from "../lib/formatters";
+import { isCustomMenuVisible } from "../lib/custom-menu-access";
 import { POS_MORE_MENU_ITEMS, type PosMenuIcon, type PosMoreMenuItem } from "../config/pos-menu-catalog";
 import { PosAdminWorkspace } from "./pos-admin/PosAdminWorkspace";
 import type { PosAdminModule } from "../types/pos-admin";
@@ -63,7 +64,7 @@ export function MoreView({context,branchId,onNavigate}:{context:PortalContext;br
   };
 
   const renderMenuGroup=(keys:readonly string[])=>(
-    <div className="moduleGrid posMenuGrid">{POS_MORE_MENU_ITEMS.filter(item=>keys.includes(item.key)).map(item=>{const allowed=state?enabled(item):false;return <button key={item.key} className={`moduleCard posMenuCard ${allowed?"":"locked"} ${!item.target&&!item.adminModule&&allowed?"linkedOnly":""}`} disabled={!state||!allowed} onClick={()=>activate(item)}><span className="moduleIcon"><MoreIcon name={item.icon}/></span><div><strong>{item.label}</strong><span>{item.desc}</span><small>{!state?"กำลังตรวจสิทธิ์...":!allowed?"ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด":detail(item)}</small></div><ChevronRight size={18}/></button>;})}</div>
+    <div className="moduleGrid posMenuGrid">{POS_MORE_MENU_ITEMS.filter(item=>keys.includes(item.key) && (!state?.is_custom || isCustomMenuVisible(state,item.key))).map(item=>{const allowed=state?enabled(item):false;return <button key={item.key} className={`moduleCard posMenuCard ${allowed?"":"locked"} ${!item.target&&!item.adminModule&&allowed?"linkedOnly":""}`} disabled={!state||!allowed} onClick={()=>activate(item)}><span className="moduleIcon"><MoreIcon name={item.icon}/></span><div><strong>{item.label}</strong><span>{item.desc}</span><small>{!state?"กำลังตรวจสิทธิ์...":!allowed?"ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด":detail(item)}</small></div><ChevronRight size={18}/></button>;})}</div>
   );
 
   return <>
