@@ -64,7 +64,7 @@ export function MoreView({context,branchId,onNavigate}:{context:PortalContext;br
   };
 
   const renderMenuGroup=(keys:readonly string[])=>(
-    <div className="moduleGrid posMenuGrid">{POS_MORE_MENU_ITEMS.filter(item=>keys.includes(item.key) && (!state?.is_custom || isCustomMenuVisible(state,item.key))).map(item=>{const allowed=state?enabled(item):false;return <button key={item.key} className={`moduleCard posMenuCard ${allowed?"":"locked"} ${!item.target&&!item.adminModule&&allowed?"linkedOnly":""}`} disabled={!state||!allowed} onClick={()=>activate(item)}><span className="moduleIcon"><MoreIcon name={item.icon}/></span><div><strong>{item.label}</strong><span>{item.desc}</span><small>{!state?"กำลังตรวจสิทธิ์...":!allowed?"ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด":detail(item)}</small></div><ChevronRight size={18}/></button>;})}</div>
+    <div className="moduleGrid posMenuGrid">{POS_MORE_MENU_ITEMS.filter(item=>keys.includes(item.key) && (!(state?.is_custom || state?.is_internal_test_full) || isCustomMenuVisible(state,item.key))).map(item=>{const allowed=state?enabled(item):false;return <button key={item.key} className={`moduleCard posMenuCard ${allowed?"":"locked"} ${!item.target&&!item.adminModule&&allowed?"linkedOnly":""}`} disabled={!state||!allowed} onClick={()=>activate(item)}><span className="moduleIcon"><MoreIcon name={item.icon}/></span><div><strong>{item.label}</strong><span>{item.desc}</span><small>{!state?"กำลังตรวจสิทธิ์...":!allowed?"ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด":detail(item)}</small></div><ChevronRight size={18}/></button>;})}</div>
   );
 
   return <>
