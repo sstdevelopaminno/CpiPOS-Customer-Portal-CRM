@@ -18,9 +18,17 @@ const KNOWN_CUSTOM_MENU_KEYS = new Set<string>([
 ]);
 
 export function isCustomMenuVisible(
-  state: Pick<FeatureState, "is_custom" | "menu_policy">,
+  state: Pick<FeatureState, "is_custom" | "is_internal_test_full" | "menu_policy">,
   key: string
 ): boolean {
+  if (state.is_internal_test_full) {
+    if (!KNOWN_CUSTOM_MENU_KEYS.has(key)) return false;
+    if (key === "main.shift") return true;
+    if (state.menu_policy[key] === false) return false;
+    if (key.startsWith("more.")) return isCustomMenuVisible(state, "main.more");
+    if (key.startsWith("settings.")) return isCustomMenuVisible(state, "main.settings");
+    return true;
+  }
   if (!state.is_custom) return state.menu_policy[key] !== false;
   if (key === "main.shift") return true;
   if (!KNOWN_CUSTOM_MENU_KEYS.has(key) || state.menu_policy[key] !== true) return false;
