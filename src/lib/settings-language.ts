@@ -14,7 +14,7 @@ const words:Record<string,[string,string]> = {
  "รีเฟรช":["Refresh","ໂຫຼດໃໝ່"],"ร้าน":["Store","ຮ້ານ"],"สาขา":["Branches","ສາຂາ"],
  "อุปกรณ์":["Devices","ອຸປະກອນ"],"บัญชีรับเงิน":["Payment accounts","ບັນຊີຮັບເງິນ"],
  "หัวข้อ":["topics","ຫົວຂໍ້"],"เครื่อง":["devices","ເຄື່ອງ"],"เครื่องที่เชื่อม":["connected printers","ເຄື່ອງພິມທີ່ເຊື່ອມ"],
- "รายการ Audit":["audit entries","ລາຍການ Audit"],"บัญชี":["accounts","ບັນຊີ"],
+ "รายการ Audit":["audit entries","ລາຍການ Audit"],
  "สาขาเปิดภาษี":["branches with tax","ສາຂາທີ່ເປີດພາສີ"],"สาขามีการตั้งค่า":["configured branches","ສາຂາທີ່ຕັ້ງຄ່າ"],
  "การเชื่อมต่อ":["connections","ການເຊື່ອມຕໍ່"],"ใช้รูป QR เดียวกับที่ POS อ่านจากบัญชีรับชำระ":["Uses the same QR image as POS payment account","ໃຊ້ QR ຮູບດຽວກັບບັນຊີ POS"],
  "Popup QR โต๊ะ":["Table QR popup","ປັອບອັບ QR ໂຕະ"],
