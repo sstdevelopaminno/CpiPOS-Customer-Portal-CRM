@@ -34,12 +34,15 @@ export async function loadFeatureState(tenantId: string, branchId: string | null
       .select("metadata,status,ended_at")
       .eq("tenant_id",tenantId)
       .order("created_at",{ascending:false}).limit(1).maybeSingle();
-    if(contractError) throw contractError;
-    const grants=contract?.metadata?.sales_modes as Record<string,unknown>|undefined;
-    const active=contract?.status==="active"||contract?.status==="trial";
-    opticalRetailEnabled=Boolean(active
-      && (!contract?.ended_at || Date.parse(contract.ended_at)>Date.now())
-      && grants?.optical_retail===true);
+    // Optical fails closed if its extra lookup fails, without breaking normal
+    // CRM menus for existing CUSTOM tenants.
+    if(!contractError){
+      const grants=contract?.metadata?.sales_modes as Record<string,unknown>|undefined;
+      const active=contract?.status==="active"||contract?.status==="trial";
+      opticalRetailEnabled=Boolean(active
+        && (!contract?.ended_at || Date.parse(contract.ended_at)>Date.now())
+        && grants?.optical_retail===true);
+    }
   }
   return {
     package_id: typeof value.package_id==="string"?value.package_id:null,
