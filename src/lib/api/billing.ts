@@ -25,10 +25,30 @@ export async function loadFeatureState(tenantId: string, branchId: string | null
   });
   if (error) throw error;
   const value=(data??{}) as Record<string,unknown>;
+  // Fail closed: CUSTOM is not equivalent to Optical permission.
+  // The authoritative IT sales-mode switch is on the latest tenant contract.
+  let opticalRetailEnabled=false;
+  if(value.is_custom===true || value.is_internal_test_full===true){
+    const {data:contract,error:contractError}=await supabase
+      .from("tenant_subscription_contracts")
+      .select("metadata,status,ended_at")
+      .eq("tenant_id",tenantId)
+      .order("created_at",{ascending:false}).limit(1).maybeSingle();
+    // Optical fails closed if its extra lookup fails, without breaking normal
+    // CRM menus for existing CUSTOM tenants.
+    if(!contractError){
+      const grants=contract?.metadata?.sales_modes as Record<string,unknown>|undefined;
+      const active=contract?.status==="active"||contract?.status==="trial";
+      opticalRetailEnabled=Boolean(active
+        && (!contract?.ended_at || Date.parse(contract.ended_at)>Date.now())
+        && grants?.optical_retail===true);
+    }
+  }
   return {
     package_id: typeof value.package_id==="string"?value.package_id:null,
     is_custom: value.is_custom === true,
     is_internal_test_full: value.is_internal_test_full === true,
+    optical_retail_enabled: opticalRetailEnabled,
     package_features: (value.package_features??{}) as Record<string,boolean>,
     feature_overrides: (value.feature_overrides??{}) as Record<string,boolean>,
     menu_policy: (value.menu_policy??{}) as Record<string,boolean>
