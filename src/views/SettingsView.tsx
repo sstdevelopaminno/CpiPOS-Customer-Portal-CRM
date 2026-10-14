@@ -271,7 +271,7 @@ export function SettingsView({context,branchId,onNavigate,onContextChanged}:{con
   );
 
   return <>
-    <div className="pageHeading"><div><p className="eyebrow">SETTINGS · POS MENU</p><h2>{T("ตั้งค่า")}</h2><p>{T("รายการและลำดับเมนูอ้างอิงจาก CpiPOS ฝั่ง POS รวมเมนู QR โต๊ะและออเดอร์/ครัวที่แสดงในหน้าตั้งค่าจริง")}</p></div><button className="ghostButton" onClick={()=>void Promise.all([refresh(),onContextChanged()])}><RefreshCw size={18}/>{T("รีเฟรช")}</button></div>
+    <div className="pageHeading"><div><p className="eyebrow">SETTINGS · POS MENU</p><h2>{T("ตั้งค่า")}</h2><p>{T("รายการและลำดับเมนูอ้างอิงจาก CpiPOS ฝั่ง POS รวมเมนู QR โต๊ะและออเดอร์/ครัวที่แสดงในหน้าตั้งค่าจริง")}</p></div><div style={{display:"flex",flexWrap:"wrap",gap:8}}><button type="button" className="ghostButton" onClick={()=>setLanguageModalOpen(true)}><Languages size={18}/>{T("เปลี่ยนภาษา")}: {languageOptions.find(o=>o.code===language)?.label}</button><button className="ghostButton" onClick={()=>void Promise.all([refresh(),onContextChanged()])}><RefreshCw size={18}/>{T("รีเฟรช")}</button></div></div>
     {error?<ErrorPanel message={error}/>:null}
     {snapshot?<section className="settingsOverview">
       <div><Store size={20}/><span>{T("ร้าน")}</span><strong>{snapshot.store?.display_name||snapshot.store?.name||"—"}</strong></div>
