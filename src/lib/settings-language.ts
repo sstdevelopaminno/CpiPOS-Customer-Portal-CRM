@@ -88,3 +88,29 @@ const words:Record<string,[string,string]> = {
 export function settingsText(language:CrmSettingsLanguage,text:string):string {
  return language==="th"?text:words[text]?.[language==="en"?0:1]??text;
 }
+
+
+const menuDescriptions: Record<string,[[string,string],[string,string]]> = {
+ store:[["Store / company","ຂໍ້ມູນຮ້ານ / ບໍລິສັດ"],["Store code, display name, logo, address and contact","ລະຫັດຮ້ານ ຊື່ ໂລໂກ້ ທີ່ຢູ່ ແລະຕິດຕໍ່"]],
+ branches:[["Branches","ສາຂາ"],["Add and manage branches","ເພີ່ມ ແລະຈັດການສາຂາ"]],
+ devices:[["Cashier terminals","ເຄື່ອງ POS"],["Link terminals, scope and shift","ຜູກເຄື່ອງ ສິດທິ ແລະກະຂາຍ"]],
+ printers:[["Printers","ເຄື່ອງພິມ"],["Receipts, print agents and cash drawers","ໃບຮັບເງິນ ເຄື່ອງພິມ ແລະລິ້ນຊັກເງິນ"]],
+ activity:[["Activity audit","ກວດສອບການໃຊ້ງານ"],["Users, actions, times and approvals","ຜູ້ໃຊ້ ການດຳເນີນງານ ເວລາ ແລະອະນຸມັດ"]],
+ payments:[["Payment settings","ຕັ້ງຄ່າການຊຳລະ"],["Bank accounts, PromptPay and QR","ບັນຊີທະນາຄານ PromptPay ແລະ QR"]],
+ inet:[["INET QR","INET QR"],["Dynamic QR configuration per branch","ຕັ້ງຄ່າ Dynamic QR ຕາມສາຂາ"]],
+ taxes:[["Tax settings","ຕັ້ງຄ່າພາສີ"],["VAT and withholding tax rules","ກົດເກນ VAT ແລະຫັກພາສີ"]],
+ notifications:[["Notification settings","ຕັ້ງຄ່າແຈ້ງເຕືອນ"],["Popup and sound for QR table calls","ປັອບອັບ ແລະສຽງຈາກ QR ໂຕະ"]],
+ users:[["Users","ຜູ້ໃຊ້ງານ"],["Manage staff roles and PIN","ຈັດການສິດພະນັກງານ ແລະ PIN"]],
+ language:[["Change language","ປ່ຽນພາສາ"],["Choose Thai, English or Lao for CRM settings","ເລືອກພາສາໄທ ອັງກິດ ຫຼື ລາວ ສຳລັບ CRM"]],
+ currency:[["Currency (CUSTOM)","ສະກຸນເງິນ (CUSTOM)"],["THB/LAK, controlled by IT","THB/LAK ຄວບຄຸມໂດຍ IT"]],
+ placement:[["Menu placement","ຕຳແໜ່ງເມນູ"],["Choose menu position on POS device","ເລືອກຕຳແໜ່ງເມນູໃນ POS"]],
+ display:[["Customer display","ຈໍລູກຄ້າ"],["Configure the customer-facing screen","ຕັ້ງຄ່າຈໍລູກຄ້າ"]],
+ orderKitchen:[["Order and kitchen notifications","ແຈ້ງເຕືອນອໍເດີ ແລະຄົວ"],["QR alerts, kitchen dispatch and printing","ແຈ້ງເຕືອນ QR ສົ່ງເຂົ້າຄົວ ແລະພິມ"]],
+ tableQr:[["Table QR settings","ຕັ້ງຄ່າ QR ໂຕະ"],["Set QR expiry time or bill lifetime","ກຳນົດອາຍຸ QR ຕາມເວລາ ຫຼືບິນ"]]
+};
+export function settingsMenuLocale(language:CrmSettingsLanguage,kind:string,label:string,desc:string) {
+ if(language==="th")return{label,desc};
+ const entry=menuDescriptions[kind];
+ const i=language==="en"?0:1;
+ return entry?{label:entry[0][i],desc:entry[1][i]}:{label:settingsText(language,label),desc:settingsText(language,desc)};
+}
