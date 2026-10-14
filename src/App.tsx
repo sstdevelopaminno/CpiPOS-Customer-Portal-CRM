@@ -210,6 +210,7 @@ export default function App() {
       {activeView==="staff"?<StaffView context={context} branchId={branchId||null}/>:null}
       {activeView==="package"?<PackageView context={context}/>:null}
       {activeView==="more"?<MoreView context={context} branchId={branchId||null} onNavigate={chooseView}/>:null}
+      {activeView==="optical" && canSeeOptical?<OpticalCustomersView context={context} branchId={branchId||null}/>:null}
       {activeView==="settings"?<SettingsView context={context} branchId={branchId||null} onNavigate={chooseView} onContextChanged={refreshContextAfterMutation}/>:null}
 
       <footer>ข้อมูลและสิทธิ์ถูกจำกัดตามบัญชี {context.role==="owner"?"Owner":"Manager"} · {context.branches.length} สาขาที่เข้าถึงได้</footer>
