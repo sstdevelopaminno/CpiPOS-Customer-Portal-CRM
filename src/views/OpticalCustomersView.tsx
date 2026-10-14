@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { supabase } from "../lib/supabase";
+import "../styles/optical-customers.css";
 import type { PortalContext } from "../types/portal";
 
 type Customer = {
@@ -111,7 +112,7 @@ export function OpticalCustomersView({context,branchId}:{context:PortalContext;b
     </label>
   );
   const filtered=customers.filter(row=>(row.customer_code+" "+row.full_name+" "+(row.phone??"")).toLowerCase().includes(search.toLowerCase()));
-  return <section className="space-y-4">
+  return <section className="optical-customer-ui space-y-4">
     <header className="flex flex-wrap items-center justify-between gap-3">
       <div><p className="text-xs font-bold text-emerald-700">IMDC OPTICAL</p><h2>ประวัติลูกค้าและค่าสายตา</h2>
         <p>เฉพาะร้านและสาขาที่ IT เปิดสิทธิ์ Optical · ข้อมูลการตรวจเก่าจะไม่ถูกเขียนทับ</p></div>
