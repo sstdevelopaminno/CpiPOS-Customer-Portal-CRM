@@ -29,9 +29,10 @@ describe("POS menu parity",()=>{
   it("matches the Settings menu set from POS main including injected QR menus",()=>{
     expect(POS_SETTINGS_MENU_ITEMS.map(item=>item.kind)).toEqual([
       "store","branches","devices","printers","activity","payments","inet","taxes","notifications",
-      "users","language","placement","display","orderKitchen","tableQr"
+      "users","language","currency","placement","display","orderKitchen","tableQr"
     ]);
     expect(POS_SETTINGS_MENU_ITEMS.some(item=>["support","push"].includes(item.kind))).toBe(false);
+    expect(POS_SETTINGS_MENU_ITEMS.find(item=>item.kind==="currency")?.key).toBe("settings.currency");
     expect(POS_SETTINGS_MENU_ITEMS.find(item=>item.kind==="devices")?.adminModule).toBe("devices");
     expect(POS_SETTINGS_MENU_ITEMS.find(item=>item.kind==="printers")?.adminModule).toBe("printers");
     expect(POS_SETTINGS_MENU_ITEMS.find(item=>item.kind==="display")?.adminModule).toBe("display");
