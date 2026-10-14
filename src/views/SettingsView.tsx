@@ -164,7 +164,7 @@ function SettingEditorModal({
           <label><span>{T("เลขบัญชี")}</span><input value={accountDraft.account_number} onChange={e=>setAccountDraft({...accountDraft,account_number:e.target.value})}/></label>
           <label><span>PromptPay</span><input value={accountDraft.promptpay_phone} onChange={e=>setAccountDraft({...accountDraft,promptpay_phone:e.target.value})} required={accountDraft.qr_mode==="promptpay_link"} placeholder={accountDraft.qr_mode==="promptpay_link"?T("ระบุหมายเลข PromptPay"):undefined}/></label>
           <label><span>{T("รูปแบบ QR")}</span><select value={accountDraft.qr_mode} onChange={e=>setAccountDraft({...accountDraft,qr_mode:e.target.value})}><option value="promptpay_link">PromptPay</option><option value="qr_image">{T("รูป QR")}</option></select></label>
-          {accountDraft.qr_mode==="qr_image"?<label className="span2"><span>{T("URL / พาธรูป QR")}</span><input value={accountDraft.qr_image_url} onChange={e=>setAccountDraft({...accountDraft,qr_image_url:e.target.value})} placeholder="https://... หรือพาธรูป QR ที่ระบบ POS ใช้งาน" required/><small>ใช้รูป QR เดียวกับที่ POS อ่านจากบัญชีรับชำระ</small></label>:null}
+          {accountDraft.qr_mode==="qr_image"?<label className="span2"><span>{T("URL / พาธรูป QR")}</span><input value={accountDraft.qr_image_url} onChange={e=>setAccountDraft({...accountDraft,qr_image_url:e.target.value})} placeholder="https://... หรือพาธรูป QR ที่ระบบ POS ใช้งาน" required/><small>{T("ใช้รูป QR เดียวกับที่ POS อ่านจากบัญชีรับชำระ")}</small></label>:null}
           <label className="switchField"><input type="checkbox" checked={accountDraft.applies_to_all_branches} onChange={e=>setAccountDraft({...accountDraft,applies_to_all_branches:e.target.checked})}/><span>{T("ใช้ทุกสาขา")}</span></label>
           <label className="switchField"><input type="checkbox" checked={accountDraft.is_active} onChange={e=>setAccountDraft({...accountDraft,is_active:e.target.checked})}/><span>{T("เปิดใช้งาน")}</span></label>
         </>:null}
@@ -177,7 +177,7 @@ function SettingEditorModal({
 
         {kind==="notifications"?<>
           <label className="span2"><span>{T("สาขา")}</span><select value={scopeBranch} onChange={e=>changeScope(e.target.value)}>{snapshot.branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></label>
-          <label className="switchField"><input type="checkbox" checked={notificationDraft.table_qr_popup_enabled} onChange={e=>setNotificationDraft({...notificationDraft,table_qr_popup_enabled:e.target.checked})}/><span>Popup QR โต๊ะ</span></label>
+          <label className="switchField"><input type="checkbox" checked={notificationDraft.table_qr_popup_enabled} onChange={e=>setNotificationDraft({...notificationDraft,table_qr_popup_enabled:e.target.checked})}/><span>{T("Popup QR โต๊ะ")}</span></label>
           <label className="switchField"><input type="checkbox" checked={notificationDraft.table_qr_sound_enabled} onChange={e=>setNotificationDraft({...notificationDraft,table_qr_sound_enabled:e.target.checked})}/><span>{T("เสียงแจ้งเตือน")}</span></label>
           <label><span>{T("ระดับเสียง 0–1")}</span><input type="number" min="0" max="1" step="0.1" value={notificationDraft.table_qr_sound_volume} onChange={e=>setNotificationDraft({...notificationDraft,table_qr_sound_volume:Number(e.target.value)})}/></label>
           <label className="switchField"><input type="checkbox" checked={notificationDraft.table_qr_popup_store_enabled} onChange={e=>setNotificationDraft({...notificationDraft,table_qr_popup_store_enabled:e.target.checked})}/><span>{T("แจ้งหน้าร้าน")}</span></label>
@@ -239,15 +239,15 @@ export function SettingsView({context,branchId,onNavigate,onContextChanged}:{con
   const detail=(item:PosSettingsMenuItem)=>{
     if(!snapshot)return "กำลังโหลดข้อมูล...";
     if(item.kind==="store")return snapshot.store?.display_name||snapshot.store?.name||"ร้านค้า";
-    if(item.kind==="branches")return snapshot.branches.length+" สาขา";
-    if(item.kind==="devices")return snapshot.devices.length+" เครื่อง";
-    if(item.kind==="printers")return number.format(Number(linkedSnapshot?.printers_count??0))+" เครื่องที่เชื่อม";
-    if(item.kind==="activity")return number.format(Number(linkedSnapshot?.audit_count??0))+" รายการ Audit";
-    if(item.kind==="payments")return snapshot.payment_accounts.length+" บัญชี";
-    if(item.kind==="taxes")return snapshot.tax_settings.filter(x=>x.is_enabled).length+" สาขาเปิดภาษี";
-    if(item.kind==="notifications"||item.kind==="orderKitchen"||item.kind==="tableQr")return snapshot.notifications.length+" สาขามีการตั้งค่า";
+    if(item.kind==="branches")return snapshot.branches.length+" "+T("สาขา");
+    if(item.kind==="devices")return snapshot.devices.length+" "+T("เครื่อง");
+    if(item.kind==="printers")return number.format(Number(linkedSnapshot?.printers_count??0))+" "+T("เครื่องที่เชื่อม");
+    if(item.kind==="activity")return number.format(Number(linkedSnapshot?.audit_count??0))+" "+T("รายการ Audit");
+    if(item.kind==="payments")return snapshot.payment_accounts.length+" "+T("บัญชี");
+    if(item.kind==="taxes")return snapshot.tax_settings.filter(x=>x.is_enabled).length+" "+T("สาขาเปิดภาษี");
+    if(item.kind==="notifications"||item.kind==="orderKitchen"||item.kind==="tableQr")return snapshot.notifications.length+" "+T("สาขามีการตั้งค่า");
     if(item.kind==="users")return "จัดการจากเมนูพนักงาน";
-    if(item.kind==="display")return number.format(Number(linkedSnapshot?.display_pairings_count??0))+" การเชื่อมต่อ";
+    if(item.kind==="display")return number.format(Number(linkedSnapshot?.display_pairings_count??0))+" "+T("การเชื่อมต่อ");
     if(item.kind==="language")return languageOptions.find(x=>x.code===language)?.label??"ไทย";
     if(item.kind==="placement")return T("ค่าเฉพาะเครื่อง POS");
     if(item.kind==="currency")return "ตั้งค่าที่เครื่อง POS โดยต้องได้รับสิทธิ์จาก IT";
@@ -280,10 +280,10 @@ export function SettingsView({context,branchId,onNavigate,onContextChanged}:{con
       <div><CreditCard size={20}/><span>{T("บัญชีรับเงิน")}</span><strong>{snapshot.payment_accounts.length}</strong></div>
     </section>:null}
     <TopicHub label={T("หมวดหมู่การตั้งค่า POS")} items={[
-      {id:"store",title:T("ข้อมูลร้านและผู้ใช้งาน"),description:T("ข้อมูลบริษัท สาขา และสิทธิ์พนักงาน"),count:"3 หัวข้อ",content:renderSettingsGroup(["store","branches","users"])},
-      {id:"billing",title:T("การชำระเงินและภาษี"),description:T("บัญชีรับเงิน INET QR ภาษีและการแจ้งเตือน"),count:"4 หัวข้อ",content:renderSettingsGroup(["payments","inet","taxes","notifications"])},
-      {id:"hardware",title:T("เครื่องและอุปกรณ์"),description:T("เครื่องแคชเชียร์ เครื่องพิมพ์ และจอลูกค้า"),count:"3 หัวข้อ",content:renderSettingsGroup(["devices","printers","display"])},
-      {id:"operations",title:T("การดำเนินงานและการแสดงผล"),description:T("Audit ครัว QR โต๊ะ ภาษา และแถบเมนู"),count:"5 หัวข้อ",content:renderSettingsGroup(["activity","orderKitchen","tableQr","language","currency","placement"])},
+      {id:"store",title:T("ข้อมูลร้านและผู้ใช้งาน"),description:T("ข้อมูลบริษัท สาขา และสิทธิ์พนักงาน"),count:`3 ${T("หัวข้อ")}`,content:renderSettingsGroup(["store","branches","users"])},
+      {id:"billing",title:T("การชำระเงินและภาษี"),description:T("บัญชีรับเงิน INET QR ภาษีและการแจ้งเตือน"),count:`4 ${T("หัวข้อ")}`,content:renderSettingsGroup(["payments","inet","taxes","notifications"])},
+      {id:"hardware",title:T("เครื่องและอุปกรณ์"),description:T("เครื่องแคชเชียร์ เครื่องพิมพ์ และจอลูกค้า"),count:`3 ${T("หัวข้อ")}`,content:renderSettingsGroup(["devices","printers","display"])},
+      {id:"operations",title:T("การดำเนินงานและการแสดงผล"),description:T("Audit ครัว QR โต๊ะ ภาษา และแถบเมนู"),count:`6 ${T("หัวข้อ")}`,content:renderSettingsGroup(["activity","orderKitchen","tableQr","language","currency","placement"])},
       {id:"connected",title:T("ข้อมูลร้านที่เชื่อมอยู่"),description:T("ดูสาขา เครื่อง และบัญชีรับเงินที่เชื่อมกับ POS"),content:<>
             {snapshot?<article className="panel settingsDataPanel"><div className="panelHeader"><div><p className="eyebrow">CONNECTED POS SETTINGS</p><h3>{T("ข้อมูลที่เชื่อมอยู่")}</h3></div></div><div className="settingsDataGrid">
       <div><strong>{T("ข้อมูลร้าน")}</strong><span>{snapshot.store?.company_address||"ยังไม่ได้ระบุที่อยู่"}</span><span>{snapshot.store?.contact_phone||snapshot.store?.owner_phone||"—"}</span></div>
