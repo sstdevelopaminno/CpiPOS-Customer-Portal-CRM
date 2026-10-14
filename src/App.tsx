@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Boxes, ChevronRight, Download, LayoutDashboard, LoaderCircle, LogOut, Menu, MoreHorizontal, PackageCheck, PanelLeftClose, PanelLeftOpen, ReceiptText, Settings, ShieldCheck, Store, UsersRound, Warehouse, WifiOff } from "lucide-react";
+import { Boxes, ChevronRight, Download, Glasses, LayoutDashboard, LoaderCircle, LogOut, Menu, MoreHorizontal, PackageCheck, PanelLeftClose, PanelLeftOpen, ReceiptText, Settings, ShieldCheck, Store, UsersRound, Warehouse, WifiOff } from "lucide-react";
 import { loadFeatureState, loadPortalContext, logoutPortal, todayInputValue, type FeatureState, type PortalContext, type PortalView, type ReportRange } from "./lib/portal";
 import { supabase } from "./lib/supabase";
 import { isCustomMenuVisible } from "./lib/custom-menu-access";
@@ -12,6 +12,7 @@ import { StockView } from "./views/StockView";
 import { StaffView } from "./views/StaffView";
 import { PackageView } from "./views/PackageView";
 import { MoreView } from "./views/MoreView";
+import { OpticalCustomersView } from "./views/OpticalCustomersView";
 import { SettingsView } from "./views/SettingsView";
 
 type InstallPromptEvent = Event & {
@@ -27,13 +28,14 @@ const nav: Array<{ id: PortalView; label: string; icon: React.ReactNode }> = [
   { id:"staff",label:"พนักงาน",icon:<UsersRound size={21}/> },
   { id:"package",label:"แพ็กเกจ",icon:<PackageCheck size={21}/> },
   { id:"more",label:"เพิ่มเติม",icon:<MoreHorizontal size={21}/> },
+  { id:"optical",label:"ลูกค้าแว่นตา",icon:<Glasses size={21}/> },
   { id:"settings",label:"ตั้งค่า",icon:<Settings size={21}/> }
 ];
 
 const PORTAL_VIEW_MENU: Record<PortalView,string> = {
   dashboard:"more.sales_summary", sales:"main.sales_list", products:"more.stock",
   stock:"more.stock", staff:"settings.users", package:"main.package_payment",
-  more:"main.more", settings:"main.settings"
+  more:"main.more", settings:"main.settings", optical:"main.optical_customers"
 };
 
 export default function App() {
@@ -146,8 +148,14 @@ export default function App() {
     });
   },[]);
 
+  const canSeeOptical = Boolean(menuAccess?.optical_retail_enabled
+    && (menuAccess.is_custom || menuAccess.is_internal_test_full)
+    && menuAccess.menu_policy["main.optical_customers"] !== false);
+  const canSeeView=(id:PortalView)=>id==="optical" ? canSeeOptical
+    : !(menuAccess?.is_custom || menuAccess?.is_internal_test_full)
+      || isCustomMenuVisible(menuAccess,PORTAL_VIEW_MENU[id]);
   const chooseView=(next:PortalView)=>{
-    if((menuAccess?.is_custom || menuAccess?.is_internal_test_full) && !isCustomMenuVisible(menuAccess,PORTAL_VIEW_MENU[next]))return;
+    if(!canSeeView(next))return;
     setView(next);setMobileOpen(false);
   };
 
@@ -157,14 +165,8 @@ export default function App() {
   // Never render unrestricted navigation before an authoritative feature
   // snapshot arrives. This prevents CUSTOM menus flashing or becoming usable on
   // an API failure; fixed plans resume their legacy behavior after load.
-  const availableNav = !menuAccess ? []
-    : (menuAccess.is_custom || menuAccess.is_internal_test_full)
-      ? nav.filter(item=>isCustomMenuVisible(menuAccess,PORTAL_VIEW_MENU[item.id]))
-      : nav;
-  const activeView = !menuAccess ? null
-    : (menuAccess.is_custom || menuAccess.is_internal_test_full) && !isCustomMenuVisible(menuAccess,PORTAL_VIEW_MENU[view])
-      ? availableNav[0]?.id ?? null
-      : view;
+  const availableNav = !menuAccess ? [] : nav.filter(item=>canSeeView(item.id));
+  const activeView = !menuAccess ? null : !canSeeView(view) ? availableNav[0]?.id ?? null : view;
   const showFilters=activeView!=="package";
   const showPeriod=activeView==="dashboard"||activeView==="sales";
   const canInstall=Boolean(installPrompt)&&!standalone;
