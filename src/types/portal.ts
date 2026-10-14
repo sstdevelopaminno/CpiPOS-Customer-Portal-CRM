@@ -1,5 +1,5 @@
 export type PortalRole = "owner" | "manager";
-export type PortalView = "dashboard" | "sales" | "products" | "stock" | "staff" | "package" | "more" | "settings";
+export type PortalView = "dashboard" | "sales" | "products" | "stock" | "staff" | "package" | "more" | "settings" | "optical";
 export type ReportRange = "day" | "month" | "year";
 
 export interface BranchSummary {
@@ -224,6 +224,7 @@ export interface FeatureState {
   package_id: string | null;
   is_custom: boolean;
   is_internal_test_full: boolean;
+  optical_retail_enabled: boolean;
   package_features: Record<string, boolean>;
   feature_overrides: Record<string, boolean>;
   menu_policy: Record<string, boolean>;
