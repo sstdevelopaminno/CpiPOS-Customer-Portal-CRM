@@ -7,7 +7,7 @@ export const dateOnly = new Intl.DateTimeFormat("th-TH", { dateStyle: "medium" }
 
 export function formatCurrency(value:number,currency:string|null|undefined){
   const code=String(currency||"THB").toUpperCase();
-  try{return new Intl.NumberFormat("th-TH",{style:"currency",currency:code,maximumFractionDigits:2}).format(Number(value)||0);}
+  try{return new Intl.NumberFormat(code==="LAK"?"lo-LA":"th-TH",{style:"currency",currency:code,minimumFractionDigits:code==="LAK"?0:2,maximumFractionDigits:code==="LAK"?0:2}).format(Number(value)||0);}
   catch{return `${number.format(Number(value)||0)} ${code}`;}
 }
 

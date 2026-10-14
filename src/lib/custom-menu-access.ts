@@ -13,7 +13,7 @@ const KNOWN_CUSTOM_MENU_KEYS = new Set<string>([
   "settings.printers", "settings.activity", "settings.payments",
   "settings.inet_nops", "settings.taxes", "settings.notifications",
   "settings.support", "settings.push_notifications", "settings.users",
-  "settings.language", "settings.placement", "settings.display",
+  "settings.language", "settings.currency", "settings.placement", "settings.display",
   "settings.order_kitchen", "settings.table_qr"
 ]);
 
