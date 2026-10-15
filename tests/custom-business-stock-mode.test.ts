@@ -49,6 +49,21 @@ describe("CUSTOM stock differs by IT-approved sales mode",()=>{
     const app=source("App.tsx");
     expect(app).toContain('strictOpticalCategory={stockBusinessMode==="mixed"}');
   });
+  it("supports assigned branch selection, custom catalog creation and completed-only ranking",()=>{
+    const view=source("views/BusinessStockOverview.tsx");
+    const best=source("views/OpticalBestSellers.tsx");
+    const create=source("views/OpticalCreateProduct.tsx");
+    expect(view).toContain('context.branches.map(b=><option');
+    expect(view).toContain("setStockBranch");
+    expect(view).toContain("OpticalBestSellers");
+    expect(view).toContain("OpticalCreateProduct");
+    expect(best).toContain('.eq("status","completed")');
+    expect(best).toContain('order_items');
+    expect(best).toContain('.eq("branch_id",branchId)');
+    expect(create).toContain('customer_portal_optical_product_create_v1');
+    expect(create).toContain("p_branch_id:target");
+    expect(create).toContain("SKU / บาร์โค้ด");
+  });
   it("does not bypass main.more / more.stock or expose special Optical inventory to food plans",()=>{
     const app=source("App.tsx");
     expect(app).toContain('canSeeView("stock")');
