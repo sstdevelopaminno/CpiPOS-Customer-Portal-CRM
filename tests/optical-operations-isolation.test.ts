@@ -5,6 +5,8 @@ describe("CRM Optical-only workspace",()=>{
   it("never exposes new financial screens in ordinary plans or before explicit rollout",()=>{
     const app=read("App.tsx");
     expect(app).toContain('canSeeOptical');
+    expect(app).toContain('id!=="reports"||context.role==="owner"');
+    expect(app).toContain("OpticalCustomerAddressEditor");
     expect(app).toContain('VITE_OPTICAL_OPS_V1_ENABLED === "true"');
     expect(app).toContain("menuAccess?.optical_retail_enabled");
     expect(app).toContain("<OpticalCustomersView");
@@ -19,5 +21,10 @@ describe("CRM Optical-only workspace",()=>{
     expect(ui).not.toContain('"ingredients"');
     expect(ui).not.toContain('.update({');
     expect(ui).toContain("b.on_hand-b.reserved");
+    expect(ui).toContain("b.image_url");
+    const address=read("views/OpticalCustomerAddressEditor.tsx");
+    expect(address).toContain('supabase.rpc("optical_save_customer_address_v1"');
+    expect(address).toContain('.eq("tenant_id",context.tenantId).eq("branch_id",branch)');
+
   });
 });
