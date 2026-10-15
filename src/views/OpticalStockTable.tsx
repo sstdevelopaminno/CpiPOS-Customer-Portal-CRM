@@ -6,7 +6,7 @@ export type OpticalTableEntry={
   id:string;sku:string|null;kind:"frame"|"lens"|"accessory";
   brand:string|null;model:string|null;color:string|null;frameSize:string|null;
   lensName:string|null;index:string|null;sph:number|null;cyl:number|null;
-  price:number;quantity:number|null;remaining:number|null;
+  price:number;quantity:number|null;remaining:number|null;imageUrl?:string|null;
 };
 type Tab="frame"|"lens"|"accessory";
 const show=(v:unknown)=>v===undefined||v===null||String(v).trim()===""?"—":String(v);
@@ -44,7 +44,7 @@ export function OpticalStockTable({rows,currency}:{rows:OpticalTableEntry[];curr
     </div>
     <div className="optical-stock-tables__scroll">
       <table><thead><tr>
-        {["SKU / บาร์โค้ด",...(tab==="frame"
+        {["SKU / บาร์โค้ด","รูปสินค้า",...(tab==="frame"
           ?["แบรนด์","รุ่น","สี","ขนาด"]:tab==="lens"
           ?["ยี่ห้อ","ชื่อเลนส์","Index","ค่าสายตา"]
           :["ชื่อสินค้า","ประเภท","รายละเอียด","หน่วย"]),
@@ -53,6 +53,9 @@ export function OpticalStockTable({rows,currency}:{rows:OpticalTableEntry[];curr
       <tbody>{current.map(item=><tr key={item.id}>
         <td><button type="button" className="optical-stock-tables__sku"
           onClick={()=>setSku(item)}>ดูรหัส</button></td>
+        <td>{item.imageUrl?<img src={item.imageUrl} alt={item.lensName??item.model??"สินค้า"} loading="lazy"
+          style={{height:44,width:44,borderRadius:8,objectFit:"cover"}}/>:
+          <span aria-label="ยังไม่มีรูปสินค้า" style={{color:"#94a3b8",fontSize:12}}>ไม่มีรูป</span>}</td>
         {tab==="frame"?<>
           <td>{show(item.brand)}</td><td><strong>{show(item.model)}</strong></td>
           <td>{show(item.color)}</td><td>{show(item.frameSize)}</td>
