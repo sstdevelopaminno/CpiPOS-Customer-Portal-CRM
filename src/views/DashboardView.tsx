@@ -3,11 +3,12 @@ import { Banknote, Boxes, Clock3, LoaderCircle, ReceiptText, RefreshCw, Store, T
 import { loadDashboard, reportRangeLabel, type DashboardSummary, type OrderRow, type PortalContext, type ReportRange } from "../lib/portal";
 import { MetricCard, Empty, ErrorPanel } from "../components/common";
 import { TopicHub } from "../components/TopicHub";
-import { money, number, dateTime, amount } from "../lib/formatters";
+import { number, dateTime, amount, formatCurrency, orderMoney } from "../lib/formatters";
 
 export function DashboardView({ context, branchId, range, anchor }: { context: PortalContext; branchId: string | null; range: ReportRange; anchor: string }) {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [currencyTotals,setCurrencyTotals]=useState<Array<{currency_code:"THB"|"LAK"|"USD";receipt_count:number;net_sales:number}>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -18,6 +19,7 @@ export function DashboardView({ context, branchId, range, anchor }: { context: P
       const data = await loadDashboard(context.tenantId, branchId, range, anchor);
       setSummary(data.summary);
       setOrders(data.recentOrders);
+      setCurrencyTotals(data.currencyTotals);
     } catch {
       setError("ไม่สามารถโหลดข้อมูลภาพรวมได้ กรุณาลองใหม่");
     } finally {
@@ -30,6 +32,12 @@ export function DashboardView({ context, branchId, range, anchor }: { context: P
   const topProducts = summary?.top_products ?? [];
   const maxTopSale = Math.max(1, ...topProducts.map(item=>Number(item.sales_total || 0)));
   const periodLabel = reportRangeLabel(range, anchor);
+  const salesByCurrency = currencyTotals.map((bucket) => formatCurrency(Number(bucket.net_sales),bucket.currency_code)).join(" / ");
+  const totalReceipts = currencyTotals.reduce((sum,bucket)=>sum+Number(bucket.receipt_count),0);
+  const avgByCurrency = currencyTotals.length === 1 && totalReceipts>0
+    ? formatCurrency(Number(currencyTotals[0].net_sales)/totalReceipts,currencyTotals[0].currency_code)
+    : currencyTotals.length>1 ? "แยกสกุลเงิน" : "—";
+  const hasMixedCurrencies = currencyTotals.length > 1;
 
   if (loading && !summary) return <div className="loadingPanel"><LoaderCircle className="spin"/>กำลังโหลด Dashboard...</div>;
 
@@ -40,16 +48,17 @@ export function DashboardView({ context, branchId, range, anchor }: { context: P
     </div>
     {error ? <ErrorPanel message={error}/> : null}
     <section className="metricsGrid">
-      <MetricCard icon={<Banknote/>} label="ยอดขาย" value={money.format(summary?.sales_total??0)} helper={periodLabel}/>
+      <MetricCard icon={<Banknote/>} label="ยอดขายแยกสกุลเงิน" value={salesByCurrency||"—"} helper={periodLabel}/>
       <MetricCard icon={<ReceiptText/>} label="จำนวนบิล" value={number.format(summary?.order_count??0)} helper="เฉพาะรายการในช่วงที่เลือก"/>
-      <MetricCard icon={<TrendingUp/>} label="ยอดเฉลี่ยต่อบิล" value={money.format(summary?.average_ticket??0)} helper="Average ticket"/>
+      <MetricCard icon={<TrendingUp/>} label="ยอดเฉลี่ยต่อบิล" value={avgByCurrency} helper={hasMixedCurrencies?"ห้ามเฉลี่ยยอดต่างสกุลเงิน":"Average ticket"}/>
       <MetricCard icon={<Clock3/>} label="กะที่เปิดอยู่" value={number.format(summary?.open_shifts??0)} helper="สถานะปัจจุบัน"/>
     </section>
 
+    {hasMixedCurrencies ? <p className="auditNote" role="note">รายงานมีหลายสกุลเงิน แสดงยอดแยก THB/LAK/USD ตามสกุลของบิล ไม่รวมยอดและไม่แปลงอัตราแลกเปลี่ยน</p> : null}
     <TopicHub label="รายละเอียดและรายงาน" items={[
       {id:"recent",title:"บิลล่าสุด",description:"รายการขายและยอดเงินตามช่วงเวลา",icon:<ReceiptText size={22}/>,count:`${orders.length} บิลล่าสุด`,content:<article className="panel">
         <div className="panelHeader"><div><p className="eyebrow">RECENT SALES</p><h3>บิลล่าสุด</h3></div></div>
-        {orders.length ? <div className="rows dashboardScroll">{orders.map(order=><div className="dataRow" key={order.id}><div><strong>{order.order_no||"รายการขาย"}</strong><span>{dateTime.format(new Date(order.created_at))}</span></div><div className="rowAmount"><strong>{money.format(amount(order))}</strong><span>{order.order_type||order.channel||"POS"}</span></div></div>)}</div> : <Empty>ยังไม่มีรายการขายในช่วงเวลานี้</Empty>}
+        {orders.length ? <div className="rows dashboardScroll">{orders.map(order=><div className="dataRow" key={order.id}><div><strong>{order.order_no||"รายการขาย"}</strong><span>{dateTime.format(new Date(order.created_at))}</span></div><div className="rowAmount"><strong>{orderMoney(amount(order),order)}</strong><span>{order.order_type||order.channel||"POS"}</span></div></div>)}</div> : <Empty>ยังไม่มีรายการขายในช่วงเวลานี้</Empty>}
       </article>},
       {id:"health",title:"สถานะร้าน",description:"สาขา สินค้า และวัตถุดิบที่ต้องสั่งซื้อ",icon:<Store size={22}/>,content:<article className="panel">
         <div className="panelHeader"><div><p className="eyebrow">STORE HEALTH</p><h3>สถานะร้าน</h3></div></div>
@@ -66,7 +75,7 @@ export function DashboardView({ context, branchId, range, anchor }: { context: P
         return <div className="topProductRow" key={item.name+"-"+index}>
           <div className="topProductRank">{index+1}</div>
           <div className="topProductMain">
-            <div className="topProductMeta"><strong>{item.name}</strong><span>{number.format(Number(item.quantity||0))} ชิ้น · {money.format(Number(item.sales_total||0))}</span></div>
+            <div className="topProductMeta"><strong>{item.name}</strong><span>{number.format(Number(item.quantity||0))} ชิ้น · {hasMixedCurrencies?"ยอดต่างสกุลเงิน":formatCurrency(Number(item.sales_total||0),currencyTotals[0]?.currency_code??context.salesCurrencyCode??"THB")}</span></div>
             <div className="topProductTrack"><div className="topProductBar" style={{width:`${width}%`}}/></div>
           </div>
         </div>;
