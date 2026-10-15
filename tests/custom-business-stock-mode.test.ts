@@ -36,6 +36,9 @@ describe("CUSTOM stock differs by IT-approved sales mode",()=>{
     expect(component).not.toContain("deleteStock(");
     expect(component).not.toContain(".update(");
     expect(router).toContain("BusinessStockOverview");
+    expect(router).toContain('strictOpticalCategory={mode==="mixed"}');
+    expect(component).toContain('!strictOpticalCategory || /^(กรอบแว่น');
+
     expect(router).toContain("BusinessStockOverview");
   });
   it("does not bypass main.more / more.stock or expose special Optical inventory to food plans",()=>{
