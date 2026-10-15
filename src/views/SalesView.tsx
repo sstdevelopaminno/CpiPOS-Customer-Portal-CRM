@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Eye, LoaderCircle, Pencil, Save, Search, Trash2 } from "lucide-react";
 import { cancelOrder, loadOrderItems, loadSales, updateOrder, type OrderItemRow, type OrderRow, type PortalContext, type ReportRange } from "../lib/portal";
 import { Empty, ErrorPanel, Pagination, Modal } from "../components/common";
-import { money, number, dateTime, amount, statusLabel, branchName } from "../lib/formatters";
+import { number, dateTime, amount, statusLabel, branchName, orderMoney } from "../lib/formatters";
 
 function OrderDetailModal({
   order,
@@ -62,8 +62,8 @@ function OrderDetailModal({
       <div className="billSummary">
         <div><span>ประเภท</span><strong>{order.order_type||order.channel||"POS"}</strong></div>
         <div><span>สถานะ</span><strong>{statusLabel(order.status)}</strong></div>
-        <div><span>ส่วนลด</span><strong>{money.format(Number(order.discount_amount??0))}</strong></div>
-        <div><span>ยอดสุทธิ</span><strong>{money.format(amount(order))}</strong></div>
+        <div><span>ส่วนลด</span><strong>{orderMoney(Number(order.discount_amount??0),order)}</strong></div>
+        <div><span>ยอดสุทธิ</span><strong>{orderMoney(amount(order),order)}</strong></div>
       </div>
 
       <div className="editableBillMeta">
@@ -73,9 +73,9 @@ function OrderDetailModal({
 
       <div className="billItems">
         <div className="billItemsHead"><span>รายการ</span><span>จำนวน</span><span>รวม</span></div>
-        {loading ? <div className="loadingPanel compact"><LoaderCircle className="spin"/>กำลังโหลดรายการ...</div> : items.length ? items.map(item=><div className="billItem" key={item.id}><div><strong>{item.name||"สินค้า"}</strong>{item.notes?<small>{item.notes}</small>:null}</div><span>{number.format(Number(item.quantity))}</span><strong>{money.format(Number(item.line_total))}</strong></div>) : <Empty>ไม่พบรายการสินค้าในบิลนี้</Empty>}
+        {loading ? <div className="loadingPanel compact"><LoaderCircle className="spin"/>กำลังโหลดรายการ...</div> : items.length ? items.map(item=><div className="billItem" key={item.id}><div><strong>{item.name||"สินค้า"}</strong>{item.notes?<small>{item.notes}</small>:null}</div><span>{number.format(Number(item.quantity))}</span><strong>{orderMoney(Number(item.line_total),order)}</strong></div>) : <Empty>ไม่พบรายการสินค้าในบิลนี้</Empty>}
       </div>
-      <div className="billTotal"><span>ยอดรวมสุทธิ</span><strong>{money.format(amount(order))}</strong></div>
+      <div className="billTotal"><span>ยอดรวมสุทธิ</span><strong>{orderMoney(amount(order),order)}</strong></div>
     </div>
     <div className="modalActions">
       {editing?<button className="secondaryButton" onClick={()=>setEditing(false)} disabled={busy}>ยกเลิกการแก้ไข</button>:<button className="secondaryButton" onClick={()=>setEditing(true)}><Pencil size={17}/>แก้ไขข้อมูล</button>}
@@ -93,7 +93,7 @@ export function SalesView({ context, branchId, range, anchor }: { context: Porta
   const [query,setQuery]=useState("");
   const [page,setPage]=useState(0);
   const [totalCount,setTotalCount]=useState(0);
-  const [salesTotal,setSalesTotal]=useState(0);
+
   const pageSize=20;
   const requestIdRef=useRef(0);
 
@@ -107,7 +107,7 @@ export function SalesView({ context, branchId, range, anchor }: { context: Porta
       if(requestId!==requestIdRef.current)return;
       setRows(result.rows);
       setTotalCount(result.total);
-      setSalesTotal(result.salesTotal);
+
     }
     catch{
       if(requestId===requestIdRef.current)setError("ไม่สามารถโหลดรายการขายได้");
@@ -125,6 +125,18 @@ export function SalesView({ context, branchId, range, anchor }: { context: Porta
     if(!q)return true;
     return [row.order_no,row.customer_name,row.channel,row.order_type,branchMap.get(row.branch_id)].some(value=>String(value??"").toLowerCase().includes(q));
   });
+  const totalByCurrency = useMemo(() => {
+    const buckets: Record<"THB" | "LAK" | "USD", number> = { THB: 0, LAK: 0, USD: 0 };
+    for (const row of rows) {
+      if (row.status !== "completed") continue;
+      const code = row.metadata?.currency_code;
+      const currency = code === "LAK" || code === "USD" ? code : "THB";
+      buckets[currency] += amount(row);
+    }
+    return (["THB", "LAK", "USD"] as const)
+      .filter((code) => rows.some((row) => (row.metadata?.currency_code === code || (code === "THB" && !["LAK","USD"].includes(String(row.metadata?.currency_code)))) && row.status === "completed"))
+      .map((code) => new Intl.NumberFormat(code === "LAK" ? "lo-LA" : "en-US", { style: "currency", currency: code, minimumFractionDigits: code === "LAK" ? 0 : 2, maximumFractionDigits: code === "LAK" ? 0 : 2 }).format(buckets[code])).join(" / ");
+  }, [rows]);
   const pageCount=Math.max(1,Math.ceil(totalCount/pageSize));
   const pageLabel=totalCount
     ? String(page*pageSize+1)+"–"+String(Math.min((page+1)*pageSize,totalCount))+" จาก "+number.format(totalCount)
@@ -133,7 +145,7 @@ export function SalesView({ context, branchId, range, anchor }: { context: Porta
   return <>
     <div className="pageHeading">
       <div><p className="eyebrow">SALES</p><h2>รายการขาย</h2><p>ดูรายวัน รายเดือน หรือรายปี พร้อมแก้ข้อมูลประกอบและยกเลิกบิลแบบคืนสต๊อก</p></div>
-      <div className="headingStat"><span>ยอดขายรวมช่วงนี้</span><strong>{money.format(salesTotal)}</strong></div>
+      <div className="headingStat"><span>ยอดชำระในหน้าปัจจุบัน (แยกสกุลเงิน)</span><strong>{totalByCurrency || "—"}</strong><small>ไม่รวมยอดข้ามสกุลเงิน · เลือกหน้าถัดไปเพื่อดูรายการอื่น</small></div>
     </div>
     <TopicHub label="หัวข้อรายการขาย" items={[
       {id:"bills",title:"ค้นหาและจัดการบิล",description:"รายการขายตามสาขาและวันที่ เลือกบิลเพื่อดู แก้ไข หรือยกเลิก",count:pageLabel,content:<>
@@ -142,7 +154,7 @@ export function SalesView({ context, branchId, range, anchor }: { context: Porta
     <article className="panel tablePanel">
       {loading?<div className="loadingPanel"><LoaderCircle className="spin"/>กำลังโหลดรายการขาย...</div>:filtered.length?
       <div className="tableWrap"><table><thead><tr><th>เลขที่บิล</th><th>เวลา</th><th>สาขา</th><th>สถานะ</th><th className="right">ยอดรวม</th><th></th></tr></thead><tbody>
-        {filtered.map(row=><tr key={row.id}><td><strong>{row.order_no||"—"}</strong></td><td>{dateTime.format(new Date(row.created_at))}</td><td>{branchMap.get(row.branch_id)||"—"}</td><td><span className={`status status-${row.status}`}>{statusLabel(row.status)}</span></td><td className="right"><strong>{money.format(amount(row))}</strong></td><td className="right"><button className="tableAction" onClick={()=>setSelectedOrder(row)}><Eye size={16}/>ดู/จัดการ</button></td></tr>)}
+        {filtered.map(row=><tr key={row.id}><td><strong>{row.order_no||"—"}</strong></td><td>{dateTime.format(new Date(row.created_at))}</td><td>{branchMap.get(row.branch_id)||"—"}</td><td><span className={`status status-${row.status}`}>{statusLabel(row.status)}</span></td><td className="right"><strong>{orderMoney(amount(row),row)}</strong></td><td className="right"><button className="tableAction" onClick={()=>setSelectedOrder(row)}><Eye size={16}/>ดู/จัดการ</button></td></tr>)}
       </tbody></table></div>:<Empty>ยังไม่มีข้อมูลรายการขายในช่วงเวลานี้</Empty>}
       <Pagination page={page} pageCount={pageCount} onPageChange={setPage} disabled={loading}/>
     </article>
