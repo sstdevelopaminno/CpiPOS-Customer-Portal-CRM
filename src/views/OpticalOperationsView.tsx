@@ -56,6 +56,7 @@ export function OpticalOperationsView({
   useEffect(()=>{
     if(!branch)return;
     let cancelled=false;
+    if(page==="stock"){setBins([]);setSkuMap({});}
     setLoading(true);setError("");
     const load=async()=>{
       try{
