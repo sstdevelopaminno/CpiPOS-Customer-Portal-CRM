@@ -10,6 +10,7 @@ describe("CRM Optical history controls",()=>{
     expect(app).toContain('id==="optical" ? canSeeOptical');
     expect(state).toContain('contractCurrent && approvedSalesModes.optical_retail===true');
     expect(state).toContain('grants[mode]===true');
+    expect(state).toContain('contract?.status==="active"||contract?.status==="trial"');
     expect(state).toContain('"tenant_subscription_contracts"');
   });
   it("queries the shared tenant-scoped Optical tables and softly archives",()=>{

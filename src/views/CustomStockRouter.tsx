@@ -3,6 +3,7 @@ import type { FeatureState, PortalContext } from "../types/portal";
 import { resolveCustomInventoryMode } from "../lib/custom-inventory-mode";
 import { StockView } from "./StockView";
 import { BusinessStockOverview } from "./BusinessStockOverview";
+import { OpticalOperationsView } from "./OpticalOperationsView";
 
 export function CustomStockRouter({context,branchId,features}:{
   context:PortalContext;branchId:string|null;features:FeatureState;
@@ -10,7 +11,7 @@ export function CustomStockRouter({context,branchId,features}:{
   const mode=resolveCustomInventoryMode(features);
   const [selected,setSelected]=useState<"optical"|"other">("optical");
   useEffect(()=>setSelected("optical"),[context.tenantId,branchId,mode]);
-  // Standalone stock UI is read-only until the separate finance PR is released.
+  const canUseLiveOpticalStock=import.meta.env.VITE_OPTICAL_OPS_V1_ENABLED==="true";
   const hasFood=["takeaway","dine_in","buffet_table","delivery"].some(
     mode=>features.sales_modes?.[mode]===true
   );
@@ -20,7 +21,9 @@ export function CustomStockRouter({context,branchId,features}:{
   // also falls back to the previous behavior.
   if(mode==="legacy")return <StockView context={context} branchId={branchId}/>;
 
-  const opticalContent=<BusinessStockOverview context={context} branchId={branchId} business="optical" strictOpticalCategory={mode==="mixed"}/>;
+  const opticalContent=canUseLiveOpticalStock
+    ? <OpticalOperationsView context={context} branchId={branchId} page="stock"/>
+    : <BusinessStockOverview context={context} branchId={branchId} business="optical" strictOpticalCategory={mode==="mixed"}/>;
 
   if(mode==="optical")return opticalContent;
   if(mode==="retail")return <BusinessStockOverview context={context} branchId={branchId} business="retail"/>;

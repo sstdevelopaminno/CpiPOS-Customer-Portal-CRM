@@ -9,12 +9,16 @@ import { DashboardView } from "./views/DashboardView";
 import { SalesView } from "./views/SalesView";
 import { ProductsView } from "./views/ProductsView";
 import { CustomStockRouter } from "./views/CustomStockRouter";
+import { BusinessStockOverview } from "./views/BusinessStockOverview";
 import { resolveCustomInventoryMode } from "./lib/custom-inventory-mode";
 import { StaffView } from "./views/StaffView";
 import { PackageView } from "./views/PackageView";
 import { MoreView } from "./views/MoreView";
 import { OpticalCustomersView } from "./views/OpticalCustomersView";
+import { OpticalOperationsView } from "./views/OpticalOperationsView";
+import { OpticalCustomerAddressEditor } from "./views/OpticalCustomerAddressEditor";
 import { SettingsView } from "./views/SettingsView";
+import {useCustomBranding} from "./lib/use-custom-branding";
 
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -54,6 +58,8 @@ export default function App() {
   const [standalone,setStandalone]=useState(()=>window.matchMedia("(display-mode: standalone)").matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone));
   const [collapsed,setCollapsed]=useState(()=>localStorage.getItem("cpipos-sidebar-collapsed")==="1");
   const [mobileOpen,setMobileOpen]=useState(false);
+  const [opticalTab,setOpticalTab]=useState<"customers"|"orders"|"stock"|"reports">("customers");
+  const customBranding=useCustomBranding(context?.tenantId,menuAccess?.is_custom===true);
 
   const restore=useCallback(async()=>{
     setFatal("");
@@ -164,28 +170,24 @@ export default function App() {
   if(checking)return <div className="bootScreen"><img className="bootLogo" src="/cpipos-logo.png" alt="CpiPOS"/><LoaderCircle className="spin"/><span>กำลังเตรียมข้อมูลร้าน...</span></div>;
   if(!context)return <Login onSuccess={restore} canInstall={Boolean(installPrompt)&&!standalone} onInstall={installApp}/>;
 
-  // Never render unrestricted navigation before an authoritative feature
-  // snapshot arrives. This prevents CUSTOM menus flashing or becoming usable on
-  // an API failure; fixed plans resume their legacy behavior after load.
+  // Keep navigation hidden until IT entitlement resolves; never flash unauthorized CUSTOM menus.
   const availableNav = !menuAccess ? [] : nav.filter(item=>canSeeView(item.id))
-    .map(item=>item.id==="stock"
-      ? {...item,label:stockBusinessMode==="optical"?"สต๊อกกรอบ/เลนส์":
-          stockBusinessMode==="retail"?"สต๊อกสินค้า":
-          stockBusinessMode==="mixed"?"สต๊อกตามโหมด":"วัตถุดิบ"}
-      : item);
+    .map(item=>item.id==="stock"?{...item,label:stockBusinessMode==="optical"?"สต๊อกกรอบ/เลนส์":
+      stockBusinessMode==="retail"?"สต๊อกสินค้า":stockBusinessMode==="mixed"?"สต๊อกตามโหมด":"วัตถุดิบ"}:item);
   const activeView = !menuAccess ? null : !canSeeView(view) ? availableNav[0]?.id ?? null : view;
   const showFilters=activeView!=="package";
   const showPeriod=activeView==="dashboard"||activeView==="sales";
   const canInstall=Boolean(installPrompt)&&!standalone;
 
-  return <div className={`appShell ${collapsed?"sidebarCollapsed":""}`}>
+  return <div className={`appShell ${collapsed?"sidebarCollapsed":""} ${customBranding?"crm-custom-branded":""}`}
+    style={customBranding?({"--crm-custom-accent":customBranding.accent_color,"--crm-custom-sidebar":customBranding.sidebar_color} as React.CSSProperties):undefined}>
     {mobileOpen?<button className="drawerBackdrop" aria-label="ปิดเมนู" onClick={()=>setMobileOpen(false)}/>:null}
     <aside className={`sidebar ${mobileOpen?"mobileOpen":""}`}>
       <div className="sidebarTop">
-        <div className="brandBlock"><img className="brandLogo" src="/cpipos-logo.png" alt="CpiPOS"/><div><strong>CpiPOS</strong><span>Customer Portal</span></div></div>
+        <div className="brandBlock"><img className="brandLogo" src="/cpipos-logo.png" alt="CpiPOS"/><div><strong>{customBranding?.system_name??"CpiPOS"}</strong><span>Powered by CpiPOS</span></div></div>
         <button className="collapseButton" aria-label={collapsed?"ขยายเมนู":"ย่อเมนู"} onClick={toggleCollapsed}>{collapsed?<PanelLeftOpen size={20}/>:<PanelLeftClose size={20}/>}</button>
       </div>
-      <div className="storeCard"><div className="storeAvatar">{context.logoUrl?<img src={context.logoUrl} alt=""/>:<Store size={22}/>}</div><div><strong>{context.tenantName}</strong><span>ร้าน {context.tenantCode}</span></div></div>
+      <div className="storeCard"><div className="storeAvatar">{customBranding?.logo_url?<img src={customBranding.logo_url} alt="โลโก้ร้าน"/>:context.logoUrl?<img src={context.logoUrl} alt=""/>:<Store size={22}/>}</div><div><strong>{context.tenantName}</strong><span>ร้าน {context.tenantCode}</span></div></div>
       <nav aria-label="เมนูหลัก">{availableNav.map(item=><button key={item.id} aria-current={activeView===item.id?"page":undefined} title={collapsed?item.label:undefined} className={activeView===item.id?"active":""} onClick={()=>chooseView(item.id)}>{item.icon}<span>{item.label}</span><ChevronRight size={17}/></button>)}</nav>
       <div className="sidebarBottom">
         {canInstall?<button className="sidebarInstallButton" onClick={()=>void installApp()}><Download size={17}/><span>ติดตั้งเว็บแอป</span></button>:null}
@@ -197,7 +199,7 @@ export default function App() {
     <main className="content">
       <header className="mobileHeader">
         <button className="iconButton" aria-label="เปิดเมนู" onClick={()=>setMobileOpen(true)}><Menu size={21}/></button>
-        <div className="brandBlock"><img className="brandLogo" src="/cpipos-logo.png" alt="CpiPOS"/><div><strong>CpiPOS</strong><span>{context.tenantName}</span></div></div>
+        <div className="brandBlock"><img className="brandLogo" src="/cpipos-logo.png" alt="CpiPOS"/><div><strong>{customBranding?.system_name??"CpiPOS"}</strong><span>Powered by CpiPOS · {context.tenantName}</span></div></div>
         <div className="mobileHeaderActions">{canInstall?<button className="iconButton" aria-label="ติดตั้งเว็บแอป" onClick={()=>void installApp()}><Download size={19}/></button>:null}<button className="iconButton" aria-label="ออกจากระบบ" onClick={()=>void logoutPortal()}><LogOut size={19}/></button></div>
       </header>
 
@@ -218,11 +220,34 @@ export default function App() {
       {activeView==="staff"?<StaffView context={context} branchId={branchId||null}/>:null}
       {activeView==="package"?<PackageView context={context}/>:null}
       {activeView==="more"?<MoreView context={context} branchId={branchId||null} onNavigate={chooseView}/>:null}
-      {activeView==="optical" && canSeeOptical ? <div className="space-y-4">
-        {canSeeView("stock")?<div className="custom-stock-shortcut"><span>IMDC OPTICAL · สต๊อกกรอบแว่น/เลนส์</span>
-          <button type="button" onClick={()=>chooseView("stock")}>เปิดเมนูสต๊อก</button></div>:null}
-        <OpticalCustomersView context={context} branchId={branchId||null}/>
-      </div> : null}
+      {activeView==="optical" && canSeeOptical ? (
+        import.meta.env.VITE_OPTICAL_OPS_V1_ENABLED === "true" ? (
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2" role="tablist" aria-label="โมดูล Optical">
+              {([["customers","ประวัติลูกค้า"],["orders","ใบสั่งงาน"],
+                ["stock","สต๊อกกรอบ/เลนส์"],["reports","รายงานเจ้าของร้าน"]] as const)
+                .filter(([id])=>(id!=="reports"||context.role==="owner") && (id!=="stock"||canSeeView("stock"))).map(([id,label])=><button type="button" role="tab"
+                aria-selected={opticalTab===id} key={id} onClick={()=>setOpticalTab(id)}
+                className={`rounded-xl border px-4 py-2 text-sm font-bold ${opticalTab===id?"border-emerald-700 bg-emerald-700 text-white":"border-emerald-100 bg-white text-emerald-800"}`}>{label}</button>)}
+            </div>
+            {opticalTab==="stock" && canSeeView("stock") ? (
+              <BusinessStockOverview context={context} branchId={branchId||null} business="optical" strictOpticalCategory={stockBusinessMode==="mixed"}/>
+            ) : opticalTab==="stock" ? (
+              <p role="alert">เมนูสต๊อกยังไม่ได้รับอนุมัติจาก IT Admin</p>
+            ) : opticalTab==="customers"?<div className="space-y-4">
+              <OpticalCustomersView context={context} branchId={branchId||null}/>
+              <OpticalCustomerAddressEditor context={context} branchId={branchId||null}/>
+            </div>:(
+              opticalTab==="reports"&&context.role!=="owner"
+                ? <p role="alert">เฉพาะเจ้าของร้านเท่านั้นที่สามารถดูรายงาน Optical</p>
+                : <OpticalOperationsView context={context} branchId={branchId||null} page={opticalTab}/>
+            )}
+          </div>
+        ) : <div className="space-y-4">
+          {canSeeView("stock")?<div className="custom-stock-shortcut"><span>IMDC OPTICAL · สต๊อกกรอบแว่น/เลนส์</span><button type="button" onClick={()=>chooseView("stock")}>เปิดเมนูสต๊อก</button></div>:null}
+          <OpticalCustomersView context={context} branchId={branchId||null}/>
+        </div>
+      ) : null}
       {activeView==="settings"?<SettingsView context={context} branchId={branchId||null} onNavigate={chooseView} onContextChanged={refreshContextAfterMutation}/>:null}
 
       <footer>ข้อมูลและสิทธิ์ถูกจำกัดตามบัญชี {context.role==="owner"?"Owner":"Manager"} · {context.branches.length} สาขาที่เข้าถึงได้</footer>

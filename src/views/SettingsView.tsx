@@ -9,6 +9,7 @@ import { POS_SETTINGS_MENU_ITEMS, type PosMenuIcon, type PosSettingsEditorKind, 
 import { PosAdminWorkspace } from "./pos-admin/PosAdminWorkspace";
 import { CRM_SETTINGS_LANGUAGE_STORAGE, languageOptions, normalizeCrmSettingsLanguage, settingsMenuLocale, settingsText, type CrmSettingsLanguage } from "../lib/settings-language";
 import type { PosAdminModule } from "../types/pos-admin";
+import {CustomBrandingEditor} from "./CustomBrandingEditor";
 
 function SettingsMenuIcon({name}:{name:PosMenuIcon}) {
   if(name==="store")return <Store/>;
@@ -197,6 +198,7 @@ export function SettingsView({context,branchId,onNavigate,onContextChanged}:{con
     catch{return "th";}
   });
   const [languageModalOpen,setLanguageModalOpen]=useState(false);
+  const [brandingModalOpen,setBrandingModalOpen]=useState(false);
   const T=(value:string)=>settingsText(language,value);
   const setSettingsLanguage=(next:CrmSettingsLanguage)=>{
     setLanguage(next);
@@ -267,7 +269,15 @@ export function SettingsView({context,branchId,onNavigate,onContextChanged}:{con
   };
 
   const renderSettingsGroup=(keys:readonly string[])=>(
-    <div className="moduleGrid settingsGrid posMenuGrid">{POS_SETTINGS_MENU_ITEMS.filter(item=>keys.includes(item.kind) && (item.key !== "settings.currency" || (features?.is_custom === true && isCustomMenuVisible(features,item.key))) && (!(features?.is_custom || features?.is_internal_test_full) || isCustomMenuVisible(features,item.key))).map(item=>{const isAllowed=features?allowed(item.key,item.feature):false;const editable=canEdit(item);const directlyManaged=Boolean(item.target||item.adminModule||editable||item.kind==="language");const localized=settingsMenuLocale(language,item.kind,item.label,item.desc);return <button key={item.key} className={`moduleCard posMenuCard ${isAllowed?"":"locked"} ${isAllowed&&!directlyManaged?"linkedOnly":""}`} disabled={!features||!isAllowed} onClick={()=>activate(item)}><span className="moduleIcon"><SettingsMenuIcon name={item.icon}/></span><div><strong>{localized.label}</strong><span>{localized.desc}</span><small>{!features?T("กำลังตรวจสิทธิ์..."):!isAllowed?T("ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด"):item.adminModule?T("จัดการเพิ่ม แก้ไข ลบจาก Customer Portal"):editable?T("กดเพื่อจัดการ"):item.target?T("เปิดใช้งานใน Customer Portal"):detail(item)}</small></div><ChevronRight size={18}/></button>;})}</div>
+    <div className="moduleGrid settingsGrid posMenuGrid">
+      {keys.includes("store") && features?.is_custom===true && isCustomMenuVisible(features,"settings.store")
+        ?<button className="moduleCard posMenuCard" onClick={()=>setBrandingModalOpen(true)}>
+          <span className="moduleIcon"><Settings/></span>
+          <div><strong>ธีมสี / โลโก้ / ชื่อระบบ (CUSTOM)</strong>
+          <span>ปรับหน้าระบบและสีไฮไลต์ · Powered by CpiPOS</span>
+          <small>จัดการร่วมกับ POS</small></div><ChevronRight size={18}/>
+        </button>:null}
+      {POS_SETTINGS_MENU_ITEMS.filter(item=>keys.includes(item.kind) && (item.key !== "settings.currency" || (features?.is_custom === true && isCustomMenuVisible(features,item.key))) && (!(features?.is_custom || features?.is_internal_test_full) || isCustomMenuVisible(features,item.key))).map(item=>{const isAllowed=features?allowed(item.key,item.feature):false;const editable=canEdit(item);const directlyManaged=Boolean(item.target||item.adminModule||editable||item.kind==="language");const localized=settingsMenuLocale(language,item.kind,item.label,item.desc);return <button key={item.key} className={`moduleCard posMenuCard ${isAllowed?"":"locked"} ${isAllowed&&!directlyManaged?"linkedOnly":""}`} disabled={!features||!isAllowed} onClick={()=>activate(item)}><span className="moduleIcon"><SettingsMenuIcon name={item.icon}/></span><div><strong>{localized.label}</strong><span>{localized.desc}</span><small>{!features?T("กำลังตรวจสิทธิ์..."):!isAllowed?T("ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด"):item.adminModule?T("จัดการเพิ่ม แก้ไข ลบจาก Customer Portal"):editable?T("กดเพื่อจัดการ"):item.target?T("เปิดใช้งานใน Customer Portal"):detail(item)}</small></div><ChevronRight size={18}/></button>;})}</div>
   );
 
   return <>
@@ -297,6 +307,12 @@ export function SettingsView({context,branchId,onNavigate,onContextChanged}:{con
     <div className="auditNote">{T("เครื่องแคชเชียร์ เครื่องพิมพ์ และ Customer Display pairing จัดการจาก Customer Portal ได้แล้ว; การค้นหา USB/Bluetooth จริงและค่า local เช่นภาษา/ตำแหน่งเมนูยังทำที่เครื่อง POS/Print Agent")}</div>
     {editor&&snapshot?<SettingEditorModal kind={editor} context={context} branchId={branchId} snapshot={snapshot} language={language} onClose={()=>setEditor(null)} onSaved={refresh} onContextChanged={onContextChanged}/>:null}
     {linkedItem?<ConnectedPosModuleModal title={settingsMenuLocale(language,linkedItem.kind,linkedItem.label,linkedItem.desc).label} description={settingsMenuLocale(language,linkedItem.kind,linkedItem.label,linkedItem.desc).desc} detail={detail(linkedItem)} onClose={()=>setLinkedItem(null)}/>:null}
+    {brandingModalOpen&&features?.is_custom?<Modal title="ธีมสี โลโก้ และชื่อระบบ (CUSTOM)"
+      subtitle="ใช้ข้อมูลร่วมกันระหว่าง CRM และ POS · Powered by CpiPOS"
+      onClose={()=>setBrandingModalOpen(false)} wide>
+      <CustomBrandingEditor tenantId={context.tenantId}
+        onSaved={()=>window.dispatchEvent(new Event("cpipos-custom-branding-updated"))}/>
+    </Modal>:null}
     {languageModalOpen?<Modal title={T("เปลี่ยนภาษา")} subtitle={T("ภาษาไทย อังกฤษ หรือลาว")} onClose={()=>setLanguageModalOpen(false)}><div className="entityForm"><div className="formGrid">{languageOptions.map(option=><label key={option.code} className="switchField span2" style={{padding:"12px 16px",border:"1px solid #dbe2ed",borderRadius:12}}><input type="radio" name="crm-settings-language" checked={language===option.code} onChange={()=>{setSettingsLanguage(option.code);setLanguageModalOpen(false);}}/><span>{option.label}</span></label>)}</div><div className="modalActions"><button type="button" className="secondaryButton" onClick={()=>setLanguageModalOpen(false)}>{T("ยกเลิก")}</button></div></div></Modal>:null}
     {adminModule?<Modal title={T("ตั้งค่า POS")} subtitle={T("จัดการข้อมูลร่วมกับระบบ POS ภายใต้สิทธิ์ Owner/Manager")} onClose={()=>setAdminModule(null)} wide workspace><div className="topicModalBody"><PosAdminWorkspace module={adminModule} context={context} branchId={branchId} onBack={()=>setAdminModule(null)}/></div></Modal>:null}
   </>;

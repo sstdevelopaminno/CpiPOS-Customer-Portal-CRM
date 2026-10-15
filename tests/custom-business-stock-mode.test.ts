@@ -35,11 +35,34 @@ describe("CUSTOM stock differs by IT-approved sales mode",()=>{
     expect(component).not.toContain("saveStock(");
     expect(component).not.toContain("deleteStock(");
     expect(component).not.toContain(".update(");
+    expect(router).toContain('VITE_OPTICAL_OPS_V1_ENABLED==="true"');
     expect(router).toContain("BusinessStockOverview");
     expect(router).toContain('strictOpticalCategory={mode==="mixed"}');
-    expect(component).toContain('!strictOpticalCategory || /^(กรอบแว่น');
-
-    expect(router).toContain("BusinessStockOverview");
+    expect(component).toContain('if(optical){');
+    expect(component).toContain('optical_stock_bins');
+    expect(component).toContain('OpticalStockTable rows={opticalEntries}');
+    const table=source("views/OpticalStockTable.tsx");
+    expect(table).toContain("สต๊อกกรอบแว่น");
+    expect(table).toContain("สต๊อกเลนส์");
+    expect(table).toContain("SKU / บาร์โค้ด");
+    expect(table).toContain('role="dialog"');
+    const app=source("App.tsx");
+    expect(app).toContain('strictOpticalCategory={stockBusinessMode==="mixed"}');
+  });
+  it("supports assigned branch selection, custom catalog creation and completed-only ranking",()=>{
+    const view=source("views/BusinessStockOverview.tsx");
+    const best=source("views/OpticalBestSellers.tsx");
+    const create=source("views/OpticalCreateProduct.tsx");
+    expect(view).toContain('context.branches.map(b=><option');
+    expect(view).toContain("setStockBranch");
+    expect(view).toContain("OpticalBestSellers");
+    expect(view).toContain("OpticalCreateProduct");
+    expect(best).toContain('.eq("status","completed")');
+    expect(best).toContain('order_items');
+    expect(best).toContain('.eq("branch_id",branchId)');
+    expect(create).toContain('customer_portal_optical_product_create_v1');
+    expect(create).toContain("p_branch_id:target");
+    expect(create).toContain("SKU / บาร์โค้ด");
   });
   it("does not bypass main.more / more.stock or expose special Optical inventory to food plans",()=>{
     const app=source("App.tsx");
