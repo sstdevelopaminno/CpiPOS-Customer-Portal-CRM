@@ -236,7 +236,7 @@ export default function App() {
                 className={`rounded-xl border px-4 py-2 text-sm font-bold ${opticalTab===id?"border-emerald-700 bg-emerald-700 text-white":"border-emerald-100 bg-white text-emerald-800"}`}>{label}</button>)}
             </div>
             {opticalTab==="stock" && canSeeView("stock") ? (
-              <BusinessStockOverview context={context} branchId={branchId||null} business="optical"/>
+              <BusinessStockOverview context={context} branchId={branchId||null} business="optical" strictOpticalCategory={stockBusinessMode==="mixed"}/>
             ) : opticalTab==="stock" ? (
               <p role="alert">เมนูสต๊อกยังไม่ได้รับอนุมัติจาก IT Admin</p>
             ) : opticalTab==="customers"?<div className="space-y-4">
