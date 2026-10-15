@@ -81,6 +81,20 @@ export async function loadPortalContext(): Promise<PortalContext> {
   if (tenantError) throw tenantError;
   if (branchError) throw branchError;
 
+  // Read the sales (not subscription billing) currency of this authenticated tenant.
+  // Tenant RLS applies to the contract read; do not trust a browser-provided tenant ID.
+  const { data: approvedContract, error: currencyError } = await supabase
+    .from("tenant_subscription_contracts")
+    .select("metadata")
+    .eq("tenant_id", tenantId)
+    .eq("status", "active")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (currencyError) throw currencyError;
+  const approvedCurrency = (approvedContract?.metadata as Record<string, unknown> | null)?.pos_currency_code;
+  const salesCurrencyCode = approvedCurrency === "LAK" || approvedCurrency === "USD" ? approvedCurrency : "THB";
+
   const allBranches = (branches ?? []) as BranchSummary[];
   const visibleBranches = role === "owner" ? allBranches : allBranches.filter((branch) => allowedBranchIds.includes(branch.id));
 
@@ -92,6 +106,7 @@ export async function loadPortalContext(): Promise<PortalContext> {
     logoUrl: tenant.logo_url,
     role,
     branches: visibleBranches,
+    salesCurrencyCode,
     allowedBranchIds
   };
 }
