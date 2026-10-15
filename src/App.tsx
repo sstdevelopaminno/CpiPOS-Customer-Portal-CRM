@@ -13,6 +13,7 @@ import { StaffView } from "./views/StaffView";
 import { PackageView } from "./views/PackageView";
 import { MoreView } from "./views/MoreView";
 import { OpticalCustomersView } from "./views/OpticalCustomersView";
+import { OpticalOperationsView } from "./views/OpticalOperationsView";
 import { SettingsView } from "./views/SettingsView";
 
 type InstallPromptEvent = Event & {
@@ -53,6 +54,7 @@ export default function App() {
   const [standalone,setStandalone]=useState(()=>window.matchMedia("(display-mode: standalone)").matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone));
   const [collapsed,setCollapsed]=useState(()=>localStorage.getItem("cpipos-sidebar-collapsed")==="1");
   const [mobileOpen,setMobileOpen]=useState(false);
+  const [opticalTab,setOpticalTab]=useState<"customers"|"orders"|"stock"|"reports">("customers");
 
   const restore=useCallback(async()=>{
     setFatal("");
@@ -210,7 +212,25 @@ export default function App() {
       {activeView==="staff"?<StaffView context={context} branchId={branchId||null}/>:null}
       {activeView==="package"?<PackageView context={context}/>:null}
       {activeView==="more"?<MoreView context={context} branchId={branchId||null} onNavigate={chooseView}/>:null}
-      {activeView==="optical" && canSeeOptical?<OpticalCustomersView context={context} branchId={branchId||null}/>:null}
+      {activeView==="optical" && canSeeOptical ? (
+        import.meta.env.VITE_OPTICAL_OPS_V1_ENABLED === "true" ? (
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2" role="tablist" aria-label="โมดูล Optical">
+              {([
+                ["customers","ประวัติลูกค้า"],
+                ["orders","ใบสั่งงาน"],
+                ["stock","สต๊อกกรอบ/เลนส์"],
+                ["reports","รายงานเจ้าของร้าน"]
+              ] as const).map(([id,label])=><button type="button" role="tab"
+                aria-selected={opticalTab===id} key={id} onClick={()=>setOpticalTab(id)}
+                className={`rounded-xl border px-4 py-2 text-sm font-bold ${opticalTab===id?"border-emerald-700 bg-emerald-700 text-white":"border-emerald-100 bg-white text-emerald-800"}`}>{label}</button>)}
+            </div>
+            {opticalTab==="customers"?<OpticalCustomersView context={context} branchId={branchId||null}/>:(
+              <OpticalOperationsView context={context} branchId={branchId||null} page={opticalTab}/>
+            )}
+          </div>
+        ) : <OpticalCustomersView context={context} branchId={branchId||null}/>
+      ) : null}
       {activeView==="settings"?<SettingsView context={context} branchId={branchId||null} onNavigate={chooseView} onContextChanged={refreshContextAfterMutation}/>:null}
 
       <footer>ข้อมูลและสิทธิ์ถูกจำกัดตามบัญชี {context.role==="owner"?"Owner":"Manager"} · {context.branches.length} สาขาที่เข้าถึงได้</footer>
