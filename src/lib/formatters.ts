@@ -11,6 +11,16 @@ export function formatCurrency(value:number,currency:string|null|undefined){
   catch{return `${number.format(Number(value)||0)} ${code}`;}
 }
 
+export function orderSalesCurrency(order: OrderRow): "THB" | "LAK" | "USD" {
+  const code = order.metadata?.currency_code;
+  // Transactions predating currency snapshots were THB.
+  return code === "LAK" || code === "USD" ? code : "THB";
+}
+
+export function orderMoney(value: number, order: OrderRow): string {
+  return formatCurrency(value, orderSalesCurrency(order));
+}
+
 export function amount(order: OrderRow) {
   return Number(order.grand_total ?? order.total_amount ?? 0);
 }

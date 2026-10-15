@@ -2,7 +2,7 @@ import { supabase } from "../supabase";
 import { getReportWindow } from "../reporting";
 import { explainMutationError } from "../errors";
 import { orderSelect } from "../order-fields";
-import type { DashboardSummary, OrderItemRow, OrderRow, ReportRange } from "../../types/portal";
+import type { OrderItemRow, OrderRow, ReportRange } from "../../types/portal";
 
 export async function loadSales(
   tenantId: string,
@@ -30,7 +30,7 @@ export async function loadSales(
 
   const [salesResult, summaryResult] = await Promise.all([
     salesQuery.range(offset, offset + safePageSize - 1),
-    supabase.rpc("customer_portal_dashboard_v2", {
+    supabase.rpc("customer_portal_currency_summary_v1", {
       p_tenant_id: tenantId,
       p_branch_id: branchId,
       p_from: from,
@@ -41,11 +41,15 @@ export async function loadSales(
   if (salesResult.error) throw salesResult.error;
   if (summaryResult.error) throw summaryResult.error;
 
-  const summary = summaryResult.data as DashboardSummary;
+  const currencyTotals = (summaryResult.data ?? []) as unknown as Array<{
+    currency_code: "THB" | "LAK" | "USD";
+    receipt_count: number;
+    net_sales: number;
+  }>;
   return {
     rows: (salesResult.data ?? []) as unknown as OrderRow[],
     total: salesResult.count ?? 0,
-    salesTotal: Number(summary?.sales_total ?? 0)
+    currencyTotals
   };
 }
 
