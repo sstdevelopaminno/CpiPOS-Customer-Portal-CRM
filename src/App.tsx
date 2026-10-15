@@ -18,7 +18,7 @@ import { OpticalCustomersView } from "./views/OpticalCustomersView";
 import { OpticalOperationsView } from "./views/OpticalOperationsView";
 import { OpticalCustomerAddressEditor } from "./views/OpticalCustomerAddressEditor";
 import { SettingsView } from "./views/SettingsView";
-import {fetchCustomBranding,type CustomBranding} from "./lib/custom-branding";
+import {useCustomBranding} from "./lib/use-custom-branding";
 
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -59,21 +59,7 @@ export default function App() {
   const [collapsed,setCollapsed]=useState(()=>localStorage.getItem("cpipos-sidebar-collapsed")==="1");
   const [mobileOpen,setMobileOpen]=useState(false);
   const [opticalTab,setOpticalTab]=useState<"customers"|"orders"|"stock"|"reports">("customers");
-  const [customBranding,setCustomBranding]=useState<CustomBranding|null>(null);
-
-  useEffect(()=>{
-    if(!context||menuAccess?.is_custom!==true){setCustomBranding(null);return;}
-    let cancelled=false;
-    async function refreshBrand(){
-      try {
-        const data=await fetchCustomBranding(context!.tenantId);
-        if(!cancelled)setCustomBranding(data);
-      }catch{if(!cancelled)setCustomBranding(null);}
-    }
-    void refreshBrand();
-    window.addEventListener("cpipos-custom-branding-updated",refreshBrand);
-    return()=>{cancelled=true;window.removeEventListener("cpipos-custom-branding-updated",refreshBrand);};
-  },[context?.tenantId,menuAccess?.is_custom]);
+  const customBranding=useCustomBranding(context?.tenantId,menuAccess?.is_custom===true);
 
   const restore=useCallback(async()=>{
     setFatal("");
