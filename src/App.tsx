@@ -14,6 +14,7 @@ import { PackageView } from "./views/PackageView";
 import { MoreView } from "./views/MoreView";
 import { OpticalCustomersView } from "./views/OpticalCustomersView";
 import { OpticalOperationsView } from "./views/OpticalOperationsView";
+import { OpticalCustomerAddressEditor } from "./views/OpticalCustomerAddressEditor";
 import { SettingsView } from "./views/SettingsView";
 
 type InstallPromptEvent = Event & {
@@ -225,7 +226,10 @@ export default function App() {
                 aria-selected={opticalTab===id} key={id} onClick={()=>setOpticalTab(id)}
                 className={`rounded-xl border px-4 py-2 text-sm font-bold ${opticalTab===id?"border-emerald-700 bg-emerald-700 text-white":"border-emerald-100 bg-white text-emerald-800"}`}>{label}</button>)}
             </div>
-            {opticalTab==="customers"?<OpticalCustomersView context={context} branchId={branchId||null}/>:(
+            {opticalTab==="customers"?<div className="space-y-4">
+              <OpticalCustomersView context={context} branchId={branchId||null}/>
+              <OpticalCustomerAddressEditor context={context} branchId={branchId||null}/>
+            </div>:(
               opticalTab==="reports"&&context.role!=="owner"
                 ? <p role="alert">เฉพาะเจ้าของร้านเท่านั้นที่สามารถดูรายงาน Optical</p>
                 : <OpticalOperationsView context={context} branchId={branchId||null} page={opticalTab}/>
