@@ -91,9 +91,11 @@ export async function loadPortalContext(): Promise<PortalContext> {
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (currencyError) throw currencyError;
-  const approvedCurrency = (approvedContract?.metadata as Record<string, unknown> | null)?.pos_currency_code;
-  const salesCurrencyCode = approvedCurrency === "LAK" || approvedCurrency === "USD" ? approvedCurrency : "THB";
+  // A currency read outage must not lock the customer out of CRM or relabel a
+  // currency that we have not verified. Individual receipts use their snapshots.
+  const approvedCurrency = !currencyError ? (approvedContract?.metadata as Record<string, unknown> | null)?.pos_currency_code : null;
+  const salesCurrencyCode = currencyError ? null :
+    approvedCurrency === "LAK" || approvedCurrency === "USD" ? approvedCurrency : "THB";
 
   const allBranches = (branches ?? []) as BranchSummary[];
   const visibleBranches = role === "owner" ? allBranches : allBranches.filter((branch) => allowedBranchIds.includes(branch.id));
