@@ -56,14 +56,14 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
         const allBins:Record<string,unknown>[]=[];
         for(let from=0;from<10000;from+=500){
           const {data,error:e}=await supabase.from("optical_stock_bins")
-            .select("product_id,kind,brand,model,color,frame_size,lens_type,lens_index,lens_sph,lens_cyl,unit_price,on_hand,reserved")
+            .select("product_id,kind,brand,model,color,frame_size,lens_type,lens_index,lens_sph,lens_cyl,unit_price,on_hand,reserved,currency_code")
             .eq("tenant_id",context.tenantId).eq("branch_id",activeBranch)
             .order("product_id",{ascending:true}).range(from,from+499);
           if(e)throw e;
           allBins.push(...((data??[]) as Record<string,unknown>[]));
           if((data??[]).length<500)break;
         }
-        const map=new Map(allBins.map(bin=>[String(bin.product_id),bin]));
+        const map=new Map(allBins.filter(bin=>bin.currency_code===(context.salesCurrencyCode??"LAK")).map(bin=>[String(bin.product_id),bin]));
         setOpticalBins(map);
         // The existing authenticated products SELECT policy restricts tenant
         // and branch. Metadata provides attributes for catalog-only items,
