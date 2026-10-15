@@ -5,6 +5,7 @@ import { formatCurrency } from "../lib/formatters";
 import "../styles/custom-inventory.css";
 import {supabase} from "../lib/supabase";
 import {OpticalStockTable,type OpticalTableEntry} from "./OpticalStockTable";
+import {OpticalBestSellers} from "./OpticalBestSellers";
 
 export type InventoryBusiness = "optical" | "retail";
 export type InventoryFilter = "all" | "frames" | "lenses" | "low" | "legacy";
@@ -30,14 +31,16 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
 }) {
   // Always use an assigned branch. Never silently aggregate Optical patient
   // or stock records across branches (even when CRM filter says "all").
-  const activeBranch=branchId && context.branches.some(b=>b.id===branchId)
-    ? branchId : context.branches[0]?.id;
+  const [stockBranch,setStockBranch]=useState<string|null>(branchId);
+  const activeBranch=stockBranch && context.branches.some(b=>b.id===stockBranch)
+    ? stockBranch : context.branches[0]?.id;
   const [rows,setRows]=useState<ProductRow[]>([]);
   const [opticalBins,setOpticalBins]=useState<Map<string,Record<string,unknown>>>(new Map());
   const [opticalDetails,setOpticalDetails]=useState<Map<string,Record<string,unknown>>>(new Map());
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState("");
   const [search,setSearch]=useState("");
+  const [bestOpen,setBestOpen]=useState(false);
   const [filter,setFilter]=useState<InventoryFilter>("all");
   const optical=business==="optical";
 
@@ -87,6 +90,7 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
     finally{setLoading(false);}
   },[context.tenantId,activeBranch,optical]);
 
+  useEffect(()=>{setStockBranch(branchId);},[branchId]);
   useEffect(()=>{void refresh();},[refresh]);
   useEffect(()=>{setFilter("all");setSearch("");},[activeBranch,business]);
 
@@ -122,7 +126,7 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
     return {id:row.id,sku:row.sku,kind:stockKind,
       brand:field("brand"),model:field("model")??row.name,
       color:field("color"),frameSize:field("frame_size"),
-      lensName:field("lens_name")??field("model")??row.name,index:field("lens_index"),
+      lensName:field("lens_name")??field("model")??row.name,index:field("lens_index"),imageUrl:row.image_url,
       sph:numeric("lens_sph"),cyl:numeric("lens_cyl"),
       price:quantity!==null?Number(bin?.unit_price??row.price):Number(row.price),
       quantity:quantity??(row.available_quantity??null),
@@ -138,11 +142,19 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
           <p>{optical?"ตรวจสินค้า กรอบแว่น เลนส์ SKU และจำนวนพร้อมขาย":"ตรวจสินค้าตาม SKU บาร์โค้ด และจำนวนพร้อมขาย"}</p>
         </div>
       </div>
+      {optical?<div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+        <label className="business-stock__filterLabel">เลือกสาขา
+          <select value={activeBranch??""} onChange={e=>setStockBranch(e.target.value)}>
+            {context.branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
+        </label>
+        <button type="button" className="business-stock__refresh" onClick={()=>setBestOpen(true)}>★ สินค้าขายดี</button>
+      </div>:null}
       <button type="button" onClick={()=>void refresh()} disabled={loading} className="business-stock__refresh"><RefreshCw size={16}/>{loading?"กำลังโหลด...":"รีเฟรช"}</button>
     </header>
     <p className="business-stock__notice" role="note"><ShieldAlert size={18}/>
       {optical
-        ?"หน้านี้แสดงข้อมูลสินค้าจาก POS เดิมเพื่อประกอบการตรวจสอบเท่านั้น ยังไม่ใช่ยอดจอง/ยอดคงเหลือของ Optical Stock Bin และไม่อนุญาตให้ย้ายหรือตัดสต๊อกโดยตรง"
+        ?"สต๊อกที่มี Optical Stock Bin จะแสดงยอดคงเหลือหลังหักยอดจอง ส่วนสินค้าที่ยังไม่ตรวจนับจะแสดงรอยืนยัน"
         :"จำนวนพร้อมขายมาจากระบบ POS เดิม การแก้ไขสต๊อกต้องใช้ขั้นตอนที่ได้รับอนุญาตตามโหมดธุรกิจ"}
     </p>
     <div className="business-stock__metrics">
@@ -165,6 +177,10 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
         </select>
       </label>
     </div>
+    {bestOpen&&activeBranch?<OpticalBestSellers tenantId={context.tenantId}
+      branchId={activeBranch} branchName={context.branches.find(b=>b.id===activeBranch)?.name??"สาขา"}
+      currency={currency} products={opticalEntries.map(r=>({id:r.id,name:r.lensName??r.model??r.id,sku:r.sku}))}
+      onClose={()=>setBestOpen(false)}/>:null}
     {error?<p role="alert" className="business-stock__error">{error}</p>:null}
     {loading?<p role="status" className="business-stock__empty">กำลังโหลดข้อมูล...</p>:null}
     {!loading && !error && optical ? <OpticalStockTable rows={opticalEntries} currency={currency}/>:null}
