@@ -23,7 +23,7 @@ export function CustomStockRouter({context,branchId,features}:{
 
   const opticalContent=canUseLiveOpticalStock
     ? <OpticalOperationsView context={context} branchId={branchId} page="stock"/>
-    : <BusinessStockOverview context={context} branchId={branchId} business="optical"/>;
+    : <BusinessStockOverview context={context} branchId={branchId} business="optical" strictOpticalCategory={mode==="mixed"}/>;
 
   if(mode==="optical")return opticalContent;
   if(mode==="retail")return <BusinessStockOverview context={context} branchId={branchId} business="retail"/>;
