@@ -172,11 +172,8 @@ export default function App() {
 
   // Keep navigation hidden until IT entitlement resolves; never flash unauthorized CUSTOM menus.
   const availableNav = !menuAccess ? [] : nav.filter(item=>canSeeView(item.id))
-    .map(item=>item.id==="stock"
-      ? {...item,label:stockBusinessMode==="optical"?"สต๊อกกรอบ/เลนส์":
-          stockBusinessMode==="retail"?"สต๊อกสินค้า":
-          stockBusinessMode==="mixed"?"สต๊อกตามโหมด":"วัตถุดิบ"}
-      : item);
+    .map(item=>item.id==="stock"?{...item,label:stockBusinessMode==="optical"?"สต๊อกกรอบ/เลนส์":
+      stockBusinessMode==="retail"?"สต๊อกสินค้า":stockBusinessMode==="mixed"?"สต๊อกตามโหมด":"วัตถุดิบ"}:item);
   const activeView = !menuAccess ? null : !canSeeView(view) ? availableNav[0]?.id ?? null : view;
   const showFilters=activeView!=="package";
   const showPeriod=activeView==="dashboard"||activeView==="sales";
