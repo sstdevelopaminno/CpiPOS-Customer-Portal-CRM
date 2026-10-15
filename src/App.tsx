@@ -8,7 +8,9 @@ import { Login } from "./views/Login";
 import { DashboardView } from "./views/DashboardView";
 import { SalesView } from "./views/SalesView";
 import { ProductsView } from "./views/ProductsView";
-import { StockView } from "./views/StockView";
+import { CustomStockRouter } from "./views/CustomStockRouter";
+import { BusinessStockOverview } from "./views/BusinessStockOverview";
+import { resolveCustomInventoryMode } from "./lib/custom-inventory-mode";
 import { StaffView } from "./views/StaffView";
 import { PackageView } from "./views/PackageView";
 import { MoreView } from "./views/MoreView";
@@ -151,6 +153,7 @@ export default function App() {
     });
   },[]);
 
+  const stockBusinessMode = menuAccess ? resolveCustomInventoryMode(menuAccess) : "legacy";
   const canSeeOptical = Boolean(menuAccess?.optical_retail_enabled
     && (menuAccess.is_custom || menuAccess.is_internal_test_full)
     && menuAccess.menu_policy["main.optical_customers"] !== false);
@@ -168,7 +171,12 @@ export default function App() {
   // Never render unrestricted navigation before an authoritative feature
   // snapshot arrives. This prevents CUSTOM menus flashing or becoming usable on
   // an API failure; fixed plans resume their legacy behavior after load.
-  const availableNav = !menuAccess ? [] : nav.filter(item=>canSeeView(item.id));
+  const availableNav = !menuAccess ? [] : nav.filter(item=>canSeeView(item.id))
+    .map(item=>item.id==="stock"
+      ? {...item,label:stockBusinessMode==="optical"?"สต๊อกกรอบ/เลนส์":
+          stockBusinessMode==="retail"?"สต๊อกสินค้า":
+          stockBusinessMode==="mixed"?"สต๊อกตามโหมด":"วัตถุดิบ"}
+      : item);
   const activeView = !menuAccess ? null : !canSeeView(view) ? availableNav[0]?.id ?? null : view;
   const showFilters=activeView!=="package";
   const showPeriod=activeView==="dashboard"||activeView==="sales";
@@ -209,7 +217,8 @@ export default function App() {
       {activeView==="dashboard"?<DashboardView context={context} branchId={branchId||null} range={range} anchor={anchor}/>:null}
       {activeView==="sales"?<SalesView context={context} branchId={branchId||null} range={range} anchor={anchor}/>:null}
       {activeView==="products"?<ProductsView context={context} branchId={branchId||null}/>:null}
-      {activeView==="stock"?<StockView context={context} branchId={branchId||null}/>:null}
+      {activeView==="stock"&&menuAccess
+        ?<CustomStockRouter context={context} branchId={branchId||null} features={menuAccess}/>:null}
       {activeView==="staff"?<StaffView context={context} branchId={branchId||null}/>:null}
       {activeView==="package"?<PackageView context={context}/>:null}
       {activeView==="more"?<MoreView context={context} branchId={branchId||null} onNavigate={chooseView}/>:null}
@@ -222,11 +231,15 @@ export default function App() {
                 ["orders","ใบสั่งงาน"],
                 ["stock","สต๊อกกรอบ/เลนส์"],
                 ["reports","รายงานเจ้าของร้าน"]
-              ] as const).filter(([id])=>id!=="reports"||context.role==="owner").map(([id,label])=><button type="button" role="tab"
+              ] as const).filter(([id])=>(id!=="reports"||context.role==="owner") && (id!=="stock"||canSeeView("stock"))).map(([id,label])=><button type="button" role="tab"
                 aria-selected={opticalTab===id} key={id} onClick={()=>setOpticalTab(id)}
                 className={`rounded-xl border px-4 py-2 text-sm font-bold ${opticalTab===id?"border-emerald-700 bg-emerald-700 text-white":"border-emerald-100 bg-white text-emerald-800"}`}>{label}</button>)}
             </div>
-            {opticalTab==="customers"?<div className="space-y-4">
+            {opticalTab==="stock" && canSeeView("stock") ? (
+              <BusinessStockOverview context={context} branchId={branchId||null} business="optical"/>
+            ) : opticalTab==="stock" ? (
+              <p role="alert">เมนูสต๊อกยังไม่ได้รับอนุมัติจาก IT Admin</p>
+            ) : opticalTab==="customers"?<div className="space-y-4">
               <OpticalCustomersView context={context} branchId={branchId||null}/>
               <OpticalCustomerAddressEditor context={context} branchId={branchId||null}/>
             </div>:(
