@@ -3,6 +3,8 @@ import { Boxes, Glasses, Search, RefreshCw, ShieldAlert } from "lucide-react";
 import { loadProducts, type PortalContext, type ProductRow } from "../lib/portal";
 import { formatCurrency } from "../lib/formatters";
 import "../styles/custom-inventory.css";
+import {supabase} from "../lib/supabase";
+import {OpticalStockTable,type OpticalTableEntry} from "./OpticalStockTable";
 
 export type InventoryBusiness = "optical" | "retail";
 export type InventoryFilter = "all" | "frames" | "lenses" | "low" | "legacy";
@@ -31,6 +33,7 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
   const activeBranch=branchId && context.branches.some(b=>b.id===branchId)
     ? branchId : context.branches[0]?.id;
   const [rows,setRows]=useState<ProductRow[]>([]);
+  const [opticalBins,setOpticalBins]=useState<Map<string,Record<string,unknown>>>(new Map());
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState("");
   const [search,setSearch]=useState("");
@@ -44,14 +47,28 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
       // This uses the existing RLS-scoped POS product catalog only.
       // Never calls ingredient mutations or optical stock writes.
       const result=await loadProducts(context.tenantId,activeBranch);
-      setRows(result.filter(row=>row.branch_id===activeBranch)
-        // CUSTOM stores with both food and optical modes must not display
-        // restaurant items in the Optical stock view.
-        .filter(row=>!strictOpticalCategory || /^(กรอบแว่น|แว่นตา|เลนส์|optical|frames?|lenses?)$/i.test(String(row.category??"").trim()))
-      );
+      // Optical-only filtering applies even in dedicated shops: legacy food
+      // entries must not become optical stock merely because they share a tenant.
+      const productRows=result.filter(row=>row.branch_id===activeBranch);
+      if(optical){
+        const allBins:Record<string,unknown>[]=[];
+        for(let from=0;from<10000;from+=500){
+          const {data,error:e}=await supabase.from("optical_stock_bins")
+            .select("product_id,kind,brand,model,color,frame_size,lens_type,lens_index,lens_sph,lens_cyl,unit_price,on_hand,reserved")
+            .eq("tenant_id",context.tenantId).eq("branch_id",activeBranch)
+            .order("product_id",{ascending:true}).range(from,from+499);
+          if(e)throw e;
+          allBins.push(...((data??[]) as Record<string,unknown>[]));
+          if((data??[]).length<500)break;
+        }
+        const map=new Map(allBins.map(bin=>[String(bin.product_id),bin]));
+        setOpticalBins(map);
+        setRows(productRows.filter(row=>map.has(row.id) ||
+          /^(กรอบแว่น|แว่นตา|เลนส์|optical|frames?|lenses?|imdc optical qa)(\s|$)/i.test(String(row.category??"").trim())));
+      }else setRows(productRows);
     }catch{setRows([]);setError("ไม่สามารถอ่านสต๊อกสินค้าในสาขานี้ได้ กรุณาตรวจสอบสิทธิ์");}
     finally{setLoading(false);}
-  },[context.tenantId,activeBranch,strictOpticalCategory]);
+  },[context.tenantId,activeBranch,optical]);
 
   useEffect(()=>{void refresh();},[refresh]);
   useEffect(()=>{setFilter("all");setSearch("");},[activeBranch,business]);
@@ -69,6 +86,24 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
   const legacy=rows.filter(x=>x.recipe_count>0||x.stock_deduction_mode==="recipe_deduction").length;
   const currency=context.salesCurrencyCode??(optical?"LAK":"THB");
 
+  const opticalEntries:OpticalTableEntry[]=rows.map(row=>{
+    const bin=opticalBins.get(row.id);
+    const classLabel=classifyOpticalProduct(row);
+    const stockKind=bin?.kind==="lens"?"lens":bin?.kind==="accessory"?"accessory":
+      bin?.kind==="frame"?"frame":classLabel==="lenses"?"lens":"frame";
+    const field=(key:string)=>bin?.[key]===undefined||bin?.[key]===null?null:String(bin[key]);
+    const numeric=(key:string)=>bin?.[key]===undefined||bin?.[key]===null?null:Number(bin[key]);
+    const quantity=numeric("on_hand");
+    const reserved=numeric("reserved");
+    return {id:row.id,sku:row.sku,kind:stockKind,
+      brand:field("brand"),model:field("model")??row.name,
+      color:field("color"),frameSize:field("frame_size"),
+      lensName:field("model")??row.name,index:field("lens_index"),
+      sph:numeric("lens_sph"),cyl:numeric("lens_cyl"),
+      price:quantity!==null?Number(bin?.unit_price??row.price):Number(row.price),
+      quantity:quantity??(row.available_quantity??null),
+      remaining:quantity===null||reserved===null?null:Math.max(0,quantity-reserved)};
+  });
   if(!activeBranch)return <section className="business-stock" role="alert">ไม่พบสาขาที่ได้รับอนุญาตให้เข้าถึง</section>;
   return <section className={`business-stock ${optical?"business-stock--optical":"business-stock--retail"}`}>
     <header className="business-stock__heading">
@@ -108,7 +143,8 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
     </div>
     {error?<p role="alert" className="business-stock__error">{error}</p>:null}
     {loading?<p role="status" className="business-stock__empty">กำลังโหลดข้อมูล...</p>:null}
-    {!loading && !error ? <div className="business-stock__tableWrap">
+    {!loading && !error && optical ? <OpticalStockTable rows={opticalEntries} currency={currency}/>:null}
+    {!loading && !error && !optical ? <div className="business-stock__tableWrap">
       <table><thead><tr><th>สินค้า / รูปภาพ</th><th>SKU / บาร์โค้ด</th><th>ราคา ({currency})</th><th>หน่วย</th><th>จำนวนพร้อมขาย</th><th>สถานะ</th></tr></thead>
       <tbody>{filtered.map(item=>{
         const state=stockState(item);
