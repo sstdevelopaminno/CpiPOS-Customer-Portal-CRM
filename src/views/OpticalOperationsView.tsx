@@ -15,7 +15,7 @@ type Stock = {
   color:string|null;frame_size:string|null;lens_index:string|null;lens_type:string|null;
   lens_sph:number|null;lens_cyl:number|null;
   unit:string;unit_price:number;on_hand:number;reserved:number;reorder_level:number;
-  image_url:string|null
+  image_url:string|null;currency_code:string
 };
 type Metric = {metric:string;label:string;quantity:number;amount_lak:number};
 type Range = "day" | "month" | "year";
@@ -69,7 +69,7 @@ export function OpticalOperationsView({
           if(!cancelled)setOrders((data??[]) as Order[]);
         }else if(page==="stock"){
           const {data,error:e}=await supabase.from("optical_stock_bins")
-            .select("id,product_id,kind,brand,model,color,frame_size,lens_index,lens_type,lens_sph,lens_cyl,unit,unit_price,on_hand,reserved,reorder_level,image_url")
+            .select("id,product_id,kind,brand,model,color,frame_size,lens_index,lens_type,lens_sph,lens_cyl,unit,unit_price,on_hand,reserved,reorder_level,image_url,currency_code")
             .eq("tenant_id",context.tenantId).eq("branch_id",branch)
             .order("created_at",{ascending:false}).limit(200);
           if(e)throw e;
@@ -97,7 +97,7 @@ export function OpticalOperationsView({
     return()=>{cancelled=true;};
   },[context.tenantId,branch,page,range]);
 
-  const opticalEntries:OpticalTableEntry[]=bins.map(bin=>({
+  const opticalEntries:OpticalTableEntry[]=bins.filter(bin=>bin.currency_code===(context.salesCurrencyCode??"LAK")).map(bin=>({
     id:bin.id,sku:skuMap[bin.product_id]??null,
     kind:bin.kind==="lens"?"lens":bin.kind==="accessory"?"accessory":"frame",
     brand:bin.brand,model:bin.model,color:bin.color,frameSize:bin.frame_size,
