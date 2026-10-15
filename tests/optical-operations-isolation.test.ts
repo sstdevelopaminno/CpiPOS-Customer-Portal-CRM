@@ -22,6 +22,10 @@ describe("CRM Optical-only workspace",()=>{
     expect(ui).not.toContain('.update({');
     expect(ui).toContain("b.on_hand-b.reserved");
     expect(ui).toContain("b.image_url");
+    expect(ui).toContain('stockKind!=="all"');
+    expect(ui).toContain('filteredBins.map(b=>');
+    expect(ui).toContain('aria-label="ประเภทสินค้า Optical"');
+    expect(ui).toContain('aria-label="ค้นหาสต๊อก Optical"');
     const address=read("views/OpticalCustomerAddressEditor.tsx");
     expect(address).toContain('supabase.rpc("optical_save_customer_address_v1"');
     expect(address).toContain('.eq("tenant_id",context.tenantId).eq("branch_id",branch)');
