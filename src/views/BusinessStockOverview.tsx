@@ -6,6 +6,7 @@ import "../styles/custom-inventory.css";
 import {supabase} from "../lib/supabase";
 import {OpticalStockTable,type OpticalTableEntry} from "./OpticalStockTable";
 import {OpticalBestSellers} from "./OpticalBestSellers";
+import {OpticalCreateProduct} from "./OpticalCreateProduct";
 
 export type InventoryBusiness = "optical" | "retail";
 export type InventoryFilter = "all" | "frames" | "lenses" | "low" | "legacy";
@@ -40,7 +41,7 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState("");
   const [search,setSearch]=useState("");
-  const [bestOpen,setBestOpen]=useState(false);
+  const [bestOpen,setBestOpen]=useState(false),[addOpen,setAddOpen]=useState(false);
   const [filter,setFilter]=useState<InventoryFilter>("all");
   const optical=business==="optical";
 
@@ -148,6 +149,7 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
             {context.branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
         </label>
+        {["owner","manager"].includes(context.role)?<button type="button" className="business-stock__refresh" onClick={()=>setAddOpen(true)}>+ เพิ่มสินค้า</button>:null}
         <button type="button" className="business-stock__refresh" onClick={()=>setBestOpen(true)}>★ สินค้าขายดี</button>
       </div>:null}
       <button type="button" onClick={()=>void refresh()} disabled={loading} className="business-stock__refresh"><RefreshCw size={16}/>{loading?"กำลังโหลด...":"รีเฟรช"}</button>
@@ -177,6 +179,12 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
         </select>
       </label>
     </div>
+    {addOpen&&activeBranch?<OpticalCreateProduct tenantId={context.tenantId}
+      branchId={activeBranch} currency={currency} branches={context.branches}
+      onClose={()=>setAddOpen(false)} onCreated={nextBranch=>{
+        setAddOpen(false);setStockBranch(nextBranch);
+        if(nextBranch===activeBranch)void refresh();
+      }}/>:null}
     {bestOpen&&activeBranch?<OpticalBestSellers tenantId={context.tenantId}
       branchId={activeBranch} branchName={context.branches.find(b=>b.id===activeBranch)?.name??"สาขา"}
       currency={currency} products={opticalEntries.map(r=>({id:r.id,name:r.lensName??r.model??r.id,sku:r.sku}))}
