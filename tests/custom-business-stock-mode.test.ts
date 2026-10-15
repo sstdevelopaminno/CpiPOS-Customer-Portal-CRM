@@ -38,7 +38,14 @@ describe("CUSTOM stock differs by IT-approved sales mode",()=>{
     expect(router).toContain('VITE_OPTICAL_OPS_V1_ENABLED==="true"');
     expect(router).toContain("BusinessStockOverview");
     expect(router).toContain('strictOpticalCategory={mode==="mixed"}');
-    expect(component).toContain('!strictOpticalCategory || /^(กรอบแว่น');
+    expect(component).toContain('if(optical){');
+    expect(component).toContain('optical_stock_bins');
+    expect(component).toContain('OpticalStockTable rows={opticalEntries}');
+    const table=source("views/OpticalStockTable.tsx");
+    expect(table).toContain("สต๊อกกรอบแว่น");
+    expect(table).toContain("สต๊อกเลนส์");
+    expect(table).toContain("SKU / บาร์โค้ด");
+    expect(table).toContain('role="dialog"');
     const app=source("App.tsx");
     expect(app).toContain('strictOpticalCategory={stockBusinessMode==="mixed"}');
   });
