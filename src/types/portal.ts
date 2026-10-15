@@ -18,6 +18,7 @@ export interface PortalContext {
   role: PortalRole;
   branches: BranchSummary[];
   allowedBranchIds: string[];
+  salesCurrencyCode: "THB" | "LAK" | "USD";
 }
 
 export interface TopProduct {
@@ -57,6 +58,7 @@ export interface OrderRow {
   status: string;
   cancelled_reason: string | null;
   created_at: string;
+  metadata?: Record<string, unknown> | null;
 }
 
 export interface OrderItemRow {
