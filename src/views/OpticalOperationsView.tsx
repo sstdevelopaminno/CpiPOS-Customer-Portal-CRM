@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import type { PortalContext } from "../types/portal";
+import {loadProducts} from "../lib/portal";
+import {OpticalStockTable,type OpticalTableEntry} from "./OpticalStockTable";
 import { formatCurrency } from "../lib/formatters";
 
 type Page = "orders" | "stock" | "reports";
@@ -17,7 +19,7 @@ type Stock = {
 };
 type Metric = {metric:string;label:string;quantity:number;amount_lak:number};
 type Range = "day" | "month" | "year";
-type StockKind = "all" | "frame" | "lens" | "accessory";
+
 
 function laoWindow(range:Range):{from:string;to:string} {
   const parts=new Intl.DateTimeFormat("en-US",{
@@ -47,8 +49,7 @@ export function OpticalOperationsView({
   const [bins,setBins]=useState<Stock[]>([]);
   const [metrics,setMetrics]=useState<Metric[]>([]);
   const [range,setRange]=useState<Range>("day");
-  const [stockKind,setStockKind]=useState<StockKind>("all");
-  const [stockSearch,setStockSearch]=useState("");
+  const [skuMap,setSkuMap]=useState<Record<string,string>>({});
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState("");
 
@@ -72,6 +73,12 @@ export function OpticalOperationsView({
             .order("created_at",{ascending:false}).limit(200);
           if(e)throw e;
           if(!cancelled)setBins((data??[]) as Stock[]);
+          // Product codes are read through existing CRM-scoped catalog RPC;
+          // never expose codes from a different tenant/branch.
+          const products=await loadProducts(context.tenantId,branch).catch(()=>[]);
+          if(!cancelled)setSkuMap(Object.fromEntries(
+            products.filter(x=>x.branch_id===branch).map(p=>[p.id,p.sku])
+          ));
         }else{
           const window=laoWindow(range);
           const {data,error:e}=await supabase.rpc("optical_report_v1",{
@@ -89,15 +96,15 @@ export function OpticalOperationsView({
     return()=>{cancelled=true;};
   },[context.tenantId,branch,page,range]);
 
-  // Filtering only changes the view; the source remains the tenant/branch-
-  // scoped Optical Stock Bin query. It never edits or reserves inventory.
-  const filteredBins=bins.filter(bin=>{
-    if(stockKind!=="all" && (bin.kind==="frame"?"frame":bin.kind==="lens"?"lens":"accessory")!==stockKind)return false;
-    const term=stockSearch.trim().toLocaleLowerCase();
-    if(!term)return true;
-    return [bin.brand,bin.model,bin.color,bin.frame_size,bin.lens_type,
-      bin.lens_index,bin.product_id].some(value=>String(value??"").toLocaleLowerCase().includes(term));
-  });
+  const opticalEntries:OpticalTableEntry[]=bins.map(bin=>({
+    id:bin.id,sku:skuMap[bin.product_id]??null,
+    kind:bin.kind==="lens"?"lens":bin.kind==="accessory"?"accessory":"frame",
+    brand:bin.brand,model:bin.model,color:bin.color,frameSize:bin.frame_size,
+    lensName:bin.model??bin.lens_type,index:bin.lens_index,
+    sph:bin.lens_sph,cyl:bin.lens_cyl,
+    price:bin.unit_price,quantity:bin.on_hand,
+    remaining:Math.max(0,bin.on_hand-bin.reserved)
+  }));
 
   if(!branch)return <p className="rounded-xl bg-amber-50 p-4">กรุณาเลือกสาขาที่ได้รับสิทธิ์ก่อน</p>;
   return <section className="space-y-4 rounded-2xl border border-emerald-100 bg-emerald-50/30 p-4">
@@ -125,56 +132,9 @@ export function OpticalOperationsView({
       </tr>)}</tbody></table>
       {orders.length===0&&!loading?<p className="p-4 text-sm text-slate-500">ยังไม่มีใบสั่งงานในสาขานี้</p>:null}
     </div>:null}
-    {page==="stock"?<div className="overflow-x-auto rounded-xl bg-white shadow-sm">
-      <div className="flex flex-wrap items-end gap-3 border-b border-emerald-100 p-3">
-        <label className="flex min-w-[180px] flex-1 flex-col gap-1 text-sm font-medium text-slate-700">
-          ค้นหากรอบแว่นหรือเลนส์
-          <input type="search" value={stockSearch} onChange={event=>setStockSearch(event.target.value)}
-            placeholder="แบรนด์ / รุ่น / สี / ชนิดเลนส์" aria-label="ค้นหาสต๊อก Optical"
-            className="min-h-11 rounded-lg border border-slate-300 px-3"/>
-        </label>
-        <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-          ประเภทสินค้า
-          <select value={stockKind} onChange={event=>setStockKind(event.target.value as StockKind)}
-            aria-label="ประเภทสินค้า Optical" className="min-h-11 rounded-lg border border-slate-300 px-3">
-            <option value="all">ทั้งหมด</option><option value="frame">กรอบแว่น</option>
-            <option value="lens">เลนส์</option><option value="accessory">อุปกรณ์</option>
-          </select>
-        </label>
-        <span className="pb-2 text-xs text-slate-500" role="status">แสดง {filteredBins.length} จาก {bins.length} รายการ</span>
-      </div>
-      <table className="w-full text-left text-sm"><thead><tr className="bg-emerald-50">
-        <th className="p-3">สินค้า</th><th className="p-3">ราคา LAK</th>
-        <th className="p-3">คงเหลือ</th><th className="p-3">จองแล้ว</th>
-        <th className="p-3">พร้อมขาย</th>
-      </tr></thead><tbody>{filteredBins.map(b=>{
-        const available=b.on_hand-b.reserved;
-        return <tr key={b.id} className="border-t border-slate-100">
-          <td className="p-3">
-            <div className="flex items-center gap-3">
-              {b.image_url?.startsWith("https://")?<img src={b.image_url} alt={b.model??"สินค้า Optical"}
-                className="h-12 w-12 rounded-md border object-cover"/>:null}
-              <div>
-                <strong>{b.kind==="frame"?"กรอบ":b.kind==="lens"?"เลนส์":"อุปกรณ์"}</strong>
-                <div>{[b.brand,b.model].filter(Boolean).join(" · ")||b.product_id.slice(0,8)}</div>
-                <p className="text-xs text-slate-500">
-                  {[b.color,b.frame_size,b.lens_type,b.lens_index].filter(Boolean).join(" · ")}
-                  {b.lens_sph!==null?` SPH ${b.lens_sph}`:""}
-                  {b.lens_cyl!==null?` CYL ${b.lens_cyl}`:""}
-                </p>
-              </div>
-            </div>
-          </td>
-          <td className="p-3">{money(b.unit_price)}</td>
-          <td className="p-3">{b.on_hand} {b.unit}</td>
-          <td className="p-3">{b.reserved}</td>
-          <td className={`p-3 font-bold ${available===0?"text-rose-700":available<=b.reorder_level?"text-amber-700":"text-emerald-700"}`}>
-            {available} {available===0?"· หมด":available<=b.reorder_level?"· ใกล้หมด":""}
-          </td>
-        </tr>;
-      })}</tbody></table>
-      {bins.length===0&&!loading?<p className="p-4 text-sm text-slate-500">ยังไม่มีรายการ Optical Inventory ที่ผ่านการตรวจสต๊อกตั้งต้น</p>:null}
-      {bins.length>0&&filteredBins.length===0?<p className="p-4 text-sm text-slate-500">ไม่พบสินค้าตามตัวกรองที่เลือก</p>:null}
+    {page==="stock"?<div className="space-y-2">
+      <OpticalStockTable rows={opticalEntries} currency={context.salesCurrencyCode??"LAK"}/>
+      {bins.length===0&&!loading?<p className="p-4 text-sm text-slate-500">ยังไม่มี Optical Stock Bin ที่ผ่านการตรวจนับ</p>:null}
     </div>:null}
     {page==="reports"?<div className="space-y-3">
       <div className="flex flex-wrap gap-2">{(["day","month","year"] as const).map(k=><button key={k}
