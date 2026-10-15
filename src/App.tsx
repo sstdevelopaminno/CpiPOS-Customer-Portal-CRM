@@ -8,7 +8,8 @@ import { Login } from "./views/Login";
 import { DashboardView } from "./views/DashboardView";
 import { SalesView } from "./views/SalesView";
 import { ProductsView } from "./views/ProductsView";
-import { StockView } from "./views/StockView";
+import { CustomStockRouter } from "./views/CustomStockRouter";
+import { resolveCustomInventoryMode } from "./lib/custom-inventory-mode";
 import { StaffView } from "./views/StaffView";
 import { PackageView } from "./views/PackageView";
 import { MoreView } from "./views/MoreView";
@@ -148,6 +149,7 @@ export default function App() {
     });
   },[]);
 
+  const stockBusinessMode = menuAccess ? resolveCustomInventoryMode(menuAccess) : "legacy";
   const canSeeOptical = Boolean(menuAccess?.optical_retail_enabled
     && (menuAccess.is_custom || menuAccess.is_internal_test_full)
     && menuAccess.menu_policy["main.optical_customers"] !== false);
@@ -165,7 +167,12 @@ export default function App() {
   // Never render unrestricted navigation before an authoritative feature
   // snapshot arrives. This prevents CUSTOM menus flashing or becoming usable on
   // an API failure; fixed plans resume their legacy behavior after load.
-  const availableNav = !menuAccess ? [] : nav.filter(item=>canSeeView(item.id));
+  const availableNav = !menuAccess ? [] : nav.filter(item=>canSeeView(item.id))
+    .map(item=>item.id==="stock"
+      ? {...item,label:stockBusinessMode==="optical"?"สต๊อกกรอบ/เลนส์":
+          stockBusinessMode==="retail"?"สต๊อกสินค้า":
+          stockBusinessMode==="mixed"?"สต๊อกตามโหมด":"วัตถุดิบ"}
+      : item);
   const activeView = !menuAccess ? null : !canSeeView(view) ? availableNav[0]?.id ?? null : view;
   const showFilters=activeView!=="package";
   const showPeriod=activeView==="dashboard"||activeView==="sales";
@@ -206,11 +213,16 @@ export default function App() {
       {activeView==="dashboard"?<DashboardView context={context} branchId={branchId||null} range={range} anchor={anchor}/>:null}
       {activeView==="sales"?<SalesView context={context} branchId={branchId||null} range={range} anchor={anchor}/>:null}
       {activeView==="products"?<ProductsView context={context} branchId={branchId||null}/>:null}
-      {activeView==="stock"?<StockView context={context} branchId={branchId||null}/>:null}
+      {activeView==="stock"&&menuAccess
+        ?<CustomStockRouter context={context} branchId={branchId||null} features={menuAccess}/>:null}
       {activeView==="staff"?<StaffView context={context} branchId={branchId||null}/>:null}
       {activeView==="package"?<PackageView context={context}/>:null}
       {activeView==="more"?<MoreView context={context} branchId={branchId||null} onNavigate={chooseView}/>:null}
-      {activeView==="optical" && canSeeOptical?<OpticalCustomersView context={context} branchId={branchId||null}/>:null}
+      {activeView==="optical" && canSeeOptical ? <div className="space-y-4">
+        {canSeeView("stock")?<div className="custom-stock-shortcut"><span>IMDC OPTICAL · สต๊อกกรอบแว่น/เลนส์</span>
+          <button type="button" onClick={()=>chooseView("stock")}>เปิดเมนูสต๊อก</button></div>:null}
+        <OpticalCustomersView context={context} branchId={branchId||null}/>
+      </div> : null}
       {activeView==="settings"?<SettingsView context={context} branchId={branchId||null} onNavigate={chooseView} onContextChanged={refreshContextAfterMutation}/>:null}
 
       <footer>ข้อมูลและสิทธิ์ถูกจำกัดตามบัญชี {context.role==="owner"?"Owner":"Manager"} · {context.branches.length} สาขาที่เข้าถึงได้</footer>
