@@ -18,7 +18,7 @@ export interface PortalContext {
   role: PortalRole;
   branches: BranchSummary[];
   allowedBranchIds: string[];
-  salesCurrencyCode: "THB" | "LAK" | "USD";
+  salesCurrencyCode: "THB" | "LAK" | "USD" | null;
 }
 
 export interface TopProduct {
