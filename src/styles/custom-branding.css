@@ -1,0 +1,15 @@
+/* Tenant CUSTOM themes; fixed-package UI does not use this class. */
+.crm-custom-branded .sidebar{background:linear-gradient(180deg,var(--crm-custom-sidebar),#07152b)!important}
+.crm-custom-branded .sidebar nav button.active{
+ background:color-mix(in srgb,var(--crm-custom-accent),transparent 35%)!important;
+ box-shadow:inset 3px 0 var(--crm-custom-accent)!important;color:#fff!important;
+}
+.crm-custom-branded .sidebar nav button:hover:not(.active){
+ background:color-mix(in srgb,var(--crm-custom-accent),transparent 73%)!important;
+}
+.crm-custom-branded .storeAvatar{border:1px solid var(--crm-custom-accent)}
+.crm-custom-branded .moduleCard:not(.locked):hover{
+ border-color:var(--crm-custom-accent);
+}
+.crm-custom-branded .sidebarTop .brandBlock span{color:#e4e8f1;letter-spacing:normal}
+.crm-custom-branded .mobileHeader{border-bottom:2px solid var(--crm-custom-accent)}
