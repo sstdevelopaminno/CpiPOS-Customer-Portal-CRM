@@ -37,6 +37,10 @@ describe("CUSTOM stock differs by IT-approved sales mode",()=>{
     expect(component).not.toContain(".update(");
     expect(router).toContain('VITE_OPTICAL_OPS_V1_ENABLED==="true"');
     expect(router).toContain("BusinessStockOverview");
+    expect(router).toContain('strictOpticalCategory={mode==="mixed"}');
+    expect(component).toContain('!strictOpticalCategory || /^(กรอบแว่น');
+    const app=source("App.tsx");
+    expect(app).toContain('strictOpticalCategory={stockBusinessMode==="mixed"}');
   });
   it("does not bypass main.more / more.stock or expose special Optical inventory to food plans",()=>{
     const app=source("App.tsx");
