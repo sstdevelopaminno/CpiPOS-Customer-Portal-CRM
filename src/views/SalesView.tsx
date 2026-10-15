@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Eye, LoaderCircle, Pencil, Save, Search, Trash2 } from "lucide-react";
 import { cancelOrder, loadOrderItems, loadSales, updateOrder, type OrderItemRow, type OrderRow, type PortalContext, type ReportRange } from "../lib/portal";
 import { Empty, ErrorPanel, Pagination, Modal } from "../components/common";
-import { number, dateTime, amount, statusLabel, branchName, orderMoney } from "../lib/formatters";
+import { number, dateTime, amount, statusLabel, branchName, orderMoney, formatCurrency } from "../lib/formatters";
 
 function OrderDetailModal({
   order,
@@ -93,6 +93,7 @@ export function SalesView({ context, branchId, range, anchor }: { context: Porta
   const [query,setQuery]=useState("");
   const [page,setPage]=useState(0);
   const [totalCount,setTotalCount]=useState(0);
+  const [currencyTotals,setCurrencyTotals]=useState<Array<{ currency_code:"THB"|"LAK"|"USD";receipt_count:number;net_sales:number }>>([]);
 
   const pageSize=20;
   const requestIdRef=useRef(0);
@@ -107,6 +108,7 @@ export function SalesView({ context, branchId, range, anchor }: { context: Porta
       if(requestId!==requestIdRef.current)return;
       setRows(result.rows);
       setTotalCount(result.total);
+      setCurrencyTotals(result.currencyTotals);
 
     }
     catch{
@@ -125,18 +127,9 @@ export function SalesView({ context, branchId, range, anchor }: { context: Porta
     if(!q)return true;
     return [row.order_no,row.customer_name,row.channel,row.order_type,branchMap.get(row.branch_id)].some(value=>String(value??"").toLowerCase().includes(q));
   });
-  const totalByCurrency = useMemo(() => {
-    const buckets: Record<"THB" | "LAK" | "USD", number> = { THB: 0, LAK: 0, USD: 0 };
-    for (const row of rows) {
-      if (row.status !== "completed") continue;
-      const code = row.metadata?.currency_code;
-      const currency = code === "LAK" || code === "USD" ? code : "THB";
-      buckets[currency] += amount(row);
-    }
-    return (["THB", "LAK", "USD"] as const)
-      .filter((code) => rows.some((row) => (row.metadata?.currency_code === code || (code === "THB" && !["LAK","USD"].includes(String(row.metadata?.currency_code)))) && row.status === "completed"))
-      .map((code) => new Intl.NumberFormat(code === "LAK" ? "lo-LA" : "en-US", { style: "currency", currency: code, minimumFractionDigits: code === "LAK" ? 0 : 2, maximumFractionDigits: code === "LAK" ? 0 : 2 }).format(buckets[code])).join(" / ");
-  }, [rows]);
+  const totalByCurrency = currencyTotals
+    .map((bucket) => formatCurrency(Number(bucket.net_sales),bucket.currency_code))
+    .join(" / ");
   const pageCount=Math.max(1,Math.ceil(totalCount/pageSize));
   const pageLabel=totalCount
     ? String(page*pageSize+1)+"–"+String(Math.min((page+1)*pageSize,totalCount))+" จาก "+number.format(totalCount)
@@ -145,7 +138,7 @@ export function SalesView({ context, branchId, range, anchor }: { context: Porta
   return <>
     <div className="pageHeading">
       <div><p className="eyebrow">SALES</p><h2>รายการขาย</h2><p>ดูรายวัน รายเดือน หรือรายปี พร้อมแก้ข้อมูลประกอบและยกเลิกบิลแบบคืนสต๊อก</p></div>
-      <div className="headingStat"><span>ยอดชำระในหน้าปัจจุบัน (แยกสกุลเงิน)</span><strong>{totalByCurrency || "—"}</strong><small>ไม่รวมยอดข้ามสกุลเงิน · เลือกหน้าถัดไปเพื่อดูรายการอื่น</small></div>
+      <div className="headingStat"><span>ยอดขายทั้งช่วง (แยกสกุลเงิน)</span><strong>{totalByCurrency || "—"}</strong><small>รวมทั้งช่วงเวลาที่เลือกตามสิทธิ์สาขา แต่ไม่บวกยอดต่างสกุลเงินเข้าด้วยกัน</small></div>
     </div>
     <TopicHub label="หัวข้อรายการขาย" items={[
       {id:"bills",title:"ค้นหาและจัดการบิล",description:"รายการขายตามสาขาและวันที่ เลือกบิลเพื่อดู แก้ไข หรือยกเลิก",count:pageLabel,content:<>
