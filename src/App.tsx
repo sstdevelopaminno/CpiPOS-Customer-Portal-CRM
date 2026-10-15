@@ -170,9 +170,7 @@ export default function App() {
   if(checking)return <div className="bootScreen"><img className="bootLogo" src="/cpipos-logo.png" alt="CpiPOS"/><LoaderCircle className="spin"/><span>กำลังเตรียมข้อมูลร้าน...</span></div>;
   if(!context)return <Login onSuccess={restore} canInstall={Boolean(installPrompt)&&!standalone} onInstall={installApp}/>;
 
-  // Never render unrestricted navigation before an authoritative feature
-  // snapshot arrives. This prevents CUSTOM menus flashing or becoming usable on
-  // an API failure; fixed plans resume their legacy behavior after load.
+  // Keep navigation hidden until IT entitlement resolves; never flash unauthorized CUSTOM menus.
   const availableNav = !menuAccess ? [] : nav.filter(item=>canSeeView(item.id))
     .map(item=>item.id==="stock"
       ? {...item,label:stockBusinessMode==="optical"?"สต๊อกกรอบ/เลนส์":
