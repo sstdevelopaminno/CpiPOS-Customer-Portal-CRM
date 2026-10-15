@@ -43,6 +43,7 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
 
   const refresh=useCallback(async()=>{
     if(!activeBranch){setRows([]);return;}
+    setRows([]);setOpticalBins(new Map());setOpticalDetails(new Map());
     setLoading(true);setError("");
     try{
       // This uses the existing RLS-scoped POS product catalog only.
