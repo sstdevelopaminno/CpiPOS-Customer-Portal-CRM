@@ -248,7 +248,11 @@ export default function App() {
                 : <OpticalOperationsView context={context} branchId={branchId||null} page={opticalTab}/>
             )}
           </div>
-        ) : <OpticalCustomersView context={context} branchId={branchId||null}/>
+        ) : <div className="space-y-4">
+          {canSeeView("stock")?<div className="custom-stock-shortcut"><span>IMDC OPTICAL · สต๊อกกรอบแว่น/เลนส์</span>
+            <button type="button" onClick={()=>chooseView("stock")}>เปิดเมนูสต๊อก</button></div>:null}
+          <OpticalCustomersView context={context} branchId={branchId||null}/>
+        </div>
       ) : null}
       {activeView==="settings"?<SettingsView context={context} branchId={branchId||null} onNavigate={chooseView} onContextChanged={refreshContextAfterMutation}/>:null}
 
