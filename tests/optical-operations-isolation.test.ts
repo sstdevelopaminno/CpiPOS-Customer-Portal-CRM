@@ -7,6 +7,8 @@ describe("CRM Optical-only workspace",()=>{
     expect(app).toContain('canSeeOptical');
     expect(app).toContain('id!=="reports"||context.role==="owner"');
     expect(app).toContain("OpticalCustomerAddressEditor");
+    expect(app).toContain('className="custom-stock-shortcut"');
+    expect(app).toContain('onClick={()=>chooseView("stock")}');
     expect(app).toContain('VITE_OPTICAL_OPS_V1_ENABLED === "true"');
     expect(app).toContain("menuAccess?.optical_retail_enabled");
     expect(app).toContain("<OpticalCustomersView");
