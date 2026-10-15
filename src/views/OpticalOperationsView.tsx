@@ -10,6 +10,8 @@ type Order = {
 };
 type Stock = {
   id:string;product_id:string;kind:string;brand:string|null;model:string|null;
+  color:string|null;frame_size:string|null;lens_index:string|null;lens_type:string|null;
+  lens_sph:number|null;lens_cyl:number|null;
   unit:string;unit_price:number;on_hand:number;reserved:number;reorder_level:number;
   image_url:string|null
 };
@@ -62,7 +64,7 @@ export function OpticalOperationsView({
           if(!cancelled)setOrders((data??[]) as Order[]);
         }else if(page==="stock"){
           const {data,error:e}=await supabase.from("optical_stock_bins")
-            .select("id,product_id,kind,brand,model,unit,unit_price,on_hand,reserved,reorder_level,image_url")
+            .select("id,product_id,kind,brand,model,color,frame_size,lens_index,lens_type,lens_sph,lens_cyl,unit,unit_price,on_hand,reserved,reorder_level,image_url")
             .eq("tenant_id",context.tenantId).eq("branch_id",branch)
             .order("created_at",{ascending:false}).limit(200);
           if(e)throw e;
@@ -119,8 +121,19 @@ export function OpticalOperationsView({
         const available=b.on_hand-b.reserved;
         return <tr key={b.id} className="border-t border-slate-100">
           <td className="p-3">
-            <strong>{b.kind==="frame"?"กรอบ":b.kind==="lens"?"เลนส์":"อุปกรณ์"}</strong>
-            <div>{[b.brand,b.model].filter(Boolean).join(" · ")||b.product_id.slice(0,8)}</div>
+            <div className="flex items-center gap-3">
+              {b.image_url?.startsWith("https://")?<img src={b.image_url} alt={b.model??"สินค้า Optical"}
+                className="h-12 w-12 rounded-md border object-cover"/>:null}
+              <div>
+                <strong>{b.kind==="frame"?"กรอบ":b.kind==="lens"?"เลนส์":"อุปกรณ์"}</strong>
+                <div>{[b.brand,b.model].filter(Boolean).join(" · ")||b.product_id.slice(0,8)}</div>
+                <p className="text-xs text-slate-500">
+                  {[b.color,b.frame_size,b.lens_type,b.lens_index].filter(Boolean).join(" · ")}
+                  {b.lens_sph!==null?` SPH ${b.lens_sph}`:""}
+                  {b.lens_cyl!==null?` CYL ${b.lens_cyl}`:""}
+                </p>
+              </div>
+            </div>
           </td>
           <td className="p-3">{money(b.unit_price)}</td>
           <td className="p-3">{b.on_hand} {b.unit}</td>
