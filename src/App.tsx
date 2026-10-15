@@ -226,12 +226,9 @@ export default function App() {
         import.meta.env.VITE_OPTICAL_OPS_V1_ENABLED === "true" ? (
           <div className="space-y-4">
             <div className="flex flex-wrap gap-2" role="tablist" aria-label="โมดูล Optical">
-              {([
-                ["customers","ประวัติลูกค้า"],
-                ["orders","ใบสั่งงาน"],
-                ["stock","สต๊อกกรอบ/เลนส์"],
-                ["reports","รายงานเจ้าของร้าน"]
-              ] as const).filter(([id])=>(id!=="reports"||context.role==="owner") && (id!=="stock"||canSeeView("stock"))).map(([id,label])=><button type="button" role="tab"
+              {([["customers","ประวัติลูกค้า"],["orders","ใบสั่งงาน"],
+                ["stock","สต๊อกกรอบ/เลนส์"],["reports","รายงานเจ้าของร้าน"]] as const)
+                .filter(([id])=>(id!=="reports"||context.role==="owner") && (id!=="stock"||canSeeView("stock"))).map(([id,label])=><button type="button" role="tab"
                 aria-selected={opticalTab===id} key={id} onClick={()=>setOpticalTab(id)}
                 className={`rounded-xl border px-4 py-2 text-sm font-bold ${opticalTab===id?"border-emerald-700 bg-emerald-700 text-white":"border-emerald-100 bg-white text-emerald-800"}`}>{label}</button>)}
             </div>
@@ -249,8 +246,7 @@ export default function App() {
             )}
           </div>
         ) : <div className="space-y-4">
-          {canSeeView("stock")?<div className="custom-stock-shortcut"><span>IMDC OPTICAL · สต๊อกกรอบแว่น/เลนส์</span>
-            <button type="button" onClick={()=>chooseView("stock")}>เปิดเมนูสต๊อก</button></div>:null}
+          {canSeeView("stock")?<div className="custom-stock-shortcut"><span>IMDC OPTICAL · สต๊อกกรอบแว่น/เลนส์</span><button type="button" onClick={()=>chooseView("stock")}>เปิดเมนูสต๊อก</button></div>:null}
           <OpticalCustomersView context={context} branchId={branchId||null}/>
         </div>
       ) : null}
