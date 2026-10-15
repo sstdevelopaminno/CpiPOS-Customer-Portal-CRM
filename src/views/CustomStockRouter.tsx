@@ -20,7 +20,7 @@ export function CustomStockRouter({context,branchId,features}:{
   // also falls back to the previous behavior.
   if(mode==="legacy")return <StockView context={context} branchId={branchId}/>;
 
-  const opticalContent=<BusinessStockOverview context={context} branchId={branchId} business="optical"/>;
+  const opticalContent=<BusinessStockOverview context={context} branchId={branchId} business="optical" strictOpticalCategory={mode==="mixed"}/>;
 
   if(mode==="optical")return opticalContent;
   if(mode==="retail")return <BusinessStockOverview context={context} branchId={branchId} business="retail"/>;
