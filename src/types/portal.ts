@@ -227,6 +227,8 @@ export interface FeatureState {
   is_custom: boolean;
   is_internal_test_full: boolean;
   optical_retail_enabled: boolean;
+  /** IT-approved sales modes on the single currently active CUSTOM contract. */
+  sales_modes?: Record<string, boolean>;
   package_features: Record<string, boolean>;
   feature_overrides: Record<string, boolean>;
   menu_policy: Record<string, boolean>;
