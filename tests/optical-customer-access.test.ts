@@ -8,7 +8,9 @@ describe("CRM Optical history controls",()=>{
     const state=source("../src/lib/api/billing.ts");
     expect(app).toContain("menuAccess?.optical_retail_enabled");
     expect(app).toContain('id==="optical" ? canSeeOptical');
-    expect(state).toContain("grants?.optical_retail===true");
+    expect(state).toContain('contractCurrent && approvedSalesModes.optical_retail===true');
+    expect(state).toContain('grants[mode]===true');
+    expect(state).toContain('contract?.status==="active"||contract?.status==="trial"');
     expect(state).toContain('"tenant_subscription_contracts"');
   });
   it("queries the shared tenant-scoped Optical tables and softly archives",()=>{
