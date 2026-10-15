@@ -22,8 +22,9 @@ function stockState(product:ProductRow):"unverified"|"out"|"low"|"ok" {
   return "ok";
 }
 
-export function BusinessStockOverview({context,branchId,business}:{
+export function BusinessStockOverview({context,branchId,business,strictOpticalCategory=false}:{
   context:PortalContext;branchId:string|null;business:InventoryBusiness;
+  strictOpticalCategory?:boolean;
 }) {
   // Always use an assigned branch. Never silently aggregate Optical patient
   // or stock records across branches (even when CRM filter says "all").
@@ -43,10 +44,14 @@ export function BusinessStockOverview({context,branchId,business}:{
       // This uses the existing RLS-scoped POS product catalog only.
       // Never calls ingredient mutations or optical stock writes.
       const result=await loadProducts(context.tenantId,activeBranch);
-      setRows(result.filter(row=>row.branch_id===activeBranch));
+      setRows(result.filter(row=>row.branch_id===activeBranch)
+        // A mixed-mode CUSTOM store may sell food AND eyewear. Do not present
+        // food products under Optical without explicit Optical classification.
+        .filter(row=>!strictOpticalCategory || /^(กรอบแว่น|แว่นตา|เลนส์|optical|frames?|lenses?)$/i.test(String(row.category??"").trim()))
+      );
     }catch{setRows([]);setError("ไม่สามารถอ่านสต๊อกสินค้าในสาขานี้ได้ กรุณาตรวจสอบสิทธิ์");}
     finally{setLoading(false);}
-  },[context.tenantId,activeBranch]);
+  },[context.tenantId,activeBranch,strictOpticalCategory]);
 
   useEffect(()=>{void refresh();},[refresh]);
   useEffect(()=>{setFilter("all");setSearch("");},[activeBranch,business]);
@@ -126,6 +131,7 @@ export function BusinessStockOverview({context,branchId,business}:{
       })}</tbody></table>
       {filtered.length===0?<p className="business-stock__empty">ไม่พบสินค้าที่ตรงกับเงื่อนไขค้นหา</p>:null}
     </div>:null}
+    {strictOpticalCategory?<p className="business-stock__footnote">สำหรับ CUSTOM หลายโหมด ระบบแสดงเฉพาะสินค้าที่จัดหมวดหมู่เป็นกรอบแว่นหรือเลนส์ ป้องกันรายการร้านอาหารปะปนในสต๊อก Optical</p>:null}
     {optical?<p className="business-stock__footnote">รายละเอียดเฉพาะกรอบแว่น (สี/ขนาด) และเลนส์ (Index/SPH/CYL) จะใช้ข้อมูลจาก Optical Stock Bin หลังตรวจสอบการย้ายสต๊อกเดิมเสร็จแล้ว เพื่อไม่ให้จำนวนสินค้าแสดงซ้ำ</p>:null}
   </section>;
 }
