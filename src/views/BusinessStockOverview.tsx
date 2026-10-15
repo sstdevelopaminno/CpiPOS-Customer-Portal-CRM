@@ -34,6 +34,7 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
     ? branchId : context.branches[0]?.id;
   const [rows,setRows]=useState<ProductRow[]>([]);
   const [opticalBins,setOpticalBins]=useState<Map<string,Record<string,unknown>>>(new Map());
+  const [opticalDetails,setOpticalDetails]=useState<Map<string,Record<string,unknown>>>(new Map());
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState("");
   const [search,setSearch]=useState("");
@@ -63,7 +64,22 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
         }
         const map=new Map(allBins.map(bin=>[String(bin.product_id),bin]));
         setOpticalBins(map);
-        setRows(productRows.filter(row=>map.has(row.id) ||
+        // The existing authenticated products SELECT policy restricts tenant
+        // and branch. Metadata provides attributes for catalog-only items,
+        // without treating their legacy quantities as verified Optical stock.
+        const attributes:Record<string,unknown>[]=[];
+        for(let from=0;from<10000;from+=500){
+          const result=await supabase.from("products").select("id,metadata")
+            .eq("tenant_id",context.tenantId).eq("branch_id",activeBranch)
+            .is("deleted_at",null).order("id",{ascending:true}).range(from,from+499);
+          if(result.error)break;
+          attributes.push(...((result.data??[]) as Record<string,unknown>[]));
+          if((result.data??[]).length<500)break;
+        }
+        const detailMap=new Map(attributes.map(x=>[String(x.id),
+          (x.metadata && typeof x.metadata==="object" ? x.metadata : {}) as Record<string,unknown>]));
+        setOpticalDetails(detailMap);
+        setRows(productRows.filter(row=>map.has(row.id) || detailMap.get(row.id)?.business_mode==="optical_retail" ||
           /^(กรอบแว่น|แว่นตา|เลนส์|optical|frames?|lenses?|imdc optical qa)(\s|$)/i.test(String(row.category??"").trim())));
       }else setRows(productRows);
     }catch{setRows([]);setError("ไม่สามารถอ่านสต๊อกสินค้าในสาขานี้ได้ กรุณาตรวจสอบสิทธิ์");}
@@ -89,16 +105,23 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
   const opticalEntries:OpticalTableEntry[]=rows.map(row=>{
     const bin=opticalBins.get(row.id);
     const classLabel=classifyOpticalProduct(row);
+    const meta=opticalDetails.get(row.id)??{};
     const stockKind=bin?.kind==="lens"?"lens":bin?.kind==="accessory"?"accessory":
-      bin?.kind==="frame"?"frame":classLabel==="lenses"?"lens":"frame";
-    const field=(key:string)=>bin?.[key]===undefined||bin?.[key]===null?null:String(bin[key]);
-    const numeric=(key:string)=>bin?.[key]===undefined||bin?.[key]===null?null:Number(bin[key]);
+      bin?.kind==="frame"?"frame":meta.optical_kind==="lens"?"lens":meta.optical_kind==="accessory"?"accessory":classLabel==="lenses"?"lens":"frame";
+    const field=(key:string)=>{
+      const raw=bin?.[key]??meta["optical_"+key];
+      return raw===undefined||raw===null?null:String(raw);
+    };
+    const numeric=(key:string)=>{
+      const raw=bin?.[key]??meta["optical_"+key];
+      return raw===undefined||raw===null?null:Number(raw);
+    };
     const quantity=numeric("on_hand");
     const reserved=numeric("reserved");
     return {id:row.id,sku:row.sku,kind:stockKind,
       brand:field("brand"),model:field("model")??row.name,
       color:field("color"),frameSize:field("frame_size"),
-      lensName:field("model")??row.name,index:field("lens_index"),
+      lensName:field("lens_name")??field("model")??row.name,index:field("lens_index"),
       sph:numeric("lens_sph"),cyl:numeric("lens_cyl"),
       price:quantity!==null?Number(bin?.unit_price??row.price):Number(row.price),
       quantity:quantity??(row.available_quantity??null),
