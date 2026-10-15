@@ -28,6 +28,7 @@ export async function loadFeatureState(tenantId: string, branchId: string | null
   // Fail closed: CUSTOM is not equivalent to Optical permission.
   // The authoritative IT sales-mode switch is on the latest tenant contract.
   let opticalRetailEnabled=false;
+  let approvedSalesModes: Record<string,boolean>={};
   if(value.is_custom===true || value.is_internal_test_full===true){
     const {data:contract,error:contractError}=await supabase
       .from("tenant_subscription_contracts")
@@ -39,9 +40,14 @@ export async function loadFeatureState(tenantId: string, branchId: string | null
     if(!contractError){
       const grants=contract?.metadata?.sales_modes as Record<string,unknown>|undefined;
       const active=contract?.status==="active"||contract?.status==="trial";
-      opticalRetailEnabled=Boolean(active
-        && (!contract?.ended_at || Date.parse(contract.ended_at)>Date.now())
-        && grants?.optical_retail===true);
+      const contractCurrent=active && (!contract?.ended_at || Date.parse(contract.ended_at)>Date.now());
+      if(contractCurrent && grants && typeof grants==="object"){
+        approvedSalesModes=Object.fromEntries(
+          ["takeaway","dine_in","delivery","buffet_table","general_sale","optical_retail"]
+            .map(mode=>[mode,grants[mode]===true])
+        );
+      }
+      opticalRetailEnabled=Boolean(contractCurrent && approvedSalesModes.optical_retail===true);
     }
   }
   return {
@@ -49,6 +55,7 @@ export async function loadFeatureState(tenantId: string, branchId: string | null
     is_custom: value.is_custom === true,
     is_internal_test_full: value.is_internal_test_full === true,
     optical_retail_enabled: opticalRetailEnabled,
+    sales_modes: approvedSalesModes,
     package_features: (value.package_features??{}) as Record<string,boolean>,
     feature_overrides: (value.feature_overrides??{}) as Record<string,boolean>,
     menu_policy: (value.menu_policy??{}) as Record<string,boolean>
