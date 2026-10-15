@@ -185,20 +185,14 @@ export default function App() {
   const canInstall=Boolean(installPrompt)&&!standalone;
 
   return <div className={`appShell ${collapsed?"sidebarCollapsed":""} ${customBranding?"crm-custom-branded":""}`}
-    style={customBranding?({
-      "--crm-custom-accent":customBranding.accent_color,
-      "--crm-custom-sidebar":customBranding.sidebar_color
-    } as React.CSSProperties):undefined}>
+    style={customBranding?({"--crm-custom-accent":customBranding.accent_color,"--crm-custom-sidebar":customBranding.sidebar_color} as React.CSSProperties):undefined}>
     {mobileOpen?<button className="drawerBackdrop" aria-label="ปิดเมนู" onClick={()=>setMobileOpen(false)}/>:null}
     <aside className={`sidebar ${mobileOpen?"mobileOpen":""}`}>
       <div className="sidebarTop">
-        <div className="brandBlock"><img className="brandLogo" src="/cpipos-logo.png" alt="CpiPOS"/>
-          <div><strong>{customBranding?.system_name??"CpiPOS"}</strong><span>Powered by CpiPOS</span></div></div>
+        <div className="brandBlock"><img className="brandLogo" src="/cpipos-logo.png" alt="CpiPOS"/><div><strong>{customBranding?.system_name??"CpiPOS"}</strong><span>Powered by CpiPOS</span></div></div>
         <button className="collapseButton" aria-label={collapsed?"ขยายเมนู":"ย่อเมนู"} onClick={toggleCollapsed}>{collapsed?<PanelLeftOpen size={20}/>:<PanelLeftClose size={20}/>}</button>
       </div>
-      <div className="storeCard"><div className="storeAvatar">{customBranding?.logo_url?<img src={customBranding.logo_url} alt="โลโก้ร้าน"/>:
-        context.logoUrl?<img src={context.logoUrl} alt=""/>:<Store size={22}/>}</div>
-        <div><strong>{context.tenantName}</strong><span>ร้าน {context.tenantCode}</span></div></div>
+      <div className="storeCard"><div className="storeAvatar">{customBranding?.logo_url?<img src={customBranding.logo_url} alt="โลโก้ร้าน"/>:context.logoUrl?<img src={context.logoUrl} alt=""/>:<Store size={22}/>}</div><div><strong>{context.tenantName}</strong><span>ร้าน {context.tenantCode}</span></div></div>
       <nav aria-label="เมนูหลัก">{availableNav.map(item=><button key={item.id} aria-current={activeView===item.id?"page":undefined} title={collapsed?item.label:undefined} className={activeView===item.id?"active":""} onClick={()=>chooseView(item.id)}>{item.icon}<span>{item.label}</span><ChevronRight size={17}/></button>)}</nav>
       <div className="sidebarBottom">
         {canInstall?<button className="sidebarInstallButton" onClick={()=>void installApp()}><Download size={17}/><span>ติดตั้งเว็บแอป</span></button>:null}
@@ -210,8 +204,7 @@ export default function App() {
     <main className="content">
       <header className="mobileHeader">
         <button className="iconButton" aria-label="เปิดเมนู" onClick={()=>setMobileOpen(true)}><Menu size={21}/></button>
-        <div className="brandBlock"><img className="brandLogo" src="/cpipos-logo.png" alt="CpiPOS"/>
-          <div><strong>{customBranding?.system_name??"CpiPOS"}</strong><span>Powered by CpiPOS · {context.tenantName}</span></div></div>
+        <div className="brandBlock"><img className="brandLogo" src="/cpipos-logo.png" alt="CpiPOS"/><div><strong>{customBranding?.system_name??"CpiPOS"}</strong><span>Powered by CpiPOS · {context.tenantName}</span></div></div>
         <div className="mobileHeaderActions">{canInstall?<button className="iconButton" aria-label="ติดตั้งเว็บแอป" onClick={()=>void installApp()}><Download size={19}/></button>:null}<button className="iconButton" aria-label="ออกจากระบบ" onClick={()=>void logoutPortal()}><LogOut size={19}/></button></div>
       </header>
 
