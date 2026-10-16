@@ -19,6 +19,7 @@ import { OpticalOperationsView } from "./views/OpticalOperationsView";
 import { OpticalCustomerAddressEditor } from "./views/OpticalCustomerAddressEditor";
 import { SettingsView } from "./views/SettingsView";
 import {useCustomBranding} from "./lib/use-custom-branding";
+import { CRM_SETTINGS_LANGUAGE_STORAGE,normalizeCrmSettingsLanguage,settingsText,type CrmSettingsLanguage } from "./lib/settings-language";
 
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -46,6 +47,9 @@ const PORTAL_VIEW_MENU: Record<PortalView,string> = {
 export default function App() {
   const [context,setContext]=useState<PortalContext|null>(null);
   const [menuAccess,setMenuAccess]=useState<FeatureState|null>(null);
+  const [language,setLanguage]=useState<CrmSettingsLanguage>(()=>{
+    try{return normalizeCrmSettingsLanguage(localStorage.getItem(CRM_SETTINGS_LANGUAGE_STORAGE));}catch{return "th";}
+  });
   const [menuAccessError,setMenuAccessError]=useState(false);
   const [checking,setChecking]=useState(true);
   const [view,setView]=useState<PortalView>("dashboard");
@@ -82,6 +86,16 @@ export default function App() {
       }
       setFatal("บันทึกสำเร็จแล้ว แต่ไม่สามารถโหลดข้อมูลร้านล่าสุดได้ กรุณากดรีเฟรชอีกครั้ง");
     }
+  },[]);
+
+  useEffect(()=>{
+    const sync=()=>{
+      try{setLanguage(normalizeCrmSettingsLanguage(localStorage.getItem(CRM_SETTINGS_LANGUAGE_STORAGE)));}
+      catch{setLanguage("th");}
+    };
+    window.addEventListener("cpipos-crm-language-changed",sync);
+    window.addEventListener("storage",sync);
+    return()=>{window.removeEventListener("cpipos-crm-language-changed",sync);window.removeEventListener("storage",sync);};
   },[]);
 
   useEffect(()=>{
@@ -172,8 +186,8 @@ export default function App() {
 
   // Keep navigation hidden until IT entitlement resolves; never flash unauthorized CUSTOM menus.
   const availableNav = !menuAccess ? [] : nav.filter(item=>canSeeView(item.id))
-    .map(item=>item.id==="stock"?{...item,label:stockBusinessMode==="optical"?"สต๊อกกรอบ/เลนส์":
-      stockBusinessMode==="retail"?"สต๊อกสินค้า":stockBusinessMode==="mixed"?"สต๊อกตามโหมด":"วัตถุดิบ"}:item);
+    .map(item=>({...item,label:settingsText(language,item.id==="stock" ? (stockBusinessMode==="optical"?"สต๊อกกรอบ/เลนส์":
+      stockBusinessMode==="retail"?"สต๊อกสินค้า":stockBusinessMode==="mixed"?"สต๊อกตามโหมด":"วัตถุดิบ") : item.label)}));
   const activeView = !menuAccess ? null : !canSeeView(view) ? availableNav[0]?.id ?? null : view;
   const showFilters=activeView!=="package";
   const showPeriod=activeView==="dashboard"||activeView==="sales";
@@ -219,7 +233,7 @@ export default function App() {
         ?<CustomStockRouter context={context} branchId={branchId||null} features={menuAccess}/>:null}
       {activeView==="staff"?<StaffView context={context} branchId={branchId||null}/>:null}
       {activeView==="package"?<PackageView context={context}/>:null}
-      {activeView==="more"?<MoreView context={context} branchId={branchId||null} onNavigate={chooseView}/>:null}
+      {activeView==="more"?<MoreView context={context} branchId={branchId||null} onNavigate={chooseView} language={language}/>:null}
       {activeView==="optical" && canSeeOptical ? (
         import.meta.env.VITE_OPTICAL_OPS_V1_ENABLED === "true" ? (
           <div className="space-y-4">
