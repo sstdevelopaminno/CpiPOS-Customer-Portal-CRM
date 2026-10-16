@@ -5,6 +5,7 @@ import { loadFeatureState, loadMoreSnapshot, loadSettingsSnapshot, saveSetting, 
 import { ConnectedPosModuleModal, ErrorPanel, Modal } from "../components/common";
 import { number } from "../lib/formatters";
 import { isCustomMenuVisible } from "../lib/custom-menu-access";
+import {CRM_SETTINGS_MENU_KEYS,isCrmMenuEnabled} from "../lib/crm-menu-policy";
 import { POS_SETTINGS_MENU_ITEMS, type PosMenuIcon, type PosSettingsEditorKind, type PosSettingsMenuItem } from "../config/pos-menu-catalog";
 import { PosAdminWorkspace } from "./pos-admin/PosAdminWorkspace";
 import { CRM_SETTINGS_LANGUAGE_STORAGE, languageOptions, normalizeCrmSettingsLanguage, settingsMenuLocale, settingsText, type CrmSettingsLanguage } from "../lib/settings-language";
@@ -191,7 +192,7 @@ function SettingEditorModal({
   </Modal>;
 }
 
-export function SettingsView({context,branchId,onNavigate,onContextChanged}:{context:PortalContext;branchId:string|null;onNavigate:(view:PortalView)=>void;onContextChanged:()=>Promise<void>}){
+export function SettingsView({context,branchId,onNavigate,onContextChanged,menuPolicy}:{context:PortalContext;branchId:string|null;onNavigate:(view:PortalView)=>void;onContextChanged:()=>Promise<void>;menuPolicy:Record<string,boolean>}){
   const [snapshot,setSnapshot]=useState<SettingsSnapshot|null>(null);
   const [language,setLanguage]=useState<CrmSettingsLanguage>(()=>{
     try{return normalizeCrmSettingsLanguage(localStorage.getItem(CRM_SETTINGS_LANGUAGE_STORAGE));}
@@ -234,7 +235,7 @@ export function SettingsView({context,branchId,onNavigate,onContextChanged}:{con
   },[refresh]);
 
   const allowed=(key:string,feature:string)=>{
-    if(features && !isCustomMenuVisible(features,key))return false;
+    if(!isCrmMenuEnabled(menuPolicy,CRM_SETTINGS_MENU_KEYS[key])||features && !isCustomMenuVisible(features,key))return false;
     const base=features?.package_features?.[feature]??false;
     const override=features?.feature_overrides?.[feature];
     return override===undefined?base:override;
@@ -263,6 +264,7 @@ export function SettingsView({context,branchId,onNavigate,onContextChanged}:{con
     return context.role==="owner"||["taxes","notifications"].includes(item.editorKind);
   };
   const activate=(item:PosSettingsMenuItem)=>{
+    if(!isCrmMenuEnabled(menuPolicy,CRM_SETTINGS_MENU_KEYS[item.key]))return;
     if(item.kind==="language"){setLanguageModalOpen(true);return;}
     if(item.kind==="branding" && features?.is_custom && isCustomMenuVisible(features,"settings.branding")) {setBrandingModalOpen(true);return;}
     if(item.target){onNavigate(item.target);return;}
@@ -273,7 +275,7 @@ export function SettingsView({context,branchId,onNavigate,onContextChanged}:{con
 
   const renderSettingsGroup=(keys:readonly string[])=>(
     <div className="moduleGrid settingsGrid posMenuGrid">
-      {POS_SETTINGS_MENU_ITEMS.filter(item=>keys.includes(item.kind) && (item.key !== "settings.currency" && item.key !== "settings.branding" || (features?.is_custom === true && isCustomMenuVisible(features,item.key))) && (!(features?.is_custom || features?.is_internal_test_full) || isCustomMenuVisible(features,item.key))).map(item=>{const isAllowed=features?allowed(item.key,item.feature):false;const editable=canEdit(item);const directlyManaged=Boolean(item.target||item.adminModule||editable||item.kind==="language"||item.kind==="branding");const localized=settingsMenuLocale(language,item.kind,item.label,item.desc);return <button key={item.key} className={`moduleCard posMenuCard ${isAllowed?"":"locked"} ${isAllowed&&!directlyManaged?"linkedOnly":""}`} disabled={!features||!isAllowed} onClick={()=>activate(item)}><span className="moduleIcon"><SettingsMenuIcon name={item.icon}/></span><div><strong>{localized.label}</strong><span>{localized.desc}</span><small>{!features?T("กำลังตรวจสิทธิ์..."):!isAllowed?T("ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด"):item.adminModule?T("จัดการเพิ่ม แก้ไข ลบจาก Customer Portal"):editable?T("กดเพื่อจัดการ"):item.target?T("เปิดใช้งานใน Customer Portal"):detail(item)}</small></div><ChevronRight size={18}/></button>;})}</div>
+      {POS_SETTINGS_MENU_ITEMS.filter(item=>keys.includes(item.kind) && isCrmMenuEnabled(menuPolicy,CRM_SETTINGS_MENU_KEYS[item.key]) && (item.key !== "settings.currency" && item.key !== "settings.branding" || (features?.is_custom === true && isCustomMenuVisible(features,item.key))) && (!(features?.is_custom || features?.is_internal_test_full) || isCustomMenuVisible(features,item.key))).map(item=>{const isAllowed=features?allowed(item.key,item.feature):false;const editable=canEdit(item);const directlyManaged=Boolean(item.target||item.adminModule||editable||item.kind==="language"||item.kind==="branding");const localized=settingsMenuLocale(language,item.kind,item.label,item.desc);return <button key={item.key} className={`moduleCard posMenuCard ${isAllowed?"":"locked"} ${isAllowed&&!directlyManaged?"linkedOnly":""}`} disabled={!features||!isAllowed} onClick={()=>activate(item)}><span className="moduleIcon"><SettingsMenuIcon name={item.icon}/></span><div><strong>{localized.label}</strong><span>{localized.desc}</span><small>{!features?T("กำลังตรวจสิทธิ์..."):!isAllowed?T("ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด"):item.adminModule?T("จัดการเพิ่ม แก้ไข ลบจาก Customer Portal"):editable?T("กดเพื่อจัดการ"):item.target?T("เปิดใช้งานใน Customer Portal"):detail(item)}</small></div><ChevronRight size={18}/></button>;})}</div>
   );
 
   return <>
@@ -286,7 +288,7 @@ export function SettingsView({context,branchId,onNavigate,onContextChanged}:{con
       <div><CreditCard size={20}/><span>{T("บัญชีรับเงิน")}</span><strong>{snapshot.payment_accounts.length}</strong></div>
     </section>:null}
     <TopicHub label={T("หมวดหมู่การตั้งค่า POS")} items={[
-      {id:"store",title:T("ข้อมูลร้านและผู้ใช้งาน"),description:T("ข้อมูลบริษัท สาขา และสิทธิ์พนักงาน"),count:`${features?.is_custom && isCustomMenuVisible(features,"settings.branding") ? 3 : 2} ${T("หัวข้อ")}`,content:renderSettingsGroup(["branding","store","branches"])},
+      {id:"store",title:T("ข้อมูลร้านและผู้ใช้งาน"),description:T("ข้อมูลบริษัท สาขา และสิทธิ์พนักงาน"),count:`${["branding","store","branches"].filter(kind=>POS_SETTINGS_MENU_ITEMS.some(item=>item.kind===kind&&isCrmMenuEnabled(menuPolicy,CRM_SETTINGS_MENU_KEYS[item.key])&&(kind!=="branding"||features?.is_custom&&isCustomMenuVisible(features,item.key)))).length} ${T("หัวข้อ")}`,content:renderSettingsGroup(["branding","store","branches"])},
       {id:"billing",title:T("การชำระเงินและภาษี"),description:T("บัญชีรับเงิน INET QR ภาษีและการแจ้งเตือน"),count:`4 ${T("หัวข้อ")}`,content:renderSettingsGroup(["payments","inet","taxes","notifications"])},
       {id:"hardware",title:T("เครื่องและอุปกรณ์"),description:T("เครื่องแคชเชียร์ เครื่องพิมพ์ และจอลูกค้า"),count:`3 ${T("หัวข้อ")}`,content:renderSettingsGroup(["devices","printers","display"])},
       {id:"operations",title:T("การดำเนินงานและการแสดงผล"),description:T("Audit ครัว QR โต๊ะ ภาษา และแถบเมนู"),count:`6 ${T("หัวข้อ")}`,content:renderSettingsGroup(["activity","orderKitchen","tableQr","language","currency","placement"])},
@@ -301,15 +303,15 @@ export function SettingsView({context,branchId,onNavigate,onContextChanged}:{con
     ]}/>
 
     <div className="auditNote">{T("เครื่องแคชเชียร์ เครื่องพิมพ์ และ Customer Display pairing จัดการจาก Customer Portal ได้แล้ว; การค้นหา USB/Bluetooth จริงและค่า local เช่นภาษา/ตำแหน่งเมนูยังทำที่เครื่อง POS/Print Agent")}</div>
-    {editor&&snapshot?<SettingEditorModal kind={editor} context={context} branchId={branchId} snapshot={snapshot} language={language} onClose={()=>setEditor(null)} onSaved={refresh} onContextChanged={onContextChanged}/>:null}
-    {linkedItem?<ConnectedPosModuleModal title={settingsMenuLocale(language,linkedItem.kind,linkedItem.label,linkedItem.desc).label} description={settingsMenuLocale(language,linkedItem.kind,linkedItem.label,linkedItem.desc).desc} detail={detail(linkedItem)} onClose={()=>setLinkedItem(null)}/>:null}
-    {brandingModalOpen&&features?.is_custom&&isCustomMenuVisible(features,"settings.branding")?<Modal title={T("ธีมสี โลโก้ และชื่อระบบ (CUSTOM)")}
+    {editor&&snapshot&&POS_SETTINGS_MENU_ITEMS.some(item=>item.editorKind===editor&&isCrmMenuEnabled(menuPolicy,CRM_SETTINGS_MENU_KEYS[item.key]))?<SettingEditorModal kind={editor} context={context} branchId={branchId} snapshot={snapshot} language={language} onClose={()=>setEditor(null)} onSaved={refresh} onContextChanged={onContextChanged}/>:null}
+    {linkedItem&&isCrmMenuEnabled(menuPolicy,CRM_SETTINGS_MENU_KEYS[linkedItem.key])?<ConnectedPosModuleModal title={settingsMenuLocale(language,linkedItem.kind,linkedItem.label,linkedItem.desc).label} description={settingsMenuLocale(language,linkedItem.kind,linkedItem.label,linkedItem.desc).desc} detail={detail(linkedItem)} onClose={()=>setLinkedItem(null)}/>:null}
+    {brandingModalOpen&&features?.is_custom&&isCustomMenuVisible(features,"settings.branding")&&isCrmMenuEnabled(menuPolicy,CRM_SETTINGS_MENU_KEYS["settings.branding"])?<Modal title={T("ธีมสี โลโก้ และชื่อระบบ (CUSTOM)")}
       subtitle={T("ใช้ข้อมูลร่วมกันระหว่าง CRM และ POS · Powered by CpiPOS")}
       onClose={()=>setBrandingModalOpen(false)} wide>
       <CustomBrandingEditor tenantId={context.tenantId} language={language}
         onSaved={()=>window.dispatchEvent(new Event("cpipos-custom-branding-updated"))}/>
     </Modal>:null}
-    {languageModalOpen?<Modal title={T("เปลี่ยนภาษา")} subtitle={T("ภาษาไทย อังกฤษ หรือลาว")} onClose={()=>setLanguageModalOpen(false)}><div className="entityForm"><div className="formGrid">{languageOptions.map(option=><label key={option.code} className="switchField span2" style={{padding:"12px 16px",border:"1px solid #dbe2ed",borderRadius:12}}><input type="radio" name="crm-settings-language" checked={language===option.code} onChange={()=>{setSettingsLanguage(option.code);setLanguageModalOpen(false);}}/><span>{option.label}</span></label>)}</div><div className="modalActions"><button type="button" className="secondaryButton" onClick={()=>setLanguageModalOpen(false)}>{T("ยกเลิก")}</button></div></div></Modal>:null}
-    {adminModule?<Modal title={T("ตั้งค่า POS")} subtitle={T("จัดการข้อมูลร่วมกับระบบ POS ภายใต้สิทธิ์ Owner/Manager")} onClose={()=>setAdminModule(null)} wide workspace><div className="topicModalBody"><PosAdminWorkspace module={adminModule} context={context} branchId={branchId} onBack={()=>setAdminModule(null)}/></div></Modal>:null}
+    {languageModalOpen&&isCrmMenuEnabled(menuPolicy,CRM_SETTINGS_MENU_KEYS["settings.language"])?<Modal title={T("เปลี่ยนภาษา")} subtitle={T("ภาษาไทย อังกฤษ หรือลาว")} onClose={()=>setLanguageModalOpen(false)}><div className="entityForm"><div className="formGrid">{languageOptions.map(option=><label key={option.code} className="switchField span2" style={{padding:"12px 16px",border:"1px solid #dbe2ed",borderRadius:12}}><input type="radio" name="crm-settings-language" checked={language===option.code} onChange={()=>{setSettingsLanguage(option.code);setLanguageModalOpen(false);}}/><span>{option.label}</span></label>)}</div><div className="modalActions"><button type="button" className="secondaryButton" onClick={()=>setLanguageModalOpen(false)}>{T("ยกเลิก")}</button></div></div></Modal>:null}
+    {adminModule&&POS_SETTINGS_MENU_ITEMS.some(item=>item.adminModule===adminModule&&isCrmMenuEnabled(menuPolicy,CRM_SETTINGS_MENU_KEYS[item.key]))?<Modal title={T("ตั้งค่า POS")} subtitle={T("จัดการข้อมูลร่วมกับระบบ POS ภายใต้สิทธิ์ Owner/Manager")} onClose={()=>setAdminModule(null)} wide workspace><div className="topicModalBody"><PosAdminWorkspace module={adminModule} context={context} branchId={branchId} onBack={()=>setAdminModule(null)}/></div></Modal>:null}
   </>;
 }
