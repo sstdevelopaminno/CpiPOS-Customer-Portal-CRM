@@ -29,6 +29,10 @@ describe("CRM Optical-only workspace",()=>{
     expect(ui).not.toContain('.update({');
     expect(ui).toContain("bin.on_hand-bin.reserved");
     expect(ui).toContain("image_url:string|null");
+    expect(ui).toContain("imageUrl:bin.image_url");
+    const stock=read("views/BusinessStockOverview.tsx");
+    expect(stock).toContain('const T=(value:string)=>optical?opticalText(language,value):value;');
+    expect(stock).toContain('optical?T("สต๊อกกรอบแว่นและเลนส์")');
     expect(ui).toContain("OpticalStockTable");
     expect(ui).toContain("opticalEntries:OpticalTableEntry[]");
     const table=read("views/OpticalStockTable.tsx");
