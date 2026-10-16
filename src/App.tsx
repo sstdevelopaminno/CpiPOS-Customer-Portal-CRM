@@ -150,7 +150,7 @@ export default function App() {
   const stockBusinessMode = menuAccess ? resolveCustomInventoryMode(menuAccess) : "legacy";
   const crmPolicy=menuAccess?.menu_policy??{};
   const opticalTabsAllowed=(["customers","orders","stock","reports"] as const).filter(tab=>isCrmMenuEnabled(crmPolicy,CRM_OPTICAL_MENU_KEYS[tab])&&(tab!=="reports"||context?.role==="owner")&&(tab!=="stock"||isCrmMenuEnabled(crmPolicy,CRM_MAIN_MENU_KEYS.stock)));
-  const canSeeOptical=Boolean(menuAccess?.optical_retail_enabled&&(menuAccess.is_custom||menuAccess.is_internal_test_full)&&menuAccess.menu_policy["main.optical_customers"]!==false&&opticalTabsAllowed.length>0);
+  const canSeeOptical=Boolean(menuAccess?.optical_retail_enabled&&(menuAccess.is_custom||menuAccess.is_internal_test_full)&&menuAccess.menu_policy["main.optical_customers"]!==false&&opticalTabsAllowed.length>0&&(import.meta.env.VITE_OPTICAL_OPS_V1_ENABLED==="true"||opticalTabsAllowed.includes("customers")));
   const canSeeView=(id:PortalView)=>isCrmMenuEnabled(crmPolicy,CRM_MAIN_MENU_KEYS[id])&&(id==="optical"?canSeeOptical:!(menuAccess?.is_custom||menuAccess?.is_internal_test_full)||isCustomMenuVisible(menuAccess,PORTAL_VIEW_MENU[id]));
   const chooseView=(next:PortalView)=>{
     if(!canSeeView(next))return;
