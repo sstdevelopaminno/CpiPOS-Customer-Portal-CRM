@@ -111,7 +111,7 @@ export function OpticalOperationsView({
     lensName:bin.model??bin.lens_type,index:bin.lens_index,
     sph:bin.lens_sph,cyl:bin.lens_cyl,
     price:bin.unit_price,quantity:bin.on_hand,
-    remaining:Math.max(0,bin.on_hand-bin.reserved)
+    remaining:Math.max(0,bin.on_hand-bin.reserved),imageUrl:bin.image_url
   }));
 
   if(!branch)return <p className="rounded-xl bg-amber-50 p-4">{T("กรุณาเลือกสาขาที่ได้รับสิทธิ์ก่อน")}</p>;
