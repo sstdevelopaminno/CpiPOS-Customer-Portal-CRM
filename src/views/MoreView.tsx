@@ -5,6 +5,7 @@ import { ConnectedPosModuleModal, ErrorPanel, Modal } from "../components/common
 import { TopicHub } from "../components/TopicHub";
 import { number } from "../lib/formatters";
 import { isCustomMenuVisible } from "../lib/custom-menu-access";
+import {CRM_MORE_MENU_KEYS,isCrmMenuEnabled} from "../lib/crm-menu-policy";
 import { POS_MORE_MENU_ITEMS, type PosMenuIcon, type PosMoreMenuItem } from "../config/pos-menu-catalog";
 import { PosAdminWorkspace } from "./pos-admin/PosAdminWorkspace";
 import { settingsText, type CrmSettingsLanguage } from "../lib/settings-language";
@@ -22,7 +23,7 @@ function MoreIcon({name}:{name:PosMenuIcon}) {
   return <History/>;
 }
 
-export function MoreView({context,branchId,onNavigate,language="th"}:{context:PortalContext;branchId:string|null;onNavigate:(view:PortalView)=>void;language?:CrmSettingsLanguage}){
+export function MoreView({context,branchId,onNavigate,language="th",menuPolicy}:{context:PortalContext;branchId:string|null;onNavigate:(view:PortalView)=>void;language?:CrmSettingsLanguage;menuPolicy:Record<string,boolean>}){
   const T=(value:string)=>settingsText(language,value);
   const [state,setState]=useState<FeatureState|null>(null);
   const [snapshot,setSnapshot]=useState<MoreSnapshot|null>(null);
@@ -48,7 +49,7 @@ export function MoreView({context,branchId,onNavigate,language="th"}:{context:Po
   },[context.tenantId,branchId]);
 
   const enabled=(item:PosMoreMenuItem)=>{
-    const menu=state?.menu_policy?.[item.key]!==false;
+    const menu=Boolean(state&&isCrmMenuEnabled(menuPolicy,CRM_MORE_MENU_KEYS[item.key])&&state.menu_policy?.[item.key]!==false);
     const base=state?.package_features?.[item.feature]??false;
     const override=state?.feature_overrides?.[item.feature];
     return menu&&(override===undefined?base:override);
@@ -66,7 +67,7 @@ export function MoreView({context,branchId,onNavigate,language="th"}:{context:Po
   };
 
   const renderMenuGroup=(keys:readonly string[])=>(
-    <div className="moduleGrid posMenuGrid">{POS_MORE_MENU_ITEMS.filter(item=>keys.includes(item.key) && (!(state?.is_custom || state?.is_internal_test_full) || isCustomMenuVisible(state,item.key))).map(item=>{const allowed=state?enabled(item):false;return <button key={item.key} className={`moduleCard posMenuCard ${allowed?"":"locked"} ${!item.target&&!item.adminModule&&allowed?"linkedOnly":""}`} disabled={!state||!allowed} onClick={()=>activate(item)}><span className="moduleIcon"><MoreIcon name={item.icon}/></span><div><strong>{T(item.label)}</strong><span>{T(item.desc)}</span><small>{!state?T("กำลังตรวจสิทธิ์..."):!allowed?T("ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด"):detail(item)}</small></div><ChevronRight size={18}/></button>;})}</div>
+    <div className="moduleGrid posMenuGrid">{POS_MORE_MENU_ITEMS.filter(item=>keys.includes(item.key) && isCrmMenuEnabled(menuPolicy,CRM_MORE_MENU_KEYS[item.key]) && (!(state?.is_custom || state?.is_internal_test_full) || isCustomMenuVisible(state,item.key))).map(item=>{const allowed=state?enabled(item):false;return <button key={item.key} className={`moduleCard posMenuCard ${allowed?"":"locked"} ${!item.target&&!item.adminModule&&allowed?"linkedOnly":""}`} disabled={!state||!allowed} onClick={()=>activate(item)}><span className="moduleIcon"><MoreIcon name={item.icon}/></span><div><strong>{T(item.label)}</strong><span>{T(item.desc)}</span><small>{!state?T("กำลังตรวจสิทธิ์..."):!allowed?T("ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด"):detail(item)}</small></div><ChevronRight size={18}/></button>;})}</div>
   );
 
   return <>
@@ -78,7 +79,7 @@ export function MoreView({context,branchId,onNavigate,language="th"}:{context:Po
       {id:"customers",title:T("สินค้าและสมาชิก"),description:T("จัดการสมาชิกหน้าร้าน"),count:`1 ${T("หัวข้อ")}`,content:renderMenuGroup(["more.members"])}
     ]}/>
     <div className="auditNote">{T("เมนูโต๊ะ ครัว บุฟเฟ่ และสมาชิกจัดการข้อมูล POS ชุดเดียวกันจาก Customer Portal ได้แล้ว ส่วนเมนูที่ยังไม่มี control-plane จะเปิดดูสถานะโดยไม่เขียนค่าหน้าขายโดยตรง")}</div>
-    {selected?<ConnectedPosModuleModal title={T(selected.label)} description={T(selected.desc)} detail={detail(selected)} onClose={()=>setSelected(null)}/>:null}
-    {adminModule?<Modal title={T("จัดการข้อมูล POS")} subtitle={T("ข้อมูลจะใช้ร่วมกับ POS หลักตามสิทธิ์ที่กำหนด")} onClose={()=>setAdminModule(null)} wide workspace><div className="topicModalBody"><PosAdminWorkspace module={adminModule} context={context} branchId={branchId} onBack={()=>setAdminModule(null)}/></div></Modal>:null}
+    {selected&&isCrmMenuEnabled(menuPolicy,CRM_MORE_MENU_KEYS[selected.key])?<ConnectedPosModuleModal title={T(selected.label)} description={T(selected.desc)} detail={detail(selected)} onClose={()=>setSelected(null)}/>:null}
+    {adminModule&&POS_MORE_MENU_ITEMS.some(item=>item.adminModule===adminModule&&isCrmMenuEnabled(menuPolicy,CRM_MORE_MENU_KEYS[item.key]))?<Modal title={T("จัดการข้อมูล POS")} subtitle={T("ข้อมูลจะใช้ร่วมกับ POS หลักตามสิทธิ์ที่กำหนด")} onClose={()=>setAdminModule(null)} wide workspace><div className="topicModalBody"><PosAdminWorkspace module={adminModule} context={context} branchId={branchId} onBack={()=>setAdminModule(null)}/></div></Modal>:null}
   </>;
 }
