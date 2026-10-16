@@ -12,9 +12,10 @@ describe("CRM three-language POS settings",()=>{
   expect(settingsText("lo","ตั้งค่า")).toBe("ຕັ້ງຄ່າ");
   expect(settingsText("th","ตั้งค่า")).toBe("ตั้งค่า");
   expect(settingsText("en","ร้านทดสอบ A")).toBe("ร้านทดสอบ A");
+  expect(settingsText("lo","ธีมสี โลโก้ และชื่อระบบ (CUSTOM)")).toContain("ສີທີມ");
  });
  it("translates the full POS Settings card catalog",()=>{
-  for(const kind of ["store","branches","devices","printers","activity","payments","inet","taxes","notifications","users","language","currency","placement","display","orderKitchen","tableQr"]){
+  for(const kind of ["branding","store","branches","devices","printers","activity","payments","inet","taxes","notifications","users","language","currency","placement","display","orderKitchen","tableQr"]){
    const en=settingsMenuLocale("en",kind,"ภาษาไทย","ภาษาไทย");
    const lo=settingsMenuLocale("lo",kind,"ภาษาไทย","ภาษาไทย");
    expect(en.label).not.toBe("ภาษาไทย");

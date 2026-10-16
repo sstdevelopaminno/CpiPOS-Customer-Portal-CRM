@@ -9,7 +9,7 @@ const KNOWN_CUSTOM_MENU_KEYS = new Set<string>([
   "more.sales_summary", "more.receipts", "more.tables", "more.kitchen_manage",
   "more.stock", "more.buffet", "more.members", "more.tax_invoices",
   "more.product_sales", "more.ai_documents",
-  "settings.store", "settings.branches", "settings.devices",
+  "settings.branding", "settings.store", "settings.branches", "settings.devices",
   "settings.printers", "settings.activity", "settings.payments",
   "settings.inet_nops", "settings.taxes", "settings.notifications",
   "settings.support", "settings.push_notifications", "settings.users",

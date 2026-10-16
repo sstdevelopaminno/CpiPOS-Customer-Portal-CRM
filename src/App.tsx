@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { Boxes, ChevronRight, Download, Glasses, LayoutDashboard, LoaderCircle, LogOut, Menu, MoreHorizontal, PackageCheck, PanelLeftClose, PanelLeftOpen, ReceiptText, Settings, ShieldCheck, Store, UsersRound, Warehouse, WifiOff } from "lucide-react";
-import { loadFeatureState, loadPortalContext, logoutPortal, todayInputValue, type FeatureState, type PortalContext, type PortalView, type ReportRange } from "./lib/portal";
+import { loadPortalContext, logoutPortal, todayInputValue, type PortalContext, type PortalView, type ReportRange } from "./lib/portal";
 import { supabase } from "./lib/supabase";
 import { isCustomMenuVisible } from "./lib/custom-menu-access";
+import {CRM_MAIN_MENU_KEYS,CRM_OPTICAL_MENU_KEYS,isCrmMenuEnabled} from "./lib/crm-menu-policy";
 import { FilterBar } from "./components/common";
 import { Login } from "./views/Login";
 import { DashboardView } from "./views/DashboardView";
@@ -19,7 +20,9 @@ import { OpticalOperationsView } from "./views/OpticalOperationsView";
 import { OpticalCustomerAddressEditor } from "./views/OpticalCustomerAddressEditor";
 import { SettingsView } from "./views/SettingsView";
 import {useCustomBranding} from "./lib/use-custom-branding";
-
+import {settingsText} from "./lib/settings-language";
+import {useCrmLanguage} from "./lib/use-crm-language";
+import {usePortalMenuAccess} from "./lib/use-portal-menu-access";
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
@@ -45,11 +48,11 @@ const PORTAL_VIEW_MENU: Record<PortalView,string> = {
 
 export default function App() {
   const [context,setContext]=useState<PortalContext|null>(null);
-  const [menuAccess,setMenuAccess]=useState<FeatureState|null>(null);
-  const [menuAccessError,setMenuAccessError]=useState(false);
+  const language=useCrmLanguage();
   const [checking,setChecking]=useState(true);
   const [view,setView]=useState<PortalView>("dashboard");
   const [branchId,setBranchId]=useState(()=>localStorage.getItem("cpipos-customer-portal-branch")??"");
+  const {menuAccess,menuAccessError,reloadMenuAccess}=usePortalMenuAccess(context?.tenantId??null,branchId);
   const [range,setRange]=useState<ReportRange>("day");
   const [anchor,setAnchor]=useState(todayInputValue());
   const [fatal,setFatal]=useState("");
@@ -89,17 +92,6 @@ export default function App() {
     const{data}=supabase.auth.onAuthStateChange(event=>{if(event==="SIGNED_OUT")setContext(null);});
     return()=>data.subscription.unsubscribe();
   },[restore]);
-
-  useEffect(()=>{
-    if(!context){setMenuAccess(null);setMenuAccessError(false);return;}
-    let cancelled=false;
-    setMenuAccess(null);
-    setMenuAccessError(false);
-    loadFeatureState(context.tenantId,branchId||null)
-      .then(state=>{if(!cancelled){setMenuAccess(state);setMenuAccessError(false);}})
-      .catch(()=>{if(!cancelled){setMenuAccess(null);setMenuAccessError(true);}});
-    return()=>{cancelled=true;};
-  },[context,branchId]);
 
   useEffect(()=>{
     if(!context)return;
@@ -156,12 +148,10 @@ export default function App() {
   },[]);
 
   const stockBusinessMode = menuAccess ? resolveCustomInventoryMode(menuAccess) : "legacy";
-  const canSeeOptical = Boolean(menuAccess?.optical_retail_enabled
-    && (menuAccess.is_custom || menuAccess.is_internal_test_full)
-    && menuAccess.menu_policy["main.optical_customers"] !== false);
-  const canSeeView=(id:PortalView)=>id==="optical" ? canSeeOptical
-    : !(menuAccess?.is_custom || menuAccess?.is_internal_test_full)
-      || isCustomMenuVisible(menuAccess,PORTAL_VIEW_MENU[id]);
+  const crmPolicy=menuAccess?.menu_policy??{};
+  const opticalTabsAllowed=(["customers","orders","stock","reports"] as const).filter(tab=>isCrmMenuEnabled(crmPolicy,CRM_OPTICAL_MENU_KEYS[tab])&&(tab!=="reports"||context?.role==="owner")&&(tab!=="stock"||isCrmMenuEnabled(crmPolicy,CRM_MAIN_MENU_KEYS.stock)));
+  const canSeeOptical=Boolean(menuAccess?.optical_retail_enabled&&(menuAccess.is_custom||menuAccess.is_internal_test_full)&&menuAccess.menu_policy["main.optical_customers"]!==false&&opticalTabsAllowed.length>0&&(import.meta.env.VITE_OPTICAL_OPS_V1_ENABLED==="true"||opticalTabsAllowed.includes("customers")));
+  const canSeeView=(id:PortalView)=>isCrmMenuEnabled(crmPolicy,CRM_MAIN_MENU_KEYS[id])&&(id==="optical"?canSeeOptical:!(menuAccess?.is_custom||menuAccess?.is_internal_test_full)||isCustomMenuVisible(menuAccess,PORTAL_VIEW_MENU[id]));
   const chooseView=(next:PortalView)=>{
     if(!canSeeView(next))return;
     setView(next);setMobileOpen(false);
@@ -172,9 +162,10 @@ export default function App() {
 
   // Keep navigation hidden until IT entitlement resolves; never flash unauthorized CUSTOM menus.
   const availableNav = !menuAccess ? [] : nav.filter(item=>canSeeView(item.id))
-    .map(item=>item.id==="stock"?{...item,label:stockBusinessMode==="optical"?"สต๊อกกรอบ/เลนส์":
-      stockBusinessMode==="retail"?"สต๊อกสินค้า":stockBusinessMode==="mixed"?"สต๊อกตามโหมด":"วัตถุดิบ"}:item);
+    .map(item=>({...item,label:settingsText(language,item.id==="stock" ? (stockBusinessMode==="optical"?"สต๊อกกรอบ/เลนส์":
+      stockBusinessMode==="retail"?"สต๊อกสินค้า":stockBusinessMode==="mixed"?"สต๊อกตามโหมด":"วัตถุดิบ") : item.label)}));
   const activeView = !menuAccess ? null : !canSeeView(view) ? availableNav[0]?.id ?? null : view;
+  const activeOpticalTab=opticalTabsAllowed.includes(opticalTab)?opticalTab:opticalTabsAllowed[0]??null;
   const showFilters=activeView!=="package";
   const showPeriod=activeView==="dashboard"||activeView==="sales";
   const canInstall=Boolean(installPrompt)&&!standalone;
@@ -210,7 +201,7 @@ export default function App() {
 
       {!menuAccess ? <div role="status" className="emptyState">
         <p>{menuAccessError ? "ไม่สามารถโหลดสิทธิ์เมนูได้ กรุณาลองอีกครั้ง" : "กำลังโหลดสิทธิ์เมนูจาก IT..."}</p>
-        {menuAccessError ? <button type="button" onClick={()=>{setMenuAccessError(false);loadFeatureState(context.tenantId,branchId||null).then(state=>setMenuAccess(state)).catch(()=>setMenuAccessError(true));}}>ลองใหม่</button> : null}
+        {menuAccessError ? <button type="button" onClick={()=>void reloadMenuAccess()}>ลองใหม่</button> : null}
       </div> : null}
       {activeView==="dashboard"?<DashboardView context={context} branchId={branchId||null} range={range} anchor={anchor}/>:null}
       {activeView==="sales"?<SalesView context={context} branchId={branchId||null} range={range} anchor={anchor}/>:null}
@@ -219,36 +210,36 @@ export default function App() {
         ?<CustomStockRouter context={context} branchId={branchId||null} features={menuAccess}/>:null}
       {activeView==="staff"?<StaffView context={context} branchId={branchId||null}/>:null}
       {activeView==="package"?<PackageView context={context}/>:null}
-      {activeView==="more"?<MoreView context={context} branchId={branchId||null} onNavigate={chooseView}/>:null}
+      {activeView==="more"?<MoreView context={context} branchId={branchId||null} onNavigate={chooseView} language={language} menuPolicy={crmPolicy}/>:null}
       {activeView==="optical" && canSeeOptical ? (
         import.meta.env.VITE_OPTICAL_OPS_V1_ENABLED === "true" ? (
           <div className="space-y-4">
             <div className="flex flex-wrap gap-2" role="tablist" aria-label="โมดูล Optical">
               {([["customers","ประวัติลูกค้า"],["orders","ใบสั่งงาน"],
                 ["stock","สต๊อกกรอบ/เลนส์"],["reports","รายงานเจ้าของร้าน"]] as const)
-                .filter(([id])=>(id!=="reports"||context.role==="owner") && (id!=="stock"||canSeeView("stock"))).map(([id,label])=><button type="button" role="tab"
-                aria-selected={opticalTab===id} key={id} onClick={()=>setOpticalTab(id)}
-                className={`rounded-xl border px-4 py-2 text-sm font-bold ${opticalTab===id?"border-emerald-700 bg-emerald-700 text-white":"border-emerald-100 bg-white text-emerald-800"}`}>{label}</button>)}
+                .filter(([id])=>opticalTabsAllowed.includes(id)).map(([id,label])=><button type="button" role="tab"
+                aria-selected={activeOpticalTab===id} key={id} onClick={()=>setOpticalTab(id)}
+                className={`rounded-xl border px-4 py-2 text-sm font-bold ${activeOpticalTab===id?"border-emerald-700 bg-emerald-700 text-white":"border-emerald-100 bg-white text-emerald-800"}`}>{label}</button>)}
             </div>
-            {opticalTab==="stock" && canSeeView("stock") ? (
+            {activeOpticalTab==="stock" && canSeeView("stock") ? (
               <BusinessStockOverview context={context} branchId={branchId||null} business="optical" strictOpticalCategory={stockBusinessMode==="mixed"}/>
-            ) : opticalTab==="stock" ? (
+            ) : activeOpticalTab==="stock" ? (
               <p role="alert">เมนูสต๊อกยังไม่ได้รับอนุมัติจาก IT Admin</p>
-            ) : opticalTab==="customers"?<div className="space-y-4">
+            ) : activeOpticalTab==="customers"?<div className="space-y-4">
               <OpticalCustomersView context={context} branchId={branchId||null}/>
               <OpticalCustomerAddressEditor context={context} branchId={branchId||null}/>
             </div>:(
-              opticalTab==="reports"&&context.role!=="owner"
+              activeOpticalTab==="reports"&&context.role!=="owner"
                 ? <p role="alert">เฉพาะเจ้าของร้านเท่านั้นที่สามารถดูรายงาน Optical</p>
-                : <OpticalOperationsView context={context} branchId={branchId||null} page={opticalTab}/>
+                : <OpticalOperationsView context={context} branchId={branchId||null} page={activeOpticalTab==="reports"?"reports":"orders"}/>
             )}
           </div>
         ) : <div className="space-y-4">
           {canSeeView("stock")?<div className="custom-stock-shortcut"><span>IMDC OPTICAL · สต๊อกกรอบแว่น/เลนส์</span><button type="button" onClick={()=>chooseView("stock")}>เปิดเมนูสต๊อก</button></div>:null}
-          <OpticalCustomersView context={context} branchId={branchId||null}/>
+          {opticalTabsAllowed.includes("customers")?<OpticalCustomersView context={context} branchId={branchId||null}/>:null}
         </div>
       ) : null}
-      {activeView==="settings"?<SettingsView context={context} branchId={branchId||null} onNavigate={chooseView} onContextChanged={refreshContextAfterMutation}/>:null}
+      {activeView==="settings"?<SettingsView context={context} branchId={branchId||null} onNavigate={chooseView} onContextChanged={refreshContextAfterMutation} menuPolicy={crmPolicy}/>:null}
 
       <footer>ข้อมูลและสิทธิ์ถูกจำกัดตามบัญชี {context.role==="owner"?"Owner":"Manager"} · {context.branches.length} สาขาที่เข้าถึงได้</footer>
     </main>

@@ -52,6 +52,7 @@ export const POS_MORE_MENU_ITEMS: readonly PosMoreMenuItem[] = [
 ];
 
 export const POS_SETTINGS_MENU_ITEMS: readonly PosSettingsMenuItem[] = [
+  { key:"settings.branding", posHref:"/preview/pos/settings", label:"ธีมสี / โลโก้ / ชื่อระบบ (CUSTOM)", desc:"ชื่อระบบ โลโก้ สีไฮไลต์ และสีพื้นหลังเมนู · Powered by CpiPOS", feature:"core_pos_sales", kind:"branding", icon:"store" },
   { key:"settings.store", posHref:"/preview/pos/settings", label:"ข้อมูลร้านค้า/บริษัท", desc:"รหัสร้าน ชื่อแสดงผล โลโก้ ที่อยู่ และเบอร์ติดต่อ", feature:"core_pos_sales", kind:"store", icon:"store", editorKind:"store" },
   { key:"settings.branches", posHref:"/preview/pos/settings", label:"สาขา", desc:"เปิดสาขา เพิ่ม แก้ไข และจัดการสถานะสาขา", feature:"branch_management", kind:"branches", icon:"branch", editorKind:"branches" },
   { key:"settings.devices", posHref:"/preview/pos/settings", label:"เพิ่มเครื่องแคชเชียร์", desc:"ผูกเครื่อง POS กับสาขา นโยบายล็อกอิน ขอบเขตผู้ใช้ และกะ", feature:"mobile_device_enrollment", kind:"devices", icon:"terminal", adminModule:"devices" },
