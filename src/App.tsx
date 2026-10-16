@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Boxes, ChevronRight, Download, Glasses, LayoutDashboard, LoaderCircle, LogOut, Menu, MoreHorizontal, PackageCheck, PanelLeftClose, PanelLeftOpen, ReceiptText, Settings, ShieldCheck, Store, UsersRound, Warehouse, WifiOff } from "lucide-react";
-import { loadFeatureState, loadPortalContext, logoutPortal, todayInputValue, type FeatureState, type PortalContext, type PortalView, type ReportRange } from "./lib/portal";
+import { loadPortalContext, logoutPortal, todayInputValue, type PortalContext, type PortalView, type ReportRange } from "./lib/portal";
 import { supabase } from "./lib/supabase";
 import { isCustomMenuVisible } from "./lib/custom-menu-access";
 import {CRM_MAIN_MENU_KEYS,CRM_OPTICAL_MENU_KEYS,isCrmMenuEnabled} from "./lib/crm-menu-policy";
@@ -22,6 +22,7 @@ import { SettingsView } from "./views/SettingsView";
 import {useCustomBranding} from "./lib/use-custom-branding";
 import {settingsText} from "./lib/settings-language";
 import {useCrmLanguage} from "./lib/use-crm-language";
+import {usePortalMenuAccess} from "./lib/use-portal-menu-access";
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
@@ -47,12 +48,11 @@ const PORTAL_VIEW_MENU: Record<PortalView,string> = {
 
 export default function App() {
   const [context,setContext]=useState<PortalContext|null>(null);
-  const [menuAccess,setMenuAccess]=useState<FeatureState|null>(null);
   const language=useCrmLanguage();
-  const [menuAccessError,setMenuAccessError]=useState(false);
   const [checking,setChecking]=useState(true);
   const [view,setView]=useState<PortalView>("dashboard");
   const [branchId,setBranchId]=useState(()=>localStorage.getItem("cpipos-customer-portal-branch")??"");
+  const {menuAccess,menuAccessError,reloadMenuAccess}=usePortalMenuAccess(context?.tenantId??null,branchId);
   const [range,setRange]=useState<ReportRange>("day");
   const [anchor,setAnchor]=useState(todayInputValue());
   const [fatal,setFatal]=useState("");
@@ -92,17 +92,6 @@ export default function App() {
     const{data}=supabase.auth.onAuthStateChange(event=>{if(event==="SIGNED_OUT")setContext(null);});
     return()=>data.subscription.unsubscribe();
   },[restore]);
-
-  useEffect(()=>{
-    if(!context){setMenuAccess(null);setMenuAccessError(false);return;}
-    let cancelled=false;
-    setMenuAccess(null);
-    setMenuAccessError(false);
-    loadFeatureState(context.tenantId,branchId||null)
-      .then(state=>{if(!cancelled){setMenuAccess(state);setMenuAccessError(false);}})
-      .catch(()=>{if(!cancelled){setMenuAccess(null);setMenuAccessError(true);}});
-    return()=>{cancelled=true;};
-  },[context,branchId]);
 
   useEffect(()=>{
     if(!context)return;
@@ -212,7 +201,7 @@ export default function App() {
 
       {!menuAccess ? <div role="status" className="emptyState">
         <p>{menuAccessError ? "ไม่สามารถโหลดสิทธิ์เมนูได้ กรุณาลองอีกครั้ง" : "กำลังโหลดสิทธิ์เมนูจาก IT..."}</p>
-        {menuAccessError ? <button type="button" onClick={()=>{setMenuAccessError(false);loadFeatureState(context.tenantId,branchId||null).then(state=>setMenuAccess(state)).catch(()=>setMenuAccessError(true));}}>ลองใหม่</button> : null}
+        {menuAccessError ? <button type="button" onClick={()=>void reloadMenuAccess()}>ลองใหม่</button> : null}
       </div> : null}
       {activeView==="dashboard"?<DashboardView context={context} branchId={branchId||null} range={range} anchor={anchor}/>:null}
       {activeView==="sales"?<SalesView context={context} branchId={branchId||null} range={range} anchor={anchor}/>:null}
