@@ -264,7 +264,7 @@ export function SettingsView({context,branchId,onNavigate,onContextChanged}:{con
   };
   const activate=(item:PosSettingsMenuItem)=>{
     if(item.kind==="language"){setLanguageModalOpen(true);return;}
-    if(item.kind==="branding" && context.role==="owner" && features?.is_custom && isCustomMenuVisible(features,"settings.branding")) {setBrandingModalOpen(true);return;}
+    if(item.kind==="branding" && features?.is_custom && isCustomMenuVisible(features,"settings.branding")) {setBrandingModalOpen(true);return;}
     if(item.target){onNavigate(item.target);return;}
     if(item.adminModule){setAdminModule(item.adminModule);return;}
     if(canEdit(item)&&item.editorKind){setEditor(item.editorKind);return;}
@@ -286,7 +286,7 @@ export function SettingsView({context,branchId,onNavigate,onContextChanged}:{con
       <div><CreditCard size={20}/><span>{T("บัญชีรับเงิน")}</span><strong>{snapshot.payment_accounts.length}</strong></div>
     </section>:null}
     <TopicHub label={T("หมวดหมู่การตั้งค่า POS")} items={[
-      {id:"store",title:T("ข้อมูลร้านและผู้ใช้งาน"),description:T("ข้อมูลบริษัท สาขา และสิทธิ์พนักงาน"),count:`${features?.is_custom ? 3 : 2} ${T("หัวข้อ")}`,content:renderSettingsGroup(["branding","store","branches"])},
+      {id:"store",title:T("ข้อมูลร้านและผู้ใช้งาน"),description:T("ข้อมูลบริษัท สาขา และสิทธิ์พนักงาน"),count:`${features?.is_custom && isCustomMenuVisible(features,"settings.branding") ? 3 : 2} ${T("หัวข้อ")}`,content:renderSettingsGroup(["branding","store","branches"])},
       {id:"billing",title:T("การชำระเงินและภาษี"),description:T("บัญชีรับเงิน INET QR ภาษีและการแจ้งเตือน"),count:`4 ${T("หัวข้อ")}`,content:renderSettingsGroup(["payments","inet","taxes","notifications"])},
       {id:"hardware",title:T("เครื่องและอุปกรณ์"),description:T("เครื่องแคชเชียร์ เครื่องพิมพ์ และจอลูกค้า"),count:`3 ${T("หัวข้อ")}`,content:renderSettingsGroup(["devices","printers","display"])},
       {id:"operations",title:T("การดำเนินงานและการแสดงผล"),description:T("Audit ครัว QR โต๊ะ ภาษา และแถบเมนู"),count:`6 ${T("หัวข้อ")}`,content:renderSettingsGroup(["activity","orderKitchen","tableQr","language","currency","placement"])},
@@ -303,7 +303,7 @@ export function SettingsView({context,branchId,onNavigate,onContextChanged}:{con
     <div className="auditNote">{T("เครื่องแคชเชียร์ เครื่องพิมพ์ และ Customer Display pairing จัดการจาก Customer Portal ได้แล้ว; การค้นหา USB/Bluetooth จริงและค่า local เช่นภาษา/ตำแหน่งเมนูยังทำที่เครื่อง POS/Print Agent")}</div>
     {editor&&snapshot?<SettingEditorModal kind={editor} context={context} branchId={branchId} snapshot={snapshot} language={language} onClose={()=>setEditor(null)} onSaved={refresh} onContextChanged={onContextChanged}/>:null}
     {linkedItem?<ConnectedPosModuleModal title={settingsMenuLocale(language,linkedItem.kind,linkedItem.label,linkedItem.desc).label} description={settingsMenuLocale(language,linkedItem.kind,linkedItem.label,linkedItem.desc).desc} detail={detail(linkedItem)} onClose={()=>setLinkedItem(null)}/>:null}
-    {brandingModalOpen&&features?.is_custom&&isCustomMenuVisible(features,"settings.branding")&&context.role==="owner"?<Modal title={T("ธีมสี โลโก้ และชื่อระบบ (CUSTOM)")}
+    {brandingModalOpen&&features?.is_custom&&isCustomMenuVisible(features,"settings.branding")?<Modal title={T("ธีมสี โลโก้ และชื่อระบบ (CUSTOM)")}
       subtitle={T("ใช้ข้อมูลร่วมกันระหว่าง CRM และ POS · Powered by CpiPOS")}
       onClose={()=>setBrandingModalOpen(false)} wide>
       <CustomBrandingEditor tenantId={context.tenantId} language={language}
