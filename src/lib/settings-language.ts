@@ -53,6 +53,11 @@ const words:Record<string,[string,string]> = {
   "Cashier terminals, printers and customer displays can be managed here. USB/Bluetooth discovery and POS-device settings remain local.",
   "ຈັດການເຄື່ອງຂາຍ ເຄື່ອງພິມ ແລະ ຈໍລູກຄ້າໄດ້ທີ່ນີ້. USB/Bluetooth ແລະຄ່າເຄື່ອງ POS ແມ່ນຕັ້ງຄ່າໃນເຄື່ອງ."
  ],
+ "ธีมสี / โลโก้ / ชื่อระบบ (CUSTOM)":["Theme / Logo / System name (CUSTOM)","ສີທີມ / ໂລໂກ້ / ຊື່ລະບົບ (CUSTOM)"],
+ "ชื่อระบบ โลโก้ สีไฮไลต์ และสีพื้นหลังเมนู · Powered by CpiPOS":["System name, logo, highlight and menu background · Powered by CpiPOS","ຊື່ລະບົບ ໂລໂກ້ ສີໄຮໄລທ໌ ແລະ ສີພື້ນຫຼັງເມນູ · Powered by CpiPOS"],
+ "ธีมสี โลโก้ และชื่อระบบ (CUSTOM)":["Theme, logo and system name (CUSTOM)","ສີທີມ ໂລໂກ້ ແລະ ຊື່ລະບົບ (CUSTOM)"],
+ "ใช้ข้อมูลร่วมกันระหว่าง CRM และ POS · Powered by CpiPOS":["Shared settings across CRM and POS · Powered by CpiPOS","ໃຊ້ການຕັ້ງຄ່າຮ່ວມກັນລະຫວ່າງ CRM ແລະ POS · Powered by CpiPOS"],
+ "จัดการร่วมกับ POS":["Manage with POS","ຈັດການຮ່ວມກັບ POS"],
  "ตั้งค่า POS":["POS settings","ຕັ້ງຄ່າ POS"],
  "จัดการข้อมูลร่วมกับระบบ POS ภายใต้สิทธิ์ Owner/Manager":["Manage shared POS data with Owner/Manager permissions","ຈັດການຂໍ້ມູນ POS ດ້ວຍສິດ Owner/Manager"],
  "บันทึกการตั้งค่า":["Save settings","ບັນທຶກການຕັ້ງຄ່າ"],
@@ -96,6 +101,7 @@ export function settingsText(language:CrmSettingsLanguage,text:string):string {
 
 
 const menuDescriptions: Record<string,[[string,string],[string,string]]> = {
+ branding:[["Theme / Logo / System name (CUSTOM)","ສີທີມ / ໂລໂກ້ / ຊື່ລະບົບ (CUSTOM)"],["System name, logo, highlight and menu background · Powered by CpiPOS","ຊື່ລະບົບ ໂລໂກ້ ສີໄຮໄລທ໌ ແລະ ສີພື້ນຫຼັງເມນູ · Powered by CpiPOS"]],
  store:[["Store / company","ຂໍ້ມູນຮ້ານ / ບໍລິສັດ"],["Store code, display name, logo, address and contact","ລະຫັດຮ້ານ ຊື່ ໂລໂກ້ ທີ່ຢູ່ ແລະຕິດຕໍ່"]],
  branches:[["Branches","ສາຂາ"],["Add and manage branches","ເພີ່ມ ແລະຈັດການສາຂາ"]],
  devices:[["Cashier terminals","ເຄື່ອງ POS"],["Link terminals, scope and shift","ຜູກເຄື່ອງ ສິດທິ ແລະກະຂາຍ"]],
