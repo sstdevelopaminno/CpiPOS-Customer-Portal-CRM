@@ -7,6 +7,7 @@ import {supabase} from "../lib/supabase";
 import {OpticalStockTable,type OpticalTableEntry} from "./OpticalStockTable";
 import {OpticalBestSellers} from "./OpticalBestSellers";
 import {OpticalCreateProduct} from "./OpticalCreateProduct";
+import { opticalText, readOpticalLanguage } from "../lib/optical-locale";
 
 export type InventoryBusiness = "optical" | "retail";
 export type InventoryFilter = "all" | "frames" | "lenses" | "low" | "legacy";
@@ -44,6 +45,9 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
   const [bestOpen,setBestOpen]=useState(false),[addOpen,setAddOpen]=useState(false);
   const [filter,setFilter]=useState<InventoryFilter>("all");
   const optical=business==="optical";
+  const [language]=useState(readOpticalLanguage);
+  // Retail/fixed plans keep their current labels and behavior unchanged.
+  const T=(value:string)=>optical?opticalText(language,value):value;
 
   const refresh=useCallback(async()=>{
     if(!activeBranch){setRows([]);return;}
@@ -87,9 +91,9 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
         setRows(productRows.filter(row=>map.has(row.id) || detailMap.get(row.id)?.business_mode==="optical_retail" ||
           /^(กรอบแว่น|แว่นตา|เลนส์|optical|frames?|lenses?|imdc optical qa)(\s|$)/i.test(String(row.category??"").trim())));
       }else setRows(productRows);
-    }catch{setRows([]);setError("ไม่สามารถอ่านสต๊อกสินค้าในสาขานี้ได้ กรุณาตรวจสอบสิทธิ์");}
+    }catch{setRows([]);setError(T("ไม่สามารถอ่านสต๊อกสินค้าในสาขานี้ได้ กรุณาตรวจสอบสิทธิ์"));}
     finally{setLoading(false);}
-  },[context.tenantId,activeBranch,optical]);
+  },[context.tenantId,activeBranch,optical,language]);
 
   useEffect(()=>{setStockBranch(branchId);},[branchId]);
   useEffect(()=>{void refresh();},[refresh]);
@@ -133,49 +137,49 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
       quantity:quantity??(row.available_quantity??null),
       remaining:quantity===null||reserved===null?null:Math.max(0,quantity-reserved)};
   });
-  if(!activeBranch)return <section className="business-stock" role="alert">ไม่พบสาขาที่ได้รับอนุญาตให้เข้าถึง</section>;
+  if(!activeBranch)return <section className="business-stock" role="alert">{T("ไม่พบสาขาที่ได้รับอนุญาตให้เข้าถึง")}</section>;
   return <section className={`business-stock ${optical?"business-stock--optical":"business-stock--retail"}`}>
     <header className="business-stock__heading">
       <div className="business-stock__identity">
         <span className="business-stock__symbol">{optical?<Glasses size={25}/>:<Boxes size={25}/>}</span>
         <div><span className="business-stock__eyebrow">{optical?"CUSTOM · OPTICAL INVENTORY":"CUSTOM · RETAIL INVENTORY"}</span>
-          <h2>{optical?"สต๊อกกรอบแว่นและเลนส์":"สต๊อกสินค้าขายทั่วไป"}</h2>
-          <p>{optical?"ตรวจสินค้า กรอบแว่น เลนส์ SKU และจำนวนพร้อมขาย":"ตรวจสินค้าตาม SKU บาร์โค้ด และจำนวนพร้อมขาย"}</p>
+          <h2>{optical?T("สต๊อกกรอบแว่นและเลนส์"):"สต๊อกสินค้าขายทั่วไป"}</h2>
+          <p>{optical?T("ตรวจสินค้า กรอบแว่น เลนส์ SKU และจำนวนพร้อมขาย"):"ตรวจสินค้าตาม SKU บาร์โค้ด และจำนวนพร้อมขาย"}</p>
         </div>
       </div>
       {optical?<div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-        <label className="business-stock__filterLabel">เลือกสาขา
+        <label className="business-stock__filterLabel">{T("เลือกสาขา")}
           <select value={activeBranch??""} onChange={e=>setStockBranch(e.target.value)}>
             {context.branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
         </label>
-        {["owner","manager"].includes(context.role)?<button type="button" className="business-stock__refresh" onClick={()=>setAddOpen(true)}>+ เพิ่มสินค้า</button>:null}
-        <button type="button" className="business-stock__refresh" onClick={()=>setBestOpen(true)}>★ สินค้าขายดี</button>
+        {["owner","manager"].includes(context.role)?<button type="button" className="business-stock__refresh" onClick={()=>setAddOpen(true)}>{T("+ เพิ่มสินค้า")}</button>:null}
+        <button type="button" className="business-stock__refresh" onClick={()=>setBestOpen(true)}>{T("★ สินค้าขายดี")}</button>
       </div>:null}
-      <button type="button" onClick={()=>void refresh()} disabled={loading} className="business-stock__refresh"><RefreshCw size={16}/>{loading?"กำลังโหลด...":"รีเฟรช"}</button>
+      <button type="button" onClick={()=>void refresh()} disabled={loading} className="business-stock__refresh"><RefreshCw size={16}/>{T(loading?"กำลังโหลด...":"รีเฟรช")}</button>
     </header>
     <p className="business-stock__notice" role="note"><ShieldAlert size={18}/>
       {optical
-        ?"สต๊อกที่มี Optical Stock Bin จะแสดงยอดคงเหลือหลังหักยอดจอง ส่วนสินค้าที่ยังไม่ตรวจนับจะแสดงรอยืนยัน"
+        ?T("สต๊อกที่มี Optical Stock Bin จะแสดงยอดคงเหลือหลังหักยอดจอง ส่วนสินค้าที่ยังไม่ตรวจนับจะแสดงรอยืนยัน")
         :"จำนวนพร้อมขายมาจากระบบ POS เดิม การแก้ไขสต๊อกต้องใช้ขั้นตอนที่ได้รับอนุญาตตามโหมดธุรกิจ"}
     </p>
     <div className="business-stock__metrics">
-      <article><span>รายการสินค้า</span><strong>{rows.length}</strong></article>
-      <article><span>เหลือ 1 หน่วย</span><strong>{low}</strong></article>
-      <article><span>หมดสต๊อก</span><strong>{out}</strong></article>
-      <article><span>{optical?"ยังผูกสต๊อกสูตรเดิม":"สินค้าผูกสูตร"}</span><strong>{legacy}</strong></article>
+      <article><span>{T("รายการสินค้า")}</span><strong>{rows.length}</strong></article>
+      <article><span>{T("เหลือ 1 หน่วย")}</span><strong>{low}</strong></article>
+      <article><span>{T("หมดสต๊อก")}</span><strong>{out}</strong></article>
+      <article><span>{optical?T("ยังผูกสต๊อกสูตรเดิม"):"สินค้าผูกสูตร"}</span><strong>{legacy}</strong></article>
     </div>
     <div className="business-stock__toolbar">
       <label className="business-stock__search"><Search size={18}/>
-        <input aria-label="ค้นหาสินค้าจาก SKU หรือชื่อ" value={search} onChange={e=>setSearch(e.target.value)}
-          placeholder="ค้นหารหัสบาร์โค้ด / SKU / ชื่อสินค้า..."/>
+        <input aria-label={T("ค้นหาสินค้าจาก SKU หรือชื่อ")} value={search} onChange={e=>setSearch(e.target.value)}
+          placeholder={T("ค้นหารหัสบาร์โค้ด / SKU / ชื่อสินค้า...")}/>
       </label>
-      <label className="business-stock__filterLabel">แสดงรายการ
+      <label className="business-stock__filterLabel">{T("แสดงรายการ")}
         <select value={filter} onChange={e=>setFilter(e.target.value as InventoryFilter)}>
-          <option value="all">ทั้งหมด</option>
-          {optical?<><option value="frames">กรอบแว่น</option><option value="lenses">เลนส์</option></>:null}
-          <option value="low">ใกล้หมด / หมด</option>
-          <option value="legacy">ผูกสูตรสต๊อกเดิม</option>
+          <option value="all">{T("ทั้งหมด")}</option>
+          {optical?<><option value="frames">{T("กรอบแว่น")}</option><option value="lenses">{T("เลนส์")}</option></>:null}
+          <option value="low">{T("ใกล้หมด / หมด")}</option>
+          <option value="legacy">{T("ผูกสูตรสต๊อกเดิม")}</option>
         </select>
       </label>
     </div>
@@ -190,7 +194,7 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
       currency={currency} products={opticalEntries.map(r=>({id:r.id,name:r.lensName??r.model??r.id,sku:r.sku}))}
       onClose={()=>setBestOpen(false)}/>:null}
     {error?<p role="alert" className="business-stock__error">{error}</p>:null}
-    {loading?<p role="status" className="business-stock__empty">กำลังโหลดข้อมูล...</p>:null}
+    {loading?<p role="status" className="business-stock__empty">{T("กำลังโหลดข้อมูล...")}</p>:null}
     {!loading && !error && optical ? <OpticalStockTable rows={opticalEntries} currency={currency}/>:null}
     {!loading && !error && !optical ? <div className="business-stock__tableWrap">
       <table><thead><tr><th>สินค้า / รูปภาพ</th><th>SKU / บาร์โค้ด</th><th>ราคา ({currency})</th><th>หน่วย</th><th>จำนวนพร้อมขาย</th><th>สถานะ</th></tr></thead>
