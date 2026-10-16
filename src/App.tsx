@@ -19,7 +19,8 @@ import { OpticalOperationsView } from "./views/OpticalOperationsView";
 import { OpticalCustomerAddressEditor } from "./views/OpticalCustomerAddressEditor";
 import { SettingsView } from "./views/SettingsView";
 import {useCustomBranding} from "./lib/use-custom-branding";
-import { CRM_SETTINGS_LANGUAGE_STORAGE,normalizeCrmSettingsLanguage,settingsText,type CrmSettingsLanguage } from "./lib/settings-language";
+import {settingsText} from "./lib/settings-language";
+import {useCrmLanguage} from "./lib/use-crm-language";
 
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -47,9 +48,7 @@ const PORTAL_VIEW_MENU: Record<PortalView,string> = {
 export default function App() {
   const [context,setContext]=useState<PortalContext|null>(null);
   const [menuAccess,setMenuAccess]=useState<FeatureState|null>(null);
-  const [language,setLanguage]=useState<CrmSettingsLanguage>(()=>{
-    try{return normalizeCrmSettingsLanguage(localStorage.getItem(CRM_SETTINGS_LANGUAGE_STORAGE));}catch{return "th";}
-  });
+  const language=useCrmLanguage();
   const [menuAccessError,setMenuAccessError]=useState(false);
   const [checking,setChecking]=useState(true);
   const [view,setView]=useState<PortalView>("dashboard");
@@ -86,16 +85,6 @@ export default function App() {
       }
       setFatal("บันทึกสำเร็จแล้ว แต่ไม่สามารถโหลดข้อมูลร้านล่าสุดได้ กรุณากดรีเฟรชอีกครั้ง");
     }
-  },[]);
-
-  useEffect(()=>{
-    const sync=()=>{
-      try{setLanguage(normalizeCrmSettingsLanguage(localStorage.getItem(CRM_SETTINGS_LANGUAGE_STORAGE)));}
-      catch{setLanguage("th");}
-    };
-    window.addEventListener("cpipos-crm-language-changed",sync);
-    window.addEventListener("storage",sync);
-    return()=>{window.removeEventListener("cpipos-crm-language-changed",sync);window.removeEventListener("storage",sync);};
   },[]);
 
   useEffect(()=>{
