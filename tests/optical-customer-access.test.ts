@@ -7,7 +7,8 @@ describe("CRM Optical history controls",()=>{
     const app=source("../src/App.tsx");
     const state=source("../src/lib/api/billing.ts");
     expect(app).toContain("menuAccess?.optical_retail_enabled");
-    expect(app).toContain('id==="optical" ? canSeeOptical');
+    expect(app).toContain('id==="optical"?canSeeOptical');
+    expect(app).toContain('isCrmMenuEnabled(crmPolicy,CRM_MAIN_MENU_KEYS[id])');
     expect(state).toContain('contractCurrent && approvedSalesModes.optical_retail===true');
     expect(state).toContain('grants[mode]===true');
     expect(state).toContain('contract?.status==="active"||contract?.status==="trial"');
