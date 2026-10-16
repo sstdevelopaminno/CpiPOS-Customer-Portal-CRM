@@ -7,6 +7,7 @@ import { number } from "../lib/formatters";
 import { isCustomMenuVisible } from "../lib/custom-menu-access";
 import { POS_MORE_MENU_ITEMS, type PosMenuIcon, type PosMoreMenuItem } from "../config/pos-menu-catalog";
 import { PosAdminWorkspace } from "./pos-admin/PosAdminWorkspace";
+import { settingsText, type CrmSettingsLanguage } from "../lib/settings-language";
 import type { PosAdminModule } from "../types/pos-admin";
 
 function MoreIcon({name}:{name:PosMenuIcon}) {
@@ -21,7 +22,8 @@ function MoreIcon({name}:{name:PosMenuIcon}) {
   return <History/>;
 }
 
-export function MoreView({context,branchId,onNavigate}:{context:PortalContext;branchId:string|null;onNavigate:(view:PortalView)=>void}){
+export function MoreView({context,branchId,onNavigate,language="th"}:{context:PortalContext;branchId:string|null;onNavigate:(view:PortalView)=>void;language?:CrmSettingsLanguage}){
+  const T=(value:string)=>settingsText(language,value);
   const [state,setState]=useState<FeatureState|null>(null);
   const [snapshot,setSnapshot]=useState<MoreSnapshot|null>(null);
   const [selected,setSelected]=useState<PosMoreMenuItem|null>(null);
@@ -40,7 +42,7 @@ export function MoreView({context,branchId,onNavigate}:{context:PortalContext;br
       setState(features);
       setSnapshot(data);
     }).catch(()=>{
-      if(active)setError("ไม่สามารถตรวจสอบสิทธิ์เมนูเพิ่มเติมได้");
+      if(active)setError(T("ไม่สามารถตรวจสอบสิทธิ์เมนูเพิ่มเติมได้"));
     });
     return()=>{active=false;};
   },[context.tenantId,branchId]);
@@ -53,9 +55,9 @@ export function MoreView({context,branchId,onNavigate}:{context:PortalContext;br
   };
   const detail=(item:PosMoreMenuItem)=>{
     if(item.countKey&&snapshot){
-      return `เชื่อมข้อมูล POS · ${number.format(Number(snapshot[item.countKey]??0))} รายการ`;
+      return `${T("เชื่อมข้อมูล POS")} · ${number.format(Number(snapshot[item.countKey]??0))} ${T("รายการ")}`;
     }
-    return item.adminModule?"จัดการเพิ่ม แก้ไข ลบจาก Customer Portal":item.target?"เปิดใช้งานใน Customer Portal":"เชื่อมข้อมูล POS แล้ว";
+    return T(item.adminModule?"จัดการเพิ่ม แก้ไข ลบจาก Customer Portal":item.target?"เปิดใช้งานใน Customer Portal":"เชื่อมข้อมูล POS แล้ว");
   };
   const activate=(item:PosMoreMenuItem)=>{
     if(item.target){onNavigate(item.target);return;}
@@ -64,19 +66,19 @@ export function MoreView({context,branchId,onNavigate}:{context:PortalContext;br
   };
 
   const renderMenuGroup=(keys:readonly string[])=>(
-    <div className="moduleGrid posMenuGrid">{POS_MORE_MENU_ITEMS.filter(item=>keys.includes(item.key) && (!(state?.is_custom || state?.is_internal_test_full) || isCustomMenuVisible(state,item.key))).map(item=>{const allowed=state?enabled(item):false;return <button key={item.key} className={`moduleCard posMenuCard ${allowed?"":"locked"} ${!item.target&&!item.adminModule&&allowed?"linkedOnly":""}`} disabled={!state||!allowed} onClick={()=>activate(item)}><span className="moduleIcon"><MoreIcon name={item.icon}/></span><div><strong>{item.label}</strong><span>{item.desc}</span><small>{!state?"กำลังตรวจสิทธิ์...":!allowed?"ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด":detail(item)}</small></div><ChevronRight size={18}/></button>;})}</div>
+    <div className="moduleGrid posMenuGrid">{POS_MORE_MENU_ITEMS.filter(item=>keys.includes(item.key) && (!(state?.is_custom || state?.is_internal_test_full) || isCustomMenuVisible(state,item.key))).map(item=>{const allowed=state?enabled(item):false;return <button key={item.key} className={`moduleCard posMenuCard ${allowed?"":"locked"} ${!item.target&&!item.adminModule&&allowed?"linkedOnly":""}`} disabled={!state||!allowed} onClick={()=>activate(item)}><span className="moduleIcon"><MoreIcon name={item.icon}/></span><div><strong>{T(item.label)}</strong><span>{T(item.desc)}</span><small>{!state?T("กำลังตรวจสิทธิ์..."):!allowed?T("ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด"):detail(item)}</small></div><ChevronRight size={18}/></button>;})}</div>
   );
 
   return <>
-    <div className="pageHeading"><div><p className="eyebrow">MORE · POS MENU</p><h2>เพิ่มเติม</h2><p>รายการและลำดับเมนูอ้างอิงจาก CpiPOS ฝั่ง POS โดยใช้สิทธิ์แพ็กเกจและนโยบาย IT ชุดเดียวกัน</p></div></div>
+    <div className="pageHeading"><div><p className="eyebrow">MORE · POS MENU</p><h2>{T("เพิ่มเติม")}</h2><p>{T("รายการและลำดับเมนูอ้างอิงจาก CpiPOS ฝั่ง POS โดยใช้สิทธิ์แพ็กเกจและนโยบาย IT ชุดเดียวกัน")}</p></div></div>
     {error?<ErrorPanel message={error}/>:null}
-    <TopicHub label="หมวดหมู่เมนูเพิ่มเติม" items={[
-      {id:"reports",title:"ยอดขายและเอกสาร",description:"รายงาน ใบเสร็จ ใบกำกับภาษี และสินค้าขายดี",count:"4 หัวข้อ",content:renderMenuGroup(["more.sales_summary","more.receipts","more.tax_invoices","more.product_sales"])},
-      {id:"restaurant",title:"จัดการร้านอาหาร",description:"โต๊ะ ครัว และราคาบุฟเฟ่",count:"3 หัวข้อ",content:renderMenuGroup(["more.tables","more.kitchen_manage","more.buffet"])},
-      {id:"customers",title:"สินค้าและสมาชิก",description:"จัดการสินค้า วัตถุดิบ และสมาชิกหน้าร้าน",count:"2 หัวข้อ",content:renderMenuGroup(["more.stock","more.members"])}
+    <TopicHub label={T("หมวดหมู่เมนูเพิ่มเติม")} items={[
+      {id:"reports",title:T("ยอดขายและเอกสาร"),description:T("รายงาน ใบเสร็จ ใบกำกับภาษี และสินค้าขายดี"),count:`3 ${T("หัวข้อ")}`,content:renderMenuGroup(["more.receipts","more.tax_invoices","more.product_sales"])},
+      {id:"restaurant",title:T("จัดการร้านอาหาร"),description:T("โต๊ะ ครัว และราคาบุฟเฟ่"),count:`3 ${T("หัวข้อ")}`,content:renderMenuGroup(["more.tables","more.kitchen_manage","more.buffet"])},
+      {id:"customers",title:T("สินค้าและสมาชิก"),description:T("จัดการสมาชิกหน้าร้าน"),count:`1 ${T("หัวข้อ")}`,content:renderMenuGroup(["more.members"])}
     ]}/>
-    <div className="auditNote">เมนูโต๊ะ ครัว บุฟเฟ่ และสมาชิกจัดการข้อมูล POS ชุดเดียวกันจาก Customer Portal ได้แล้ว ส่วนเมนูที่ยังไม่มี control-plane จะเปิดดูสถานะโดยไม่เขียนค่าหน้าขายโดยตรง</div>
-    {selected?<ConnectedPosModuleModal title={selected.label} description={selected.desc} detail={detail(selected)} onClose={()=>setSelected(null)}/>:null}
-    {adminModule?<Modal title="จัดการข้อมูล POS" subtitle="ข้อมูลจะใช้ร่วมกับ POS หลักตามสิทธิ์ที่กำหนด" onClose={()=>setAdminModule(null)} wide workspace><div className="topicModalBody"><PosAdminWorkspace module={adminModule} context={context} branchId={branchId} onBack={()=>setAdminModule(null)}/></div></Modal>:null}
+    <div className="auditNote">{T("เมนูโต๊ะ ครัว บุฟเฟ่ และสมาชิกจัดการข้อมูล POS ชุดเดียวกันจาก Customer Portal ได้แล้ว ส่วนเมนูที่ยังไม่มี control-plane จะเปิดดูสถานะโดยไม่เขียนค่าหน้าขายโดยตรง")}</div>
+    {selected?<ConnectedPosModuleModal title={T(selected.label)} description={T(selected.desc)} detail={detail(selected)} onClose={()=>setSelected(null)}/>:null}
+    {adminModule?<Modal title={T("จัดการข้อมูล POS")} subtitle={T("ข้อมูลจะใช้ร่วมกับ POS หลักตามสิทธิ์ที่กำหนด")} onClose={()=>setAdminModule(null)} wide workspace><div className="topicModalBody"><PosAdminWorkspace module={adminModule} context={context} branchId={branchId} onBack={()=>setAdminModule(null)}/></div></Modal>:null}
   </>;
 }
