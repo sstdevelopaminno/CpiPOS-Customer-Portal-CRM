@@ -7,6 +7,7 @@ export function CustomBrandingEditor({tenantId,onSaved}:{tenantId:string;onSaved
  const [form,setForm]=useState<CustomBranding>(BRANDING_DEFAULT);
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState("");
  const [success,setSuccess]=useState("");
+ const [fileKey,setFileKey]=useState(0);
  useEffect(()=>{let active=true;
   void fetchCustomBranding(tenantId).then(v=>{if(active)setForm(v);})
    .catch(()=>{if(active)setError("ไม่สามารถอ่านธีมได้ กรุณาตรวจสอบสิทธิ์ CUSTOM และฐานข้อมูล");})
@@ -20,15 +21,21 @@ export function CustomBrandingEditor({tenantId,onSaved}:{tenantId:string;onSaved
   catch(e){setError(e instanceof Error?e.message:"อัปโหลดไม่สำเร็จ");}
   finally{setBusy(false);}
  }
- async function save(){
+ async function save(nextForm:CustomBranding=form,reset=false){
   setBusy(true);setError("");setSuccess("");
   try{
-   if(form.system_name.trim().length<2||form.system_name.trim().length>55)throw new Error("ชื่อระบบต้องมี 2–55 ตัวอักษร");
-   const next=await saveCustomBranding(tenantId,form);
-   setForm(next);setSuccess("บันทึกการตั้งค่าร่วมกับ POS สำเร็จ");
+   if(nextForm.system_name.trim().length<2||nextForm.system_name.trim().length>55)throw new Error("ชื่อระบบต้องมี 2–55 ตัวอักษร");
+   const next=await saveCustomBranding(tenantId,nextForm);
+   setForm(next);if(reset)setFileKey(k=>k+1);
+   setSuccess(reset?"คืนค่าสี โลโก้ และชื่อระบบ CpiPOS เดิมแล้ว ทั้ง POS และ CRM":"บันทึกการตั้งค่าร่วมกับ POS สำเร็จ");
    onSaved();
   }catch(e){setError(e instanceof Error?e.message:"บันทึกธีมไม่สำเร็จ");}
   finally{setBusy(false);}
+ }
+ async function resetBrand(){
+  if(loading||busy)return;
+  if(!window.confirm("ยืนยันคืนค่าสี โลโก้ และชื่อระบบ CpiPOS เดิม? ข้อมูลสินค้าและข้อมูลร้านจะไม่เปลี่ยน"))return;
+  await save({...BRANDING_DEFAULT},true);
  }
  return <div className="entityForm">
   <p>เปลี่ยนภาพลักษณ์ร้านได้โดยไม่เปลี่ยนผู้ผลิต <strong>Powered by CpiPOS</strong></p>
@@ -37,7 +44,7 @@ export function CustomBrandingEditor({tenantId,onSaved}:{tenantId:string;onSaved
    <label className="span2"><span>ชื่อระบบที่แสดง</span><input value={form.system_name} maxLength={55}
     onChange={e=>setForm(v=>({...v,system_name:e.target.value}))}/></label>
    <label className="span2"><span>โลโก้ของร้าน JPG / PNG / WebP ไม่เกิน 1 MB</span>
-    <input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy}
+    <input key={fileKey} type="file" accept="image/jpeg,image/png,image/webp" disabled={busy}
      onChange={e=>void uploadLogo(e.currentTarget.files?.[0]??null)}/></label>
    {form.logo_url?<div className="span2" style={{display:"flex",gap:12,alignItems:"center"}}>
      <img alt="โลโก้ร้าน" src={form.logo_url} style={{width:64,height:64,objectFit:"contain",borderRadius:8}}/>
@@ -68,6 +75,8 @@ export function CustomBrandingEditor({tenantId,onSaved}:{tenantId:string;onSaved
   {error?<p role="alert" style={{color:"#b91c1c"}}>{error}</p>:null}
   {success?<p role="status" style={{color:"#047857"}}>{success}</p>:null}
   <div className="modalActions"><button className="primaryAction" type="button" onClick={()=>void save()} disabled={busy||loading}>
-   {busy?"กำลังบันทึก...":"บันทึกธีมสี โลโก้ และชื่อระบบ"}</button></div>
+   {busy?"กำลังบันทึก...":"บันทึกธีมสี โลโก้ และชื่อระบบ"}</button>
+   <button type="button" className="secondaryButton" disabled={busy||loading}
+     onClick={()=>void resetBrand()}>คืนค่าธีม โลโก้ และชื่อระบบ CpiPOS เดิม</button></div>
  </div>;
 }
