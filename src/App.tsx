@@ -21,7 +21,6 @@ import { SettingsView } from "./views/SettingsView";
 import {useCustomBranding} from "./lib/use-custom-branding";
 import {settingsText} from "./lib/settings-language";
 import {useCrmLanguage} from "./lib/use-crm-language";
-
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
