@@ -5,7 +5,8 @@ describe("CRM Optical-only workspace",()=>{
   it("never exposes new financial screens in ordinary plans or before explicit rollout",()=>{
     const app=read("App.tsx");
     expect(app).toContain('canSeeOptical');
-    expect(app).toContain('id!=="reports"||context.role==="owner"');
+    expect(app).toContain('tab!=="reports"||context?.role==="owner"');
+    expect(app).toContain("activeOpticalTab");
     expect(app).toContain("OpticalCustomerAddressEditor");
     expect(app).toContain('className="custom-stock-shortcut"');
     expect(app).toContain('onClick={()=>chooseView("stock")}');
