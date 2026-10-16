@@ -4,10 +4,11 @@ import type { PortalContext } from "../types/portal";
 import {loadProducts} from "../lib/portal";
 import {OpticalStockTable,type OpticalTableEntry} from "./OpticalStockTable";
 import { formatCurrency } from "../lib/formatters";
+import { opticalText, opticalDateLocale, readOpticalLanguage } from "../lib/optical-locale";
 
 type Page = "orders" | "stock" | "reports";
 type Order = {
-  id:string;customer_id:string;seller_id:string;status:string;
+  id:string;customer_id:string;seller_id:string;status:string;currency_code:string;
   total_amount:number;paid_total:number;accepted_at:string;due_at:string|null
 };
 type Stock = {
@@ -35,7 +36,7 @@ function laoWindow(range:Range):{from:string;to:string} {
     :new Date(Date.UTC(y,m-1,d+1)-7*3600_000);
   return {from:start.toISOString(),to:end.toISOString()};
 }
-const money=(amount:number)=>formatCurrency(Number(amount||0),"LAK");
+const money=(amount:number,currency:string)=>formatCurrency(Number(amount||0),currency);
 const statusName:Record<string,string>={
   received:"รับงาน",lens_ordered:"สั่งเลนส์",edging:"เจียร",
   ready_for_pickup:"รอรับ",collected:"รับสินค้าแล้ว",cancelled:"ยกเลิก"
@@ -45,6 +46,9 @@ export function OpticalOperationsView({
   context,branchId,page
 }:{context:PortalContext;branchId:string|null;page:Page}) {
   const branch=context.branches.find(x=>x.id===branchId)?.id??context.branches[0]?.id;
+  const [language]=useState(readOpticalLanguage);
+  const T=(value:string)=>opticalText(language,value);
+  const dateLocale=opticalDateLocale(language);
   const [orders,setOrders]=useState<Order[]>([]);
   const [bins,setBins]=useState<Stock[]>([]);
   const [metrics,setMetrics]=useState<Metric[]>([]);
@@ -56,13 +60,14 @@ export function OpticalOperationsView({
   useEffect(()=>{
     if(!branch)return;
     let cancelled=false;
-    if(page==="stock"){setBins([]);setSkuMap({});}
+    // Clear prior branch/tenant rows immediately; never flash another branch while loading.
+    setOrders([]);setBins([]);setSkuMap({});setMetrics([]);
     setLoading(true);setError("");
     const load=async()=>{
       try{
         if(page==="orders"){
           const {data,error:e}=await supabase.from("optical_work_orders")
-            .select("id,customer_id,seller_id,status,total_amount,paid_total,accepted_at,due_at")
+            .select("id,customer_id,seller_id,status,currency_code,total_amount,paid_total,accepted_at,due_at")
             .eq("tenant_id",context.tenantId).eq("branch_id",branch)
             .order("created_at",{ascending:false}).limit(100);
           if(e)throw e;
@@ -81,6 +86,8 @@ export function OpticalOperationsView({
             products.filter(x=>x.branch_id===branch).map(p=>[p.id,p.sku])
           ));
         }else{
+          // This RPC returns amount_lak, not a converted amount. Fail closed for THB/USD.
+          if(context.salesCurrencyCode!=="LAK")return;
           const window=laoWindow(range);
           const {data,error:e}=await supabase.rpc("optical_report_v1",{
             p_tenant_id:context.tenantId,p_branch_id:branch,
@@ -90,12 +97,12 @@ export function OpticalOperationsView({
           if(!cancelled)setMetrics((data??[]) as Metric[]);
         }
       }catch{
-        if(!cancelled)setError("ยังไม่สามารถโหลดข้อมูล Optical ได้ กรุณาตรวจสิทธิ์หรือรอการเปิดใช้งานโมดูลโดย IT");
+        if(!cancelled)setError(T("ยังไม่สามารถโหลดข้อมูล Optical ได้ กรุณาตรวจสิทธิ์หรือรอการเปิดใช้งานโมดูลโดย IT"));
       }finally{if(!cancelled)setLoading(false);}
     };
     void load();
     return()=>{cancelled=true;};
-  },[context.tenantId,branch,page,range]);
+  },[context.tenantId,context.salesCurrencyCode,branch,page,range,language]);
 
   const opticalEntries:OpticalTableEntry[]=bins.filter(bin=>bin.currency_code===(context.salesCurrencyCode??"LAK")).map(bin=>({
     id:bin.id,sku:skuMap[bin.product_id]??null,
@@ -107,41 +114,42 @@ export function OpticalOperationsView({
     remaining:Math.max(0,bin.on_hand-bin.reserved)
   }));
 
-  if(!branch)return <p className="rounded-xl bg-amber-50 p-4">กรุณาเลือกสาขาที่ได้รับสิทธิ์ก่อน</p>;
+  if(!branch)return <p className="rounded-xl bg-amber-50 p-4">{T("กรุณาเลือกสาขาที่ได้รับสิทธิ์ก่อน")}</p>;
   return <section className="space-y-4 rounded-2xl border border-emerald-100 bg-emerald-50/30 p-4">
     <header>
       <p className="text-sm font-bold text-emerald-700">Optical CUSTOM · {context.tenantName}</p>
       <h2 className="text-xl font-bold text-slate-900">
-        {page==="orders"?"ใบสั่งงานแว่นตา":page==="stock"?"สต๊อกกรอบแว่นและเลนส์":"รายงานเจ้าของร้าน"}
+        {T(page==="orders"?"ใบสั่งงานแว่นตา":page==="stock"?"สต๊อกกรอบแว่นและเลนส์":"รายงานเจ้าของร้าน")}
       </h2>
-      <p className="text-xs text-slate-500">ข้อมูลเฉพาะร้านและสาขาปัจจุบัน · ไม่รวมยอด THB ของระบบอาหาร</p>
+      <p className="text-xs text-slate-500">{T("ข้อมูลเฉพาะร้านและสาขาปัจจุบัน · ไม่รวมยอด THB ของระบบอาหาร")}</p>
     </header>
-    {loading?<p role="status">กำลังโหลดข้อมูล...</p>:null}
+    {loading?<p role="status">{T("กำลังโหลดข้อมูล...")}</p>:null}
     {error?<p role="alert" className="rounded-lg bg-rose-50 p-3 text-rose-700">{error}</p>:null}
     {page==="orders"?<div className="overflow-x-auto rounded-xl bg-white shadow-sm">
       <table className="w-full text-left text-sm"><thead><tr className="bg-emerald-50">
-        <th className="p-3">งาน / วันที่</th><th className="p-3">สถานะ</th>
-        <th className="p-3">ยอดเต็ม</th><th className="p-3">รับแล้ว</th>
-        <th className="p-3">ค้างชำระ</th><th className="p-3">นัดรับ</th>
+        <th className="p-3">{T("งาน / วันที่")}</th><th className="p-3">{T("สถานะ")}</th>
+        <th className="p-3">{T("ยอดเต็ม")}</th><th className="p-3">{T("รับแล้ว")}</th>
+        <th className="p-3">{T("ค้างชำระ")}</th><th className="p-3">{T("นัดรับ")}</th>
       </tr></thead><tbody>{orders.map(o=><tr key={o.id} className="border-t border-slate-100">
-        <td className="p-3"><code>{o.id.slice(0,8)}</code><div className="text-xs text-slate-500">{new Date(o.accepted_at).toLocaleDateString("th-TH")}</div></td>
-        <td className="p-3">{statusName[o.status]??o.status}</td>
-        <td className="p-3">{money(o.total_amount)}</td>
-        <td className="p-3">{money(o.paid_total)}</td>
-        <td className="p-3 font-semibold">{money(o.total_amount-o.paid_total)}</td>
-        <td className="p-3">{o.due_at?new Date(o.due_at).toLocaleDateString("th-TH"):"—"}</td>
+        <td className="p-3"><code>{o.id.slice(0,8)}</code><div className="text-xs text-slate-500">{new Date(o.accepted_at).toLocaleDateString(dateLocale)}</div></td>
+        <td className="p-3">{T(statusName[o.status]??o.status)}</td>
+        <td className="p-3">{money(o.total_amount,o.currency_code)}</td>
+        <td className="p-3">{money(o.paid_total,o.currency_code)}</td>
+        <td className="p-3 font-semibold">{money(o.total_amount-o.paid_total,o.currency_code)}</td>
+        <td className="p-3">{o.due_at?new Date(o.due_at).toLocaleDateString(dateLocale):"—"}</td>
       </tr>)}</tbody></table>
-      {orders.length===0&&!loading?<p className="p-4 text-sm text-slate-500">ยังไม่มีใบสั่งงานในสาขานี้</p>:null}
+      {orders.length===0&&!loading?<p className="p-4 text-sm text-slate-500">{T("ยังไม่มีใบสั่งงานในสาขานี้")}</p>:null}
     </div>:null}
     {page==="stock"?<div className="space-y-2">
       <OpticalStockTable rows={opticalEntries} currency={context.salesCurrencyCode??"LAK"}/>
-      {bins.length===0&&!loading?<p className="p-4 text-sm text-slate-500">ยังไม่มี Optical Stock Bin ที่ผ่านการตรวจนับ</p>:null}
+      {bins.length===0&&!loading?<p className="p-4 text-sm text-slate-500">{T("ยังไม่มี Optical Stock Bin ที่ผ่านการตรวจนับ")}</p>:null}
     </div>:null}
-    {page==="reports"?<div className="space-y-3">
+    {page==="reports"&&context.salesCurrencyCode!=="LAK"?<p role="status" className="rounded-xl bg-amber-50 p-4 text-sm">{T("รายงาน Optical สำหรับ THB/USD ยังไม่เปิดใช้งาน เพื่อป้องกันการแสดงยอด LAK ผิดสกุลเงิน")}</p>:null}
+    {page==="reports"&&context.salesCurrencyCode==="LAK"?<div className="space-y-3">
       <div className="flex flex-wrap gap-2">{(["day","month","year"] as const).map(k=><button key={k}
         type="button" onClick={()=>setRange(k)}
         className={`rounded-lg px-4 py-2 text-sm ${range===k?"bg-emerald-700 text-white":"bg-white text-emerald-800"}`}>
-          {k==="day"?"รายวัน":k==="month"?"รายเดือน":"รายปี"}</button>)}</div>
+          {T(k==="day"?"รายวัน":k==="month"?"รายเดือน":"รายปี")}</button>)}</div>
       <div className="grid gap-3 md:grid-cols-3">
         {[
           {label:"รับชำระ LAK",key:"payment_received"},
@@ -150,24 +158,24 @@ export function OpticalOperationsView({
         ].map((m,i)=>{
           const row=metrics.find(x=>x.metric===m.key&&x.label==="all");
           return <article key={i} className="rounded-xl border border-emerald-100 bg-white p-4 shadow-sm">
-            <h3 className="text-sm text-slate-600">{m.label}</h3>
-            <strong className="text-xl text-emerald-800">{m.count?Number(row?.quantity??0):money(Number(row?.amount_lak??0))}</strong>
+            <h3 className="text-sm text-slate-600">{T(m.label)}</h3>
+            <strong className="text-xl text-emerald-800">{m.count?Number(row?.quantity??0):money(Number(row?.amount_lak??0),"LAK")}</strong>
           </article>;
         })}
       </div>
-      <h3 className="font-bold">ยอดรับชำระตามพนักงาน</h3>
+      <h3 className="font-bold">{T("ยอดรับชำระตามพนักงาน")}</h3>
       <div className="rounded-xl bg-white p-3">
         {metrics.filter(x=>x.metric==="seller_received").map(x=><p key={x.label} className="border-b p-2 text-sm">
-          {x.label.slice(0,8)} · {x.quantity} รายการ · <strong>{money(x.amount_lak)}</strong>
+          {x.label.slice(0,8)} · {x.quantity} {T("รายการ")} · <strong>{money(x.amount_lak,"LAK")}</strong>
         </p>)}
       </div>
-      <h3 className="font-bold">สินค้าขายดี (ส่งมอบแล้ว)</h3>
+      <h3 className="font-bold">{T("สินค้าขายดี (ส่งมอบแล้ว)")}</h3>
       <div className="rounded-xl bg-white p-3">
         {metrics.filter(x=>x.metric==="popular_product").map(x=><p key={x.label} className="border-b p-2 text-sm">
-          {x.label} · {x.quantity} หน่วย
+          {x.label} · {x.quantity} {T("หน่วย")}
         </p>)}
       </div>
-      <p className="text-xs text-slate-500">รายงานแยกยอดรับชำระมัดจำออกจากยอดขายที่ส่งมอบแล้ว ไม่บวกเป็นยอดขายซ้ำ</p>
+      <p className="text-xs text-slate-500">{T("รายงานแยกยอดรับชำระมัดจำออกจากยอดขายที่ส่งมอบแล้ว ไม่บวกเป็นยอดขายซ้ำ")}</p>
     </div>:null}
   </section>;
 }
