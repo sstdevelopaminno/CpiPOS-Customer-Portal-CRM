@@ -20,6 +20,11 @@ describe("CRM Optical-only workspace",()=>{
     expect(ui).toContain('supabase.rpc("optical_report_v1"');
     expect(ui).toContain('.eq("tenant_id",context.tenantId).eq("branch_id",branch)');
     expect(ui).toContain('timeZone:"Asia/Vientiane"');
+    expect(ui).toContain('context.salesCurrencyCode!=="LAK"');
+    expect(ui).toContain('context.salesCurrencyCode==="LAK"');
+    expect(ui).toContain('currency_code,total_amount,paid_total');
+    expect(ui).toContain("money(o.total_amount,o.currency_code)");
+    expect(ui).toContain('setOrders([]);setBins([]);setSkuMap({});setMetrics([]);');
     expect(ui).not.toContain('"ingredients"');
     expect(ui).not.toContain('.update({');
     expect(ui).toContain("bin.on_hand-bin.reserved");
@@ -27,7 +32,7 @@ describe("CRM Optical-only workspace",()=>{
     expect(ui).toContain("OpticalStockTable");
     expect(ui).toContain("opticalEntries:OpticalTableEntry[]");
     const table=read("views/OpticalStockTable.tsx");
-    expect(table).toContain('aria-label="สลับประเภทสต๊อก Optical"');
+    expect(table).toContain('aria-label={T("สลับประเภทสต๊อก Optical")}');
     expect(table).toContain("ค้นหาสินค้า / SKU / บาร์โค้ด");
     expect(table).toContain('role="dialog"');
     const address=read("views/OpticalCustomerAddressEditor.tsx");
