@@ -19,6 +19,11 @@ type Stock = {
   image_url:string|null;currency_code:string
 };
 type Metric = {metric:string;label:string;quantity:number;amount_lak:number};
+type OpticalPayment={
+  id:string;work_order_id:string;amount:number;currency_code:string;
+  method:"cash"|"bank_transfer";reference_no:string|null;verified_by:string|null;
+  received_at:string;received_by:string;
+};
 type Range = "day" | "month" | "year";
 
 
@@ -50,6 +55,10 @@ export function OpticalOperationsView({
   const T=(value:string)=>opticalText(language,value);
   const dateLocale=opticalDateLocale(language);
   const [orders,setOrders]=useState<Order[]>([]);
+  const [selectedOrderId,setSelectedOrderId]=useState<string|null>(null);
+  const [payments,setPayments]=useState<OpticalPayment[]>([]);
+  const [paymentsLoading,setPaymentsLoading]=useState(false);
+  const [paymentsError,setPaymentsError]=useState("");
   const [bins,setBins]=useState<Stock[]>([]);
   const [metrics,setMetrics]=useState<Metric[]>([]);
   const [range,setRange]=useState<Range>("day");
@@ -61,7 +70,7 @@ export function OpticalOperationsView({
     if(!branch)return;
     let cancelled=false;
     // Clear prior branch/tenant rows immediately; never flash another branch while loading.
-    setOrders([]);setBins([]);setSkuMap({});setMetrics([]);
+    setOrders([]);setBins([]);setSkuMap({});setMetrics([]);setSelectedOrderId(null);setPayments([]);
     setLoading(true);setError("");
     const load=async()=>{
       try{
@@ -104,6 +113,25 @@ export function OpticalOperationsView({
     return()=>{cancelled=true;};
   },[context.tenantId,context.salesCurrencyCode,branch,page,range,language]);
 
+
+  // Financial history is read-only, tenant/branch-scoped and protected by RLS.
+  useEffect(()=>{
+    if(page!=="orders"||!branch||!selectedOrderId){setPayments([]);setPaymentsError("");return;}
+    let cancelled=false;
+    setPayments([]);setPaymentsError("");setPaymentsLoading(true);
+    void supabase.from("optical_payment_ledger")
+      .select("id,work_order_id,amount,currency_code,method,reference_no,verified_by,received_at,received_by")
+      .eq("tenant_id",context.tenantId).eq("branch_id",branch)
+      .eq("work_order_id",selectedOrderId).order("received_at",{ascending:false}).limit(100)
+      .then(({data,error:e})=>{
+        if(cancelled)return;
+        if(e){setPaymentsError(opticalText(language,"ไม่สามารถอ่านบัญชีเงินมัดจำได้ กรุณาตรวจสิทธิ์กับ IT"));return;}
+        setPayments((data??[]) as OpticalPayment[]);
+      }).finally(()=>{if(!cancelled)setPaymentsLoading(false);});
+    return()=>{cancelled=true;};
+  },[context.tenantId,branch,page,selectedOrderId,language]);
+
+  const selectedOrder=orders.find(o=>o.id===selectedOrderId)??null;
   const opticalEntries:OpticalTableEntry[]=bins.filter(bin=>bin.currency_code===(context.salesCurrencyCode??"LAK")).map(bin=>({
     id:bin.id,sku:skuMap[bin.product_id]??null,
     kind:bin.kind==="lens"?"lens":bin.kind==="accessory"?"accessory":"frame",
