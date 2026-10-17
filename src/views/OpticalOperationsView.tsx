@@ -157,7 +157,7 @@ export function OpticalOperationsView({
       <table className="w-full text-left text-sm"><thead><tr className="bg-emerald-50">
         <th className="p-3">{T("งาน / วันที่")}</th><th className="p-3">{T("สถานะ")}</th>
         <th className="p-3">{T("ยอดเต็ม")}</th><th className="p-3">{T("รับแล้ว")}</th>
-        <th className="p-3">{T("ค้างชำระ")}</th><th className="p-3">{T("นัดรับ")}</th>
+        <th className="p-3">{T("ค้างชำระ")}</th><th className="p-3">{T("นัดรับ")}</th><th className="p-3">{T("บัญชีมัดจำ")}</th>
       </tr></thead><tbody>{orders.map(o=><tr key={o.id} className="border-t border-slate-100">
         <td className="p-3"><code>{o.id.slice(0,8)}</code><div className="text-xs text-slate-500">{new Date(o.accepted_at).toLocaleDateString(dateLocale)}</div></td>
         <td className="p-3">{T(statusName[o.status]??o.status)}</td>
@@ -165,8 +165,43 @@ export function OpticalOperationsView({
         <td className="p-3">{money(o.paid_total,o.currency_code)}</td>
         <td className="p-3 font-semibold">{money(o.total_amount-o.paid_total,o.currency_code)}</td>
         <td className="p-3">{o.due_at?new Date(o.due_at).toLocaleDateString(dateLocale):"—"}</td>
+        <td className="p-3"><button type="button" className="rounded-lg border border-emerald-300 px-3 py-2 font-semibold text-emerald-800 hover:bg-emerald-50"
+          aria-expanded={selectedOrderId===o.id} onClick={()=>setSelectedOrderId(current=>current===o.id?null:o.id)}>
+          {T(selectedOrderId===o.id?"ปิดรายละเอียดมัดจำ":"ดูประวัติมัดจำ")}
+        </button></td>
       </tr>)}</tbody></table>
       {orders.length===0&&!loading?<p className="p-4 text-sm text-slate-500">{T("ยังไม่มีใบสั่งงานในสาขานี้")}</p>:null}
+      {selectedOrder?<section className="border-t border-emerald-200 p-4" data-testid="optical-crm-deposit-history">
+        <h3 className="font-bold text-emerald-950">{T("ประวัติเงินมัดจำและยอดค้างชำระ")} · {selectedOrder.id.slice(0,8)}</h3>
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          {[
+            [T("ยอดเต็ม"),money(selectedOrder.total_amount,selectedOrder.currency_code)],
+            [T("รับแล้ว"),money(selectedOrder.paid_total,selectedOrder.currency_code)],
+            [T("ค้างชำระ"),money(selectedOrder.total_amount-selectedOrder.paid_total,selectedOrder.currency_code)]
+          ].map(([label,value])=><p key={label} className="rounded-lg border border-emerald-100 bg-emerald-50 p-3 text-sm">{label}<strong className="block text-lg">{value}</strong></p>)}
+        </div>
+        {paymentsLoading?<p role="status" className="mt-2 text-sm">{T("กำลังโหลดข้อมูล...")}</p>:null}
+        {paymentsError?<p role="alert" className="mt-2 text-sm text-rose-700">{paymentsError}</p>:null}
+        <div className="mt-3 max-h-[360px] overflow-auto rounded-lg border border-slate-200">
+          <table className="w-full min-w-[620px] text-left text-sm"><thead className="sticky top-0 bg-slate-100"><tr>
+            <th className="p-2">{T("วันรับเงิน")}</th><th className="p-2">{T("วิธีรับเงิน")}</th>
+            <th className="p-2">{T("จำนวนเงินมัดจำ")}</th><th className="p-2">{T("หลักฐาน / ผู้ยืนยัน")}</th>
+          </tr></thead><tbody>{payments.map(payment=><tr key={payment.id} className="border-t">
+            <td className="p-2">{new Date(payment.received_at).toLocaleString(dateLocale)}</td>
+            <td className="p-2">{T(payment.method==="cash"?"เงินสด":"โอนเงิน")}</td>
+            <td className="p-2 font-bold">{money(payment.amount,payment.currency_code)}</td>
+            <td className="p-2">
+              {payment.method==="cash"?T("รับเงินสดโดยพนักงาน"):
+                payment.verified_by&&payment.reference_no?
+                  `${T("ผู้จัดการยืนยันด้วยตนเอง")}: ${payment.reference_no}`:
+                  T("ยังไม่ได้ตรวจสอบหลักฐานโอน")}
+            </td>
+          </tr>)}</tbody></table>
+          {!paymentsLoading&&!paymentsError&&payments.length===0?
+            <p className="p-3 text-sm text-slate-500">{T("ยังไม่มีรายการรับเงินมัดจำสำหรับงานนี้")}</p>:null}
+        </div>
+        <p className="mt-2 text-xs text-amber-700">{T("รายการเงินโอนต้องผ่านการตรวจสอบหลักฐานจริงก่อนบันทึก ไม่ใช่การอนุมัติอัตโนมัติจาก CRM")}</p>
+      </section>:null}
     </div>:null}
     {page==="stock"?<div className="space-y-2">
       <OpticalStockTable rows={opticalEntries} currency={context.salesCurrencyCode??"LAK"}/>
