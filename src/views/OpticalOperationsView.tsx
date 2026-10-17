@@ -119,15 +119,19 @@ export function OpticalOperationsView({
     if(page!=="orders"||!branch||!selectedOrderId){setPayments([]);setPaymentsError("");return;}
     let cancelled=false;
     setPayments([]);setPaymentsError("");setPaymentsLoading(true);
-    void supabase.from("optical_payment_ledger")
-      .select("id,work_order_id,amount,currency_code,method,reference_no,verified_by,received_at,received_by")
-      .eq("tenant_id",context.tenantId).eq("branch_id",branch)
-      .eq("work_order_id",selectedOrderId).order("received_at",{ascending:false}).limit(100)
-      .then(({data,error:e})=>{
+    void (async()=>{
+      try{
+        const {data,error:e}=await supabase.from("optical_payment_ledger")
+          .select("id,work_order_id,amount,currency_code,method,reference_no,verified_by,received_at,received_by")
+          .eq("tenant_id",context.tenantId).eq("branch_id",branch)
+          .eq("work_order_id",selectedOrderId).order("received_at",{ascending:false}).limit(100);
         if(cancelled)return;
         if(e){setPaymentsError(opticalText(language,"ไม่สามารถอ่านบัญชีเงินมัดจำได้ กรุณาตรวจสิทธิ์กับ IT"));return;}
         setPayments((data??[]) as OpticalPayment[]);
-      }).finally(()=>{if(!cancelled)setPaymentsLoading(false);});
+      }catch{
+        if(!cancelled)setPaymentsError(opticalText(language,"ไม่สามารถอ่านบัญชีเงินมัดจำได้ กรุณาตรวจสิทธิ์กับ IT"));
+      }finally{if(!cancelled)setPaymentsLoading(false);}
+    })();
     return()=>{cancelled=true;};
   },[context.tenantId,branch,page,selectedOrderId,language]);
 
