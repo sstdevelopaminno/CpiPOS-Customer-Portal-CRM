@@ -19,7 +19,8 @@ describe("CRM independent IT menu control",()=>{
   const app=read("App.tsx");
   expect(app).toContain("isCrmMenuEnabled(crmPolicy,CRM_MAIN_MENU_KEYS[id])");
   expect(app).toContain("isCrmMenuEnabled(crmPolicy,CRM_OPTICAL_MENU_KEYS[tab])");
-  expect(app).toContain("menuAccess.menu_policy[\"main.optical_customers\"]!==false");
+  expect(app).toContain("opticalTabsAllowed.length>0");
+  expect(app).toContain("menuAccess?.optical_retail_enabled");
   expect(app).toContain("isCustomMenuVisible(menuAccess,PORTAL_VIEW_MENU[id])");
   expect(app).toContain("activeOpticalTab");
  });
