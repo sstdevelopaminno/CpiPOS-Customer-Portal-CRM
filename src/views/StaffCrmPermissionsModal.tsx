@@ -33,7 +33,8 @@ export function StaffCrmPermissionsModal({context,staff,onClose}:{
         });
         if(error)throw error;
         if(cancelled)return;
-        const map=new Map((data??[] as Permission[]).map(item=>[item.menu_key,item]));
+        const rows:Permission[]=Array.isArray(data)?data as Permission[]:[];
+        const map=new Map<MenuKey,Permission>(rows.map((item):[MenuKey,Permission]=>[item.menu_key,item]));
         setEntries(menuKeys.map(menu_key=>({
           menu_key,can_view:map.get(menu_key)?.can_view===true,
           can_edit:map.get(menu_key)?.can_edit===true
