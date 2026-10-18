@@ -5,6 +5,7 @@ import { supabase } from "./lib/supabase";
 import { isCustomMenuVisible } from "./lib/custom-menu-access";
 import {CRM_MAIN_MENU_KEYS,CRM_OPTICAL_MENU_KEYS,isCrmMenuEnabled} from "./lib/crm-menu-policy";
 import { FilterBar } from "./components/common";
+import {CrmITCurrencyStatus} from "./components/CrmITCurrencyStatus";
 import { Login } from "./views/Login";
 import { DashboardView } from "./views/DashboardView";
 import { SalesView } from "./views/SalesView";
@@ -201,6 +202,7 @@ export default function App() {
       {fatal?<div className="errorBox">{fatal}</div>:null}
 
       {showFilters?<FilterBar context={context} branchId={branchId} onBranchChange={changeBranch} range={range} onRangeChange={setRange} anchor={anchor} onAnchorChange={setAnchor} showPeriod={showPeriod}/>:null}
+      <CrmITCurrencyStatus tenantId={context.tenantId} contextCurrency={context.salesCurrencyCode} language={language} onITCurrencyChanged={refreshContextAfterMutation}/>
 
       {!menuAccess ? <div role="status" className="emptyState">
         <p>{menuAccessError ? "ไม่สามารถโหลดสิทธิ์เมนูได้ กรุณาลองอีกครั้ง" : "กำลังโหลดสิทธิ์เมนูจาก IT..."}</p>
