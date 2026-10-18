@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { supabase } from "../lib/supabase";
 import "../styles/optical-customers.css";
+import {opticalText} from "../lib/optical-locale";
+import {useCrmLanguage} from "../lib/use-crm-language";
 import {useCrmLanguage} from "../lib/use-crm-language";
 import {opticalText} from "../lib/optical-locale";
 import type { PortalContext } from "../types/portal";
@@ -33,6 +35,8 @@ const numericKeys: Array<keyof Form>=["age","pd_mm","right_sph","right_cyl","rig
 
 export function OpticalCustomersView({context,branchId,readOnly=false}:{context:PortalContext;branchId:string|null;readOnly?:boolean}) {
   const language=useCrmLanguage();
+  const T=(text:string)=>opticalText(language,text);
+  const language=useCrmLanguage();
   const T=(value:string)=>opticalText(language,value);
   const activeBranch=branchId && context.branches.some(x=>x.id===branchId) ? branchId : context.branches[0]?.id;
   const [customers,setCustomers]=useState<Customer[]>([]);
@@ -49,15 +53,15 @@ export function OpticalCustomersView({context,branchId,readOnly=false}:{context:
   const requestId=useRef(crypto.randomUUID());
   const load=useCallback(async()=>{
     if(!activeBranch) return;
-    setLoading(true);setError("");
+    setLoading(true);setError("");setCustomers([]);
     const {data,error:queryError}=await supabase.from("optical_customers")
       .select("id,customer_code,full_name,phone,age,previous_prescription,last_exam_date,examiner_name,notes,branch_id")
       .eq("tenant_id",context.tenantId).eq("branch_id",activeBranch)
       .is("deleted_at",null).order("updated_at",{ascending:false}).limit(300);
-    if(queryError)setError(queryError.message);
+    if(queryError)setError(language==="en"?"Cannot load customer records.":language==="lo"?"ບໍ່ສາມາດໂຫຼດລູກຄ້າ":"ไม่สามารถโหลดข้อมูลลูกค้าได้");
     else setCustomers((data??[]) as Customer[]);
     setLoading(false);
-  },[activeBranch,context.tenantId]);
+  },[activeBranch,context.tenantId,language]);
   useEffect(()=>{void load();},[load]);
   useEffect(()=>{setEditing(false);setEditor(null);setHistoryFor("");setExams([]);},[activeBranch]);
   const change=(k:keyof Form,v:string)=>{setForm(curr=>({...curr,[k]:v}));setError("");requestId.current=crypto.randomUUID();};
@@ -146,7 +150,7 @@ export function OpticalCustomersView({context,branchId,readOnly=false}:{context:
           <td>{e.pd_mm??"-"}</td><td>{e.examiner_name??"-"}</td></tr>)}</tbody>
       </table></div>}</div>:null}
     {editing&&!readOnly?<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4" role="presentation" onClick={()=>{if(!saving)setEditing(false);}}>
-      <div role="dialog" aria-modal="true" aria-label="ข้อมูลลูกค้า Optical" onClick={e=>e.stopPropagation()} className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
+      <div role="dialog" aria-modal="true" aria-label={T("ประวัติลูกค้าและค่าสายตา")} onClick={e=>e.stopPropagation()} className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
         <h3 className="mb-3 text-xl font-bold">{T(editor?"แก้ไขข้อมูลและเพิ่มผลตรวจใหม่":"เพิ่มประวัติลูกค้า")}</h3>
         <form className="grid gap-4" onSubmit={e=>void save(e)}>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{field("customer_code",T("รหัสลูกค้า"))}{field("full_name",T("ชื่อ–นามสกุล"))}{field("phone",T("โทรศัพท์"),"tel")}{field("age",T("อายุ"),"number")}{field("exam_date",T("วันที่ตรวจล่าสุด"),"date")}{field("examiner_name",T("ผู้ตรวจ"))}</div>
