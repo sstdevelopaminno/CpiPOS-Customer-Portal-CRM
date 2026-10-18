@@ -3,8 +3,6 @@ import { supabase } from "../lib/supabase";
 import "../styles/optical-customers.css";
 import {opticalText} from "../lib/optical-locale";
 import {useCrmLanguage} from "../lib/use-crm-language";
-import {useCrmLanguage} from "../lib/use-crm-language";
-import {opticalText} from "../lib/optical-locale";
 import type { PortalContext } from "../types/portal";
 
 type Customer = {
@@ -36,8 +34,6 @@ const numericKeys: Array<keyof Form>=["age","pd_mm","right_sph","right_cyl","rig
 export function OpticalCustomersView({context,branchId,readOnly=false,canArchive=true}:{context:PortalContext;branchId:string|null;readOnly?:boolean;canArchive?:boolean}) {
   const language=useCrmLanguage();
   const T=(text:string)=>opticalText(language,text);
-  const language=useCrmLanguage();
-  const T=(value:string)=>opticalText(language,value);
   const activeBranch=branchId && context.branches.some(x=>x.id===branchId) ? branchId : context.branches[0]?.id;
   const [customers,setCustomers]=useState<Customer[]>([]);
   const [loading,setLoading]=useState(false);
