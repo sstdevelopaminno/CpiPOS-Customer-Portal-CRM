@@ -54,7 +54,7 @@ export default function App() {
   const [checking,setChecking]=useState(true);
   const [view,setView]=useState<PortalView>("dashboard");
   const [branchId,setBranchId]=useState(()=>localStorage.getItem("cpipos-customer-portal-branch")??"");
-  const {menuAccess,menuAccessError,reloadMenuAccess}=usePortalMenuAccess(context?.tenantId??null,branchId);
+  const {menuAccess,menuAccessError,reloadMenuAccess}=usePortalMenuAccess(context?.tenantId??null,branchId,context?.role??null);
   const [range,setRange]=useState<ReportRange>("day");
   const [anchor,setAnchor]=useState(todayInputValue());
   const [fatal,setFatal]=useState("");
@@ -156,7 +156,7 @@ export default function App() {
   const opticalTabsAllowed=(["customers","orders","stock","reports"] as const).filter(tab=>isCrmMenuEnabled(crmPolicy,CRM_OPTICAL_MENU_KEYS[tab])&&(tab!=="reports"||context?.role==="owner")&&(tab!=="stock"||isCrmMenuEnabled(crmPolicy,CRM_MAIN_MENU_KEYS.stock)));
   // IT-approved CUSTOM Optical screens can list work orders before financial writes are released.
   const canSeeOptical=Boolean(menuAccess?.optical_retail_enabled&&(menuAccess.is_custom||menuAccess.is_internal_test_full)&&opticalTabsAllowed.length>0);
-  const canSeeView=(id:PortalView)=>isCrmMenuEnabled(crmPolicy,CRM_MAIN_MENU_KEYS[id])&&(id==="optical"?canSeeOptical:!(menuAccess?.is_custom||menuAccess?.is_internal_test_full)||isCustomMenuVisible(menuAccess,PORTAL_VIEW_MENU[id]));
+  const canSeeView=(id:PortalView)=>isCrmMenuEnabled(crmPolicy,CRM_MAIN_MENU_KEYS[id])&&(id==="optical"?canSeeOptical:context?.role==="staff"?false:!(menuAccess?.is_custom||menuAccess?.is_internal_test_full)||isCustomMenuVisible(menuAccess,PORTAL_VIEW_MENU[id]));
   const chooseView=(next:PortalView)=>{
     if(!canSeeView(next))return;
     setView(next);setMobileOpen(false);
@@ -188,7 +188,7 @@ export default function App() {
       <nav aria-label="เมนูหลัก">{availableNav.map(item=><button key={item.id} aria-current={activeView===item.id?"page":undefined} title={collapsed?item.label:undefined} className={activeView===item.id?"active":""} onClick={()=>chooseView(item.id)}>{item.icon}<span>{item.label}</span><ChevronRight size={17}/></button>)}</nav>
       <div className="sidebarBottom">
         {canInstall?<button className="sidebarInstallButton" onClick={()=>void installApp()}><Download size={17}/><span>ติดตั้งเว็บแอป</span></button>:null}
-        <div className="roleBadge"><ShieldCheck size={17}/><span>{context.role==="owner"?"Owner":"Manager"}</span></div>
+        <div className="roleBadge"><ShieldCheck size={17}/><span>{context.role==="owner"?"Owner":context.role==="manager"?"Manager":"Staff"}</span></div>
         <button className="logoutButton" onClick={()=>void logoutPortal()}><LogOut size={18}/><span>ออกจากระบบ</span></button>
       </div>
     </aside>
@@ -238,7 +238,7 @@ export default function App() {
         canSeeStock={canSeeView("stock")} setOpticalTab={setOpticalTab}/> : null}
       {activeView==="settings"?<SettingsView context={context} branchId={branchId||null} onNavigate={chooseView} onContextChanged={refreshContextAfterMutation} menuPolicy={crmPolicy}/>:null}
 
-      <footer>ข้อมูลและสิทธิ์ถูกจำกัดตามบัญชี {context.role==="owner"?"Owner":"Manager"} · {context.branches.length} สาขาที่เข้าถึงได้</footer>
+      <footer>ข้อมูลและสิทธิ์ถูกจำกัดตามบัญชี {context.role==="owner"?"Owner":context.role==="manager"?"Manager":"Staff"} · {context.branches.length} สาขาที่เข้าถึงได้</footer>
     </main>
   </div>;
 }
