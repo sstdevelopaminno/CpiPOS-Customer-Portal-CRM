@@ -58,7 +58,7 @@ export async function loadPortalContext(): Promise<PortalContext> {
     .from("user_branch_roles")
     .select("tenant_id,branch_id,role,is_default")
     .eq("user_id", user.id)
-    .in("role", ["owner", "manager"])
+    .in("role", ["owner", "manager", "staff"])
     .order("is_default", { ascending: false });
   if (rolesError) throw rolesError;
   if (!roles?.length) {
@@ -71,7 +71,13 @@ export async function loadPortalContext(): Promise<PortalContext> {
   localStorage.setItem("cpipos-customer-portal-tenant", tenantId);
 
   const tenantRoles = roles.filter((row) => row.tenant_id === tenantId);
-  const role: PortalRole = tenantRoles.some((row) => row.role === "owner") ? "owner" : "manager";
+  const role: PortalRole = tenantRoles.some(row=>row.role==="owner")?"owner":
+    tenantRoles.some(row=>row.role==="manager")?"manager":"staff";
+  // Two-layer authorization: the IT package role setting and explicit tenant Owner
+  // grants are rechecked by a scoped SECURITY DEFINER RPC, never by UI alone.
+  if(role==="staff"&&import.meta.env.VITE_CRM_STAFF_ACCESS_V1_ENABLED!=="true"){
+    await logoutPortal();throw new Error("crm_staff_rollout_not_enabled");
+  }
   const allowedBranchIds = [...new Set(tenantRoles.map((row) => row.branch_id).filter(Boolean))];
 
   const [{ data: tenant, error: tenantError }, { data: branches, error: branchError }] = await Promise.all([
@@ -81,24 +87,48 @@ export async function loadPortalContext(): Promise<PortalContext> {
   if (tenantError) throw tenantError;
   if (branchError) throw branchError;
 
+  const allBranches=(branches??[]) as BranchSummary[];
+  const branchCandidates=role==="owner"?allBranches:allBranches.filter(
+    branch=>allowedBranchIds.includes(branch.id)
+  );
+  let staffScopeCurrency:string|null=null;
+  let visibleBranches=branchCandidates;
+  if(role==="staff"){
+    const results=await Promise.all(branchCandidates.map(async branch=>{
+      const {data,error}=await supabase.rpc("customer_portal_staff_feature_state_v1",{
+        p_tenant_id:tenantId,p_branch_id:branch.id
+      });
+      return {branch,data:error?null:data as Record<string,unknown>|null};
+    }));
+    const authorized=results.filter(entry=>{
+      const policy=entry.data?.menu_policy as Record<string,unknown>|undefined;
+      return entry.data?.is_custom===true &&
+        entry.data?.optical_retail_enabled===true &&
+        (policy?.["main.crm_optical_customers"]===true||policy?.["main.crm_optical_orders"]===true);
+    });
+    visibleBranches=authorized.map(entry=>entry.branch);
+    if(visibleBranches.length===0){
+      await logoutPortal();throw new Error("crm_staff_permission_denied");
+    }
+    const currency=authorized[0].data?.sales_currency_code;
+    staffScopeCurrency=currency==="LAK"||currency==="USD"||currency==="THB"?currency:null;
+  }
+
   // Read the sales (not subscription billing) currency of this authenticated tenant.
   // Tenant RLS applies to the contract read; do not trust a browser-provided tenant ID.
-  const { data: approvedContract, error: currencyError } = await supabase
-    .from("tenant_subscription_contracts")
-    .select("metadata")
-    .eq("tenant_id", tenantId)
-    .eq("status", "active")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  // A currency read outage must not lock the customer out of CRM or relabel a
-  // currency that we have not verified. Individual receipts use their snapshots.
-  const approvedCurrency = !currencyError ? (approvedContract?.metadata as Record<string, unknown> | null)?.pos_currency_code : null;
-  const salesCurrencyCode = currencyError ? null :
-    approvedCurrency === "LAK" || approvedCurrency === "USD" ? approvedCurrency : "THB";
-
-  const allBranches = (branches ?? []) as BranchSummary[];
-  const visibleBranches = role === "owner" ? allBranches : allBranches.filter((branch) => allowedBranchIds.includes(branch.id));
+  let salesCurrencyCode:PortalContext["salesCurrencyCode"]=null;
+  if(role==="staff"){
+    // Staff has no direct access to billing contracts.
+    salesCurrencyCode=staffScopeCurrency as PortalContext["salesCurrencyCode"];
+  }else{
+    const {data:approvedContract,error:currencyError}=await supabase
+      .from("tenant_subscription_contracts")
+      .select("metadata").eq("tenant_id",tenantId).eq("status","active")
+      .order("created_at",{ascending:false}).limit(1).maybeSingle();
+    const candidate=!currencyError?(approvedContract?.metadata as Record<string,unknown>|null)?.pos_currency_code:null;
+    salesCurrencyCode=currencyError?null:
+      candidate==="LAK"||candidate==="USD"||candidate==="THB"?candidate:null;
+  }
 
   return {
     userId: user.id,
@@ -109,6 +139,6 @@ export async function loadPortalContext(): Promise<PortalContext> {
     role,
     branches: visibleBranches,
     salesCurrencyCode,
-    allowedBranchIds
+    allowedBranchIds:visibleBranches.map(branch=>branch.id)
   };
 }
