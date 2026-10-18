@@ -4,15 +4,17 @@ const read=(path:string)=>readFileSync(new URL("../src/"+path,import.meta.url),"
 describe("CRM Optical-only workspace",()=>{
   it("never exposes new financial screens in ordinary plans or before explicit rollout",()=>{
     const app=read("App.tsx");
+    const workspace=read("views/OpticalWorkspace.tsx");
     expect(app).toContain('canSeeOptical');
     expect(app).toContain('tab!=="reports"||context?.role==="owner"');
     expect(app).toContain("activeOpticalTab");
-    expect(app).toContain("OpticalCustomerAddressEditor");
-    expect(app).toContain('className="custom-stock-shortcut"');
-    expect(app).toContain('onClick={()=>chooseView("stock")}');
-    expect(app).toContain('VITE_OPTICAL_OPS_V1_ENABLED === "true"');
+    expect(workspace).toContain("OpticalCustomerAddressEditor");
+    expect(workspace).toContain('<BusinessStockOverview');
+    expect(workspace).toContain('canSeeStock');
+    expect(app).toContain('VITE_OPTICAL_OPS_V1_ENABLED==="true"');
+    expect(workspace).toContain('id!=="reports"||opticalFinanceUiEnabled');
     expect(app).toContain("menuAccess?.optical_retail_enabled");
-    expect(app).toContain("<OpticalCustomersView");
+    expect(workspace).toContain("<OpticalCustomersView");
   });
   it("isolates inventory and reports by tenant and branch without food stock changes",()=>{
     const ui=read("views/OpticalOperationsView.tsx");
