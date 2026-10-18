@@ -1,7 +1,7 @@
 import {useCallback,useEffect,useRef,useState} from "react";
 import {loadFeatureState,type FeatureState} from "./portal";
 
-/** Refresh IT control switches when CRM regains focus, without polling.
+/** Reconcile IT CRM switches while visible and on focus, using tenant-scoped RPC.
  * Any lookup failure closes navigation rather than reusing stale authorizations.
  */
 export function usePortalMenuAccess(tenantId:string|null,branchId:string){
@@ -29,8 +29,14 @@ export function usePortalMenuAccess(tenantId:string|null,branchId:string){
     const onVisibility=()=>{if(document.visibilityState==="visible")refresh();};
     window.addEventListener("focus",refresh);
     document.addEventListener("visibilitychange",onVisibility);
+    // IT may close a submenu while this CRM tab stays open. Revalidate rather
+    // than waiting for a manual page refresh; never poll hidden browser tabs.
+    const interval=window.setInterval(()=>{
+      if(document.visibilityState==="visible")void reloadMenuAccess();
+    },10_000);
     return()=>{
       request.current++;
+      window.clearInterval(interval);
       window.removeEventListener("focus",refresh);
       document.removeEventListener("visibilitychange",onVisibility);
     };
