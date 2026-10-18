@@ -189,7 +189,7 @@ export default function App() {
       :settingsText(language,item.id==="stock" ? (stockBusinessMode==="optical"?"สต๊อกกรอบ/เลนส์":
       stockBusinessMode==="retail"?"สต๊อกสินค้า":stockBusinessMode==="mixed"?"สต๊อกตามโหมด":"วัตถุดิบ") : item.label)}));
   const activeView = !menuAccess ? null : !canSeeView(view) ? availableNav[0]?.id ?? null : view;
-  const activeOpticalTab=customerOpticalTabsAllowed.includes(opticalTab)?opticalTab:customerOpticalTabsAllowed[0]??null;
+  const activeOpticalTab=customerOpticalTabsAllowed.find(tab=>tab===opticalTab)??customerOpticalTabsAllowed[0]??null;
   const showFilters=activeView!=="package";
   const opticalFinanceUiEnabled=import.meta.env.VITE_OPTICAL_OPS_V1_ENABLED==="true";
   const showPeriod=activeView==="dashboard"||activeView==="sales";
