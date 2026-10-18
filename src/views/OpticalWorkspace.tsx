@@ -1,3 +1,4 @@
+import {useState} from "react";
 import type { PortalContext } from "../types/portal";
 import type { CrmSettingsLanguage } from "../lib/settings-language";
 import { settingsText } from "../lib/settings-language";
@@ -6,6 +7,7 @@ import { BusinessStockOverview } from "./BusinessStockOverview";
 import { OpticalCustomersView } from "./OpticalCustomersView";
 import { OpticalCustomerAddressEditor } from "./OpticalCustomerAddressEditor";
 import { OpticalOperationsView } from "./OpticalOperationsView";
+import { OpticalWorkOrderDrafts } from "./OpticalWorkOrderDrafts";
 
 export type OpticalTab = "customers" | "orders" | "stock" | "reports";
 type Props = {
@@ -23,6 +25,8 @@ type Props = {
 /** Keep the existing POS cart independent of this CRM read-only work-order shell. */
 export function OpticalWorkspace({context,branchId,language,stockBusinessMode,activeOpticalTab,
   opticalTabsAllowed,opticalFinanceUiEnabled,canSeeStock,setOpticalTab}:Props){
+  const [orderReloadToken,setOrderReloadToken]=useState(0);
+  const draftsEnabled=context.role==="owner"&&import.meta.env.VITE_OPTICAL_WORK_ORDER_DRAFTS_V1_ENABLED==="true";
   return (
     <div className="space-y-4">
           <div className="flex flex-wrap gap-2" role="tablist" aria-label={opticalText(language,"ใบสั่งงานแว่นตา")}>
@@ -47,11 +51,14 @@ export function OpticalWorkspace({context,branchId,language,stockBusinessMode,ac
             <p role="alert">{opticalText(language,"รายงานเจ้าของร้าน")} — Owner</p>
           ) : (
             <div className="space-y-3">
-              {activeOpticalTab==="orders"&&(!opticalFinanceUiEnabled||context.role==="staff")?
+              {activeOpticalTab==="orders"&&(!opticalFinanceUiEnabled||context.role==="staff")&&!draftsEnabled?
                 <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
                   {language==="en"?"Work-order list only. Creating, editing and checkout are locked until the Optical finance rollout is approved.":language==="lo"?"ສະແດງລາຍການໃບງານເທົ່ານັ້ນ; ການສ້າງ ແກ້ໄຂ ແລະ ຊຳລະເງິນ ຍັງບໍ່ເປີດໃຊ້":"เปิดดูรายการใบงานเท่านั้น การสร้าง แก้ไข และชำระเงินจริงยังปิดไว้จนผ่านการทดสอบและอนุมัติเปิดโมดูล"}
                 </p>:null}
-              <OpticalOperationsView context={context} branchId={branchId||null} page={activeOpticalTab==="reports"?"reports":"orders"}/>
+              {activeOpticalTab==="orders"&&draftsEnabled?<OpticalWorkOrderDrafts context={context}
+                branchId={branchId||context.branches[0]?.id||""}
+                onIssued={()=>setOrderReloadToken(n=>n+1)}/>:null}
+              <OpticalOperationsView context={context} branchId={branchId||null} page={activeOpticalTab==="reports"?"reports":"orders"} reloadToken={orderReloadToken}/>
             </div>
           )}
         </div>
