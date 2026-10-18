@@ -39,15 +39,15 @@ export function OpticalWorkspace({context,branchId,language,stockBusinessMode,ac
           ) : activeOpticalTab==="stock" ? (
             <p role="alert">{opticalText(language,"สต๊อกกรอบแว่นและเลนส์")} — {settingsText(language,"ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด")}</p>
           ) : activeOpticalTab==="customers"?<div className="space-y-4">
-            <OpticalCustomersView context={context} branchId={branchId||null}/>
-            <OpticalCustomerAddressEditor context={context} branchId={branchId||null}/>
+            <OpticalCustomersView context={context} branchId={branchId||null} readOnly={context.role==="staff"}/>
+            {context.role!=="staff"?<OpticalCustomerAddressEditor context={context} branchId={branchId||null}/>:null}
           </div> : activeOpticalTab==="reports"&&!opticalFinanceUiEnabled ? (
             <p role="alert">{opticalText(language,"รายงานเจ้าของร้าน")} — {settingsText(language,"ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด")}</p>
           ) : activeOpticalTab==="reports"&&context.role!=="owner" ? (
             <p role="alert">{opticalText(language,"รายงานเจ้าของร้าน")} — Owner</p>
           ) : (
             <div className="space-y-3">
-              {activeOpticalTab==="orders"&&!opticalFinanceUiEnabled?
+              {activeOpticalTab==="orders"&&(!opticalFinanceUiEnabled||context.role==="staff")?
                 <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
                   {language==="en"?"Work-order list only. Creating, editing and checkout are locked until the Optical finance rollout is approved.":language==="lo"?"ສະແດງລາຍການໃບງານເທົ່ານັ້ນ; ການສ້າງ ແກ້ໄຂ ແລະ ຊຳລະເງິນ ຍັງບໍ່ເປີດໃຊ້":"เปิดดูรายการใบงานเท่านั้น การสร้าง แก้ไข และชำระเงินจริงยังปิดไว้จนผ่านการทดสอบและอนุมัติเปิดโมดูล"}
                 </p>:null}
