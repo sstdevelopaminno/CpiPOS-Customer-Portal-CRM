@@ -4,7 +4,9 @@ import type { PortalContext } from "../types/portal";
 import {loadProducts} from "../lib/portal";
 import {OpticalStockTable,type OpticalTableEntry} from "./OpticalStockTable";
 import { formatCurrency } from "../lib/formatters";
-import { opticalText, opticalDateLocale, readOpticalLanguage } from "../lib/optical-locale";
+import { opticalText, opticalDateLocale } from "../lib/optical-locale";
+import { OpticalJobSheet,type OpticalJobLine,type OpticalJobCustomer } from "../components/OpticalJobSheet";
+import { useCrmLanguage } from "../lib/use-crm-language";
 
 type Page = "orders" | "stock" | "reports";
 type Order = {
@@ -48,10 +50,10 @@ const statusName:Record<string,string>={
 };
 
 export function OpticalOperationsView({
-  context,branchId,page
-}:{context:PortalContext;branchId:string|null;page:Page}) {
+  context,branchId,page,reloadToken=0
+}:{context:PortalContext;branchId:string|null;page:Page;reloadToken?:number}) {
   const branch=context.branches.find(x=>x.id===branchId)?.id??context.branches[0]?.id;
-  const [language]=useState(readOpticalLanguage);
+  const language=useCrmLanguage();
   const T=(value:string)=>opticalText(language,value);
   const dateLocale=opticalDateLocale(language);
   const [orders,setOrders]=useState<Order[]>([]);
@@ -59,6 +61,10 @@ export function OpticalOperationsView({
   const [payments,setPayments]=useState<OpticalPayment[]>([]);
   const [paymentsLoading,setPaymentsLoading]=useState(false);
   const [paymentsError,setPaymentsError]=useState("");
+  const [jobLines,setJobLines]=useState<OpticalJobLine[]>([]);
+  const [jobCustomer,setJobCustomer]=useState<OpticalJobCustomer|null>(null);
+  const [jobError,setJobError]=useState("");
+  const [jobLoading,setJobLoading]=useState(false);
   const [bins,setBins]=useState<Stock[]>([]);
   const [metrics,setMetrics]=useState<Metric[]>([]);
   const [range,setRange]=useState<Range>("day");
@@ -111,12 +117,12 @@ export function OpticalOperationsView({
     };
     void load();
     return()=>{cancelled=true;};
-  },[context.tenantId,context.salesCurrencyCode,branch,page,range,language]);
+  },[context.tenantId,context.salesCurrencyCode,branch,page,range,language,reloadToken]);
 
 
   // Financial history is read-only, tenant/branch-scoped and protected by RLS.
   useEffect(()=>{
-    if(page!=="orders"||!branch||!selectedOrderId){setPayments([]);setPaymentsError("");return;}
+    if(context.role==="staff"||page!=="orders"||!branch||!selectedOrderId){setPayments([]);setPaymentsError("");return;}
     let cancelled=false;
     setPayments([]);setPaymentsError("");setPaymentsLoading(true);
     void (async()=>{
@@ -133,7 +139,36 @@ export function OpticalOperationsView({
       }finally{if(!cancelled)setPaymentsLoading(false);}
     })();
     return()=>{cancelled=true;};
-  },[context.tenantId,branch,page,selectedOrderId,language]);
+  },[context.tenantId,context.role,branch,page,selectedOrderId,language]);
+
+  useEffect(()=>{
+    if(page!=="orders"||!branch||!selectedOrderId){setJobLines([]);setJobCustomer(null);setJobError("");return;}
+    const order=orders.find(row=>row.id===selectedOrderId);
+    if(!order){setJobLines([]);setJobCustomer(null);return;}
+    let cancelled=false;
+    setJobLines([]);setJobCustomer(null);setJobError("");setJobLoading(true);
+    void (async()=>{
+      try{
+        const [lines,customer]=await Promise.all([
+          supabase.from("optical_work_order_lines")
+            .select("id,description_snapshot,sku_snapshot,quantity,unit_price,line_total")
+            .eq("tenant_id",context.tenantId).eq("branch_id",branch)
+            .eq("work_order_id",order.id).order("id"),
+          supabase.from("optical_customers")
+            .select("full_name,customer_code")
+            .eq("tenant_id",context.tenantId).eq("branch_id",branch)
+            .eq("id",order.customer_id).maybeSingle()
+        ]);
+        if(cancelled)return;
+        if(lines.error||customer.error||!customer.data||!lines.data?.length)
+          throw new Error("job_sheet_unavailable");
+        setJobLines(lines.data as OpticalJobLine[]);
+        setJobCustomer(customer.data as OpticalJobCustomer);
+      }catch{if(!cancelled)setJobError(language==="en"?"Cannot load verified job-sheet details.":language==="lo"?"ບໍ່ສາມາດໂຫຼດລາຍລະອຽດໃບງານ":"ไม่สามารถอ่านรายละเอียดใบงานที่ยืนยันได้");}
+      finally{if(!cancelled)setJobLoading(false);}
+    })();
+    return()=>{cancelled=true;};
+  },[context.tenantId,branch,page,selectedOrderId,orders,language]);
 
   const selectedOrder=orders.find(o=>o.id===selectedOrderId)??null;
   const opticalEntries:OpticalTableEntry[]=bins.filter(bin=>bin.currency_code===(context.salesCurrencyCode??"LAK")).map(bin=>({
@@ -158,7 +193,7 @@ export function OpticalOperationsView({
     {loading?<p role="status">{T("กำลังโหลดข้อมูล...")}</p>:null}
     {error?<p role="alert" className="rounded-lg bg-rose-50 p-3 text-rose-700">{error}</p>:null}
     {page==="orders"?<div className="overflow-x-auto rounded-xl bg-white shadow-sm">
-      <table className="w-full text-left text-sm"><thead><tr className="bg-emerald-50">
+      <table className="w-full min-w-[820px] text-left text-sm"><thead><tr className="bg-emerald-50">
         <th className="p-3">{T("งาน / วันที่")}</th><th className="p-3">{T("สถานะ")}</th>
         <th className="p-3">{T("ยอดเต็ม")}</th><th className="p-3">{T("รับแล้ว")}</th>
         <th className="p-3">{T("ค้างชำระ")}</th><th className="p-3">{T("นัดรับ")}</th><th className="p-3">{T("บัญชีมัดจำ")}</th>
@@ -167,15 +202,21 @@ export function OpticalOperationsView({
         <td className="p-3">{T(statusName[o.status]??o.status)}</td>
         <td className="p-3">{money(o.total_amount,o.currency_code)}</td>
         <td className="p-3">{money(o.paid_total,o.currency_code)}</td>
-        <td className="p-3 font-semibold">{money(o.total_amount-o.paid_total,o.currency_code)}</td>
+        <td className="p-3 whitespace-nowrap font-semibold">{money(o.total_amount-o.paid_total,o.currency_code)}</td>
         <td className="p-3">{o.due_at?new Date(o.due_at).toLocaleDateString(dateLocale):"—"}</td>
-        <td className="p-3"><button type="button" className="rounded-lg border border-emerald-300 px-3 py-2 font-semibold text-emerald-800 hover:bg-emerald-50"
+        <td className="p-3"><button type="button" className="whitespace-nowrap rounded-lg border border-emerald-300 px-3 py-2 font-semibold text-emerald-800 hover:bg-emerald-50"
           aria-expanded={selectedOrderId===o.id} onClick={()=>setSelectedOrderId(current=>current===o.id?null:o.id)}>
           {T(selectedOrderId===o.id?"ปิดรายละเอียดมัดจำ":"ดูประวัติมัดจำ")}
         </button></td>
       </tr>)}</tbody></table>
-      {orders.length===0&&!loading?<p className="p-4 text-sm text-slate-500">{T("ยังไม่มีใบสั่งงานในสาขานี้")}</p>:null}
+      {orders.length===0&&!loading&&!error?<p className="p-4 text-sm text-slate-500">{T("ยังไม่มีใบสั่งงานในสาขานี้")}</p>:null}
       {selectedOrder?<section className="border-t border-emerald-200 p-4" data-testid="optical-crm-deposit-history">
+        {jobLoading?<p role="status">{T("กำลังโหลดข้อมูล...")}</p>:null}
+        {jobError?<p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">{jobError}</p>:null}
+        {jobCustomer&&jobLines.length>0&&!jobLoading&&!jobError?
+          <OpticalJobSheet order={selectedOrder} customer={jobCustomer} lines={jobLines}
+            tenantName={context.tenantName} language={language}/>:null}
+        {context.role!=="staff"?<>
         <h3 className="font-bold text-emerald-950">{T("ประวัติเงินมัดจำและยอดค้างชำระ")} · {selectedOrder.id.slice(0,8)}</h3>
         <div className="mt-3 grid gap-2 sm:grid-cols-3">
           {[
@@ -205,14 +246,15 @@ export function OpticalOperationsView({
             <p className="p-3 text-sm text-slate-500">{T("ยังไม่มีรายการรับเงินมัดจำสำหรับงานนี้")}</p>:null}
         </div>
         <p className="mt-2 text-xs text-amber-700">{T("รายการเงินโอนต้องผ่านการตรวจสอบหลักฐานจริงก่อนบันทึก ไม่ใช่การอนุมัติอัตโนมัติจาก CRM")}</p>
+        </>:null}
       </section>:null}
     </div>:null}
     {page==="stock"?<div className="space-y-2">
       <OpticalStockTable rows={opticalEntries} currency={context.salesCurrencyCode??"LAK"}/>
-      {bins.length===0&&!loading?<p className="p-4 text-sm text-slate-500">{T("ยังไม่มี Optical Stock Bin ที่ผ่านการตรวจนับ")}</p>:null}
+      {bins.length===0&&!loading&&!error?<p className="p-4 text-sm text-slate-500">{T("ยังไม่มี Optical Stock Bin ที่ผ่านการตรวจนับ")}</p>:null}
     </div>:null}
     {page==="reports"&&context.salesCurrencyCode!=="LAK"?<p role="status" className="rounded-xl bg-amber-50 p-4 text-sm">{T("รายงาน Optical สำหรับ THB/USD ยังไม่เปิดใช้งาน เพื่อป้องกันการแสดงยอด LAK ผิดสกุลเงิน")}</p>:null}
-    {page==="reports"&&context.salesCurrencyCode==="LAK"?<div className="space-y-3">
+    {page==="reports"&&context.salesCurrencyCode==="LAK"&&!error&&!loading?<div className="space-y-3">
       <div className="flex flex-wrap gap-2">{(["day","month","year"] as const).map(k=><button key={k}
         type="button" onClick={()=>setRange(k)}
         className={`rounded-lg px-4 py-2 text-sm ${range===k?"bg-emerald-700 text-white":"bg-white text-emerald-800"}`}>

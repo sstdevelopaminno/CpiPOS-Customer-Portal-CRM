@@ -46,8 +46,8 @@ describe("CUSTOM stock differs by IT-approved sales mode",()=>{
     expect(table).toContain("สต๊อกเลนส์");
     expect(table).toContain("SKU / บาร์โค้ด");
     expect(table).toContain('role="dialog"');
-    const app=source("App.tsx");
-    expect(app).toContain('strictOpticalCategory={stockBusinessMode==="mixed"}');
+    const workspace=source("views/OpticalWorkspace.tsx");
+    expect(workspace).toContain('strictOpticalCategory={stockBusinessMode==="mixed"}');
   });
   it("supports assigned branch selection, custom catalog creation and completed-only ranking",()=>{
     const view=source("views/BusinessStockOverview.tsx");

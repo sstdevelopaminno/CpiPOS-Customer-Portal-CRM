@@ -18,7 +18,27 @@ export async function loadPackage(tenantId: string, _role: PortalRole): Promise<
   };
 }
 
-export async function loadFeatureState(tenantId: string, branchId: string | null): Promise<FeatureState> {
+export async function loadFeatureState(tenantId: string, branchId: string | null, role:PortalRole="owner"): Promise<FeatureState> {
+  if(role==="staff"){
+    if(import.meta.env.VITE_CRM_STAFF_ACCESS_V1_ENABLED!=="true"||!branchId)
+      throw new Error("crm_staff_rollout_not_enabled");
+    const {data,error}=await supabase.rpc("customer_portal_staff_feature_state_v1",{
+      p_tenant_id:tenantId,p_branch_id:branchId
+    });
+    if(error||!data||typeof data!=="object")throw new Error("crm_staff_permission_denied");
+    const grant=data as Record<string,unknown>;
+    const policy=(grant.menu_policy??{}) as Record<string,boolean>;
+    const customer=policy["main.crm_optical_customers"]===true;
+    const orders=policy["main.crm_optical_orders"]===true;
+    if(!customer&&!orders||grant.is_custom!==true||grant.optical_retail_enabled!==true)
+      throw new Error("crm_staff_permission_denied");
+    return {
+      package_id:typeof grant.package_id==="string"?grant.package_id:null,
+      is_custom:true,is_internal_test_full:false,optical_retail_enabled:true,
+      sales_modes:{optical_retail:true},package_features:{},feature_overrides:{},
+      menu_policy:{...policy,"main.crm_optical":customer||orders}
+    };
+  }
   const { data, error } = await supabase.rpc("customer_portal_feature_state", {
     p_tenant_id: tenantId,
     p_branch_id: branchId

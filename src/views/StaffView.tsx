@@ -4,6 +4,7 @@ import { LoaderCircle, Pencil, Plus, Save, Search, Trash2 } from "lucide-react";
 import { createStaff, loadStaff, updateStaff, type PortalContext, type StaffDraft, type StaffRow } from "../lib/portal";
 import { Empty, ErrorPanel, Pagination, Modal } from "../components/common";
 import { maskEmployeeCode } from "../lib/formatters";
+import { StaffCrmPermissionsModal } from "./StaffCrmPermissionsModal";
 
 function StaffForm({
   context,initial,defaultBranch,onClose,onSaved
@@ -58,6 +59,7 @@ export function StaffView({ context, branchId }: { context: PortalContext; branc
   const [loading, setLoading] = useState(true);
   const [query,setQuery]=useState("");
   const [editing,setEditing]=useState<StaffRow|null|undefined>(undefined);
+  const [crmGrantsFor,setCrmGrantsFor]=useState<StaffRow|null>(null);
   const [error,setError]=useState("");
   const [page,setPage]=useState(0);
   const pageSize=20;
@@ -99,13 +101,14 @@ export function StaffView({ context, branchId }: { context: PortalContext; branc
     {error?<ErrorPanel message={error}/>:null}
     <article className="panel tablePanel">{loading?<div className="loadingPanel"><LoaderCircle className="spin"/>กำลังโหลดข้อมูลพนักงาน...</div>:visible.length?
       <div className="tableWrap boundedTable"><table><thead><tr><th>ชื่อ</th><th>สาขา</th><th>ตำแหน่ง</th><th>บทบาท</th><th>รหัสพนักงาน</th><th>สถานะ</th><th></th></tr></thead><tbody>
-        {visible.map((row,index)=>{const canEdit=context.role==="owner"||!["owner","manager"].includes(row.branch_role);return <tr key={`${row.user_id}-${row.branch_id}-${index}`}><td><strong>{row.full_name}</strong></td><td>{row.branch_name}</td><td>{row.position_title||"—"}</td><td>{row.branch_role}</td><td><span className="maskedCode">{maskEmployeeCode(row.employee_code)}</span></td><td><span className={row.is_active?"status status-completed":"status status-cancelled"}>{row.is_active?"ใช้งาน":"ปิดใช้งาน"}</span></td><td className="right">{canEdit?<div className="inlineActions"><button className="tableAction" onClick={()=>setEditing(row)}><Pencil size={15}/>แก้ไข</button>{row.is_active?<button className="tableAction dangerText" onClick={()=>void deactivate(row)}><Trash2 size={15}/>ปิดใช้</button>:null}</div>:<span className="mutedSmall">Owner เท่านั้น</span>}</td></tr>;})}
+        {visible.map((row,index)=>{const canEdit=context.role==="owner"||!["owner","manager"].includes(row.branch_role);return <tr key={`${row.user_id}-${row.branch_id}-${index}`}><td><strong>{row.full_name}</strong></td><td>{row.branch_name}</td><td>{row.position_title||"—"}</td><td>{row.branch_role}</td><td><span className="maskedCode">{maskEmployeeCode(row.employee_code)}</span></td><td><span className={row.is_active?"status status-completed":"status status-cancelled"}>{row.is_active?"ใช้งาน":"ปิดใช้งาน"}</span></td><td className="right">{canEdit?<div className="inlineActions">{context.role==="owner"&&row.branch_role==="staff"&&import.meta.env.VITE_CRM_STAFF_ACCESS_V1_ENABLED==="true"?<button type="button" className="tableAction" onClick={()=>setCrmGrantsFor(row)}>สิทธิ์ CRM</button>:null}<button className="tableAction" onClick={()=>setEditing(row)}><Pencil size={15}/>แก้ไข</button>{row.is_active?<button className="tableAction dangerText" onClick={()=>void deactivate(row)}><Trash2 size={15}/>ปิดใช้</button>:null}</div>:<span className="mutedSmall">Owner เท่านั้น</span>}</td></tr>;})}
       </tbody></table></div>:<Empty>ยังไม่มีข้อมูลพนักงานในสาขาที่เลือก</Empty>}
       <Pagination page={page} pageCount={pageCount} onPageChange={setPage} disabled={loading}/>
     </article>
       </>},
       {id:"create",title:"เพิ่มพนักงาน",description:"เปิดแบบฟอร์มเพิ่มพนักงาน",onSelect:()=>setEditing(null)}
     ]}/>
+    {crmGrantsFor&&context.role==="owner"&&import.meta.env.VITE_CRM_STAFF_ACCESS_V1_ENABLED==="true"?<StaffCrmPermissionsModal context={context} staff={crmGrantsFor} onClose={()=>setCrmGrantsFor(null)}/>:null}
     {editing!==undefined?<StaffForm context={context} initial={editing} defaultBranch={branchId??""} onClose={()=>setEditing(undefined)} onSaved={refresh}/>:null}
   </>;
 }
