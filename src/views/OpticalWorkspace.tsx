@@ -60,7 +60,7 @@ export function OpticalWorkspace({context,branchId,language,stockBusinessMode,ac
                   {language==="en"?"Work-order list only. Creating, editing and checkout are locked until the Optical finance rollout is approved.":language==="lo"?"ສະແດງລາຍການໃບງານເທົ່ານັ້ນ; ການສ້າງ ແກ້ໄຂ ແລະ ຊຳລະເງິນ ຍັງບໍ່ເປີດໃຊ້":"เปิดดูรายการใบงานเท่านั้น การสร้าง แก้ไข และชำระเงินจริงยังปิดไว้จนผ่านการทดสอบและอนุมัติเปิดโมดูล"}
                 </p>:null}
               {activeOpticalTab==="orders"&&draftsEnabled?<OpticalWorkOrderDrafts context={context}
-                branchId={branchId||context.branches[0]?.id||""}
+                branchId={effectiveBranch} staffEditAllowed={rights.ordersEdit}
                 onIssued={()=>setOrderReloadToken(n=>n+1)}/>:null}
               <OpticalOperationsView context={context} branchId={branchId||null} page={activeOpticalTab==="reports"?"reports":"orders"} reloadToken={orderReloadToken}/>
             </div>
