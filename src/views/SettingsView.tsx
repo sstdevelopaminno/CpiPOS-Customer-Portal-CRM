@@ -6,6 +6,7 @@ import { ConnectedPosModuleModal, ErrorPanel, Modal } from "../components/common
 import { number } from "../lib/formatters";
 import { isCustomMenuVisible } from "../lib/custom-menu-access";
 import {CRM_SETTINGS_MENU_KEYS,isCrmMenuEnabled} from "../lib/crm-menu-policy";
+import {visibleCrmSettingsItems} from "../lib/crm-topic-visibility";
 import { POS_SETTINGS_MENU_ITEMS, type PosMenuIcon, type PosSettingsEditorKind, type PosSettingsMenuItem } from "../config/pos-menu-catalog";
 import { PosAdminWorkspace } from "./pos-admin/PosAdminWorkspace";
 import { CRM_SETTINGS_LANGUAGE_STORAGE, languageOptions, normalizeCrmSettingsLanguage, settingsMenuLocale, settingsText, type CrmSettingsLanguage } from "../lib/settings-language";
@@ -273,34 +274,46 @@ export function SettingsView({context,branchId,onNavigate,onContextChanged,menuP
     setLinkedItem(item);
   };
 
+  const visibleSettingsGroup=(kinds:readonly string[])=>visibleCrmSettingsItems(menuPolicy,features,kinds);
+  const canSeeSettingsKind=(kind:string)=>visibleSettingsGroup([kind]).length>0;
+  const connectedKinds=["store","branches","devices","payments"];
   const renderSettingsGroup=(keys:readonly string[])=>(
     <div className="moduleGrid settingsGrid posMenuGrid">
-      {POS_SETTINGS_MENU_ITEMS.filter(item=>keys.includes(item.kind) && isCrmMenuEnabled(menuPolicy,CRM_SETTINGS_MENU_KEYS[item.key]) && (item.key !== "settings.currency" && item.key !== "settings.branding" || (features?.is_custom === true && isCustomMenuVisible(features,item.key))) && (!(features?.is_custom || features?.is_internal_test_full) || isCustomMenuVisible(features,item.key))).map(item=>{const isAllowed=features?allowed(item.key,item.feature):false;const editable=canEdit(item);const directlyManaged=Boolean(item.target||item.adminModule||editable||item.kind==="language"||item.kind==="branding");const localized=settingsMenuLocale(language,item.kind,item.label,item.desc);return <button key={item.key} className={`moduleCard posMenuCard ${isAllowed?"":"locked"} ${isAllowed&&!directlyManaged?"linkedOnly":""}`} disabled={!features||!isAllowed} onClick={()=>activate(item)}><span className="moduleIcon"><SettingsMenuIcon name={item.icon}/></span><div><strong>{localized.label}</strong><span>{localized.desc}</span><small>{!features?T("กำลังตรวจสิทธิ์..."):!isAllowed?T("ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด"):item.adminModule?T("จัดการเพิ่ม แก้ไข ลบจาก Customer Portal"):editable?T("กดเพื่อจัดการ"):item.target?T("เปิดใช้งานใน Customer Portal"):detail(item)}</small></div><ChevronRight size={18}/></button>;})}</div>
+      {visibleSettingsGroup(keys).map(item=>{const isAllowed=features?allowed(item.key,item.feature):false;const editable=canEdit(item);const directlyManaged=Boolean(item.target||item.adminModule||editable||item.kind==="language"||item.kind==="branding");const localized=settingsMenuLocale(language,item.kind,item.label,item.desc);return <button key={item.key} className={`moduleCard posMenuCard ${isAllowed?"":"locked"} ${isAllowed&&!directlyManaged?"linkedOnly":""}`} disabled={!features||!isAllowed} onClick={()=>activate(item)}><span className="moduleIcon"><SettingsMenuIcon name={item.icon}/></span><div><strong>{localized.label}</strong><span>{localized.desc}</span><small>{!features?T("กำลังตรวจสิทธิ์..."):!isAllowed?T("ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด"):item.adminModule?T("จัดการเพิ่ม แก้ไข ลบจาก Customer Portal"):editable?T("กดเพื่อจัดการ"):item.target?T("เปิดใช้งานใน Customer Portal"):detail(item)}</small></div><ChevronRight size={18}/></button>;})}</div>
   );
 
   return <>
     <div className="pageHeading"><div><p className="eyebrow">SETTINGS · POS MENU</p><h2>{T("ตั้งค่า")}</h2><p>{T("รายการและลำดับเมนูอ้างอิงจาก CpiPOS ฝั่ง POS รวมเมนู QR โต๊ะและออเดอร์/ครัวที่แสดงในหน้าตั้งค่าจริง")}</p></div><div style={{display:"flex",flexWrap:"wrap",gap:8}}><button className="ghostButton" onClick={()=>void Promise.all([refresh(),onContextChanged()])}><RefreshCw size={18}/>{T("รีเฟรช")}</button></div></div>
     {error?<ErrorPanel message={error}/>:null}
-    {snapshot?<section className="settingsOverview">
-      <div><Store size={20}/><span>{T("ร้าน")}</span><strong>{snapshot.store?.display_name||snapshot.store?.name||"—"}</strong></div>
-      <div><Building2 size={20}/><span>{T("สาขา")}</span><strong>{snapshot.branches.length}</strong></div>
-      <div><MonitorSmartphone size={20}/><span>{T("อุปกรณ์")}</span><strong>{snapshot.devices.length}</strong></div>
-      <div><CreditCard size={20}/><span>{T("บัญชีรับเงิน")}</span><strong>{snapshot.payment_accounts.length}</strong></div>
+    {snapshot&&visibleSettingsGroup(connectedKinds).length>0?<section className="settingsOverview">
+      {canSeeSettingsKind("store")?<div><Store size={20}/><span>{T("ร้าน")}</span><strong>{snapshot.store?.display_name||snapshot.store?.name||"—"}</strong></div>:null}
+      {canSeeSettingsKind("branches")?<div><Building2 size={20}/><span>{T("สาขา")}</span><strong>{snapshot.branches.length}</strong></div>:null}
+      {canSeeSettingsKind("devices")?<div><MonitorSmartphone size={20}/><span>{T("อุปกรณ์")}</span><strong>{snapshot.devices.length}</strong></div>:null}
+      {canSeeSettingsKind("payments")?<div><CreditCard size={20}/><span>{T("บัญชีรับเงิน")}</span><strong>{snapshot.payment_accounts.length}</strong></div>:null}
     </section>:null}
     <TopicHub label={T("หมวดหมู่การตั้งค่า POS")} items={[
-      {id:"store",title:T("ข้อมูลร้านและผู้ใช้งาน"),description:T("ข้อมูลบริษัท สาขา และสิทธิ์พนักงาน"),count:`${["branding","store","branches"].filter(kind=>POS_SETTINGS_MENU_ITEMS.some(item=>item.kind===kind&&isCrmMenuEnabled(menuPolicy,CRM_SETTINGS_MENU_KEYS[item.key])&&(kind!=="branding"||features?.is_custom&&isCustomMenuVisible(features,item.key)))).length} ${T("หัวข้อ")}`,content:renderSettingsGroup(["branding","store","branches"])},
-      {id:"billing",title:T("การชำระเงินและภาษี"),description:T("บัญชีรับเงิน INET QR ภาษีและการแจ้งเตือน"),count:`4 ${T("หัวข้อ")}`,content:renderSettingsGroup(["payments","inet","taxes","notifications"])},
-      {id:"hardware",title:T("เครื่องและอุปกรณ์"),description:T("เครื่องแคชเชียร์ เครื่องพิมพ์ และจอลูกค้า"),count:`3 ${T("หัวข้อ")}`,content:renderSettingsGroup(["devices","printers","display"])},
-      {id:"operations",title:T("การดำเนินงานและการแสดงผล"),description:T("Audit ครัว QR โต๊ะ ภาษา และแถบเมนู"),count:`6 ${T("หัวข้อ")}`,content:renderSettingsGroup(["activity","orderKitchen","tableQr","language","currency","placement"])},
-      {id:"connected",title:T("ข้อมูลร้านที่เชื่อมอยู่"),description:T("ดูสาขา เครื่อง และบัญชีรับเงินที่เชื่อมกับ POS"),content:<>
-            {snapshot?<article className="panel settingsDataPanel"><div className="panelHeader"><div><p className="eyebrow">CONNECTED POS SETTINGS</p><h3>{T("ข้อมูลที่เชื่อมอยู่")}</h3></div></div><div className="settingsDataGrid">
-      <div><strong>{T("ข้อมูลร้าน")}</strong><span>{snapshot.store?.company_address||T("ยังไม่ได้ระบุที่อยู่")}</span><span>{snapshot.store?.contact_phone||snapshot.store?.owner_phone||"—"}</span></div>
-      <div><strong>{T("สาขา")}</strong>{snapshot.branches.slice(0,5).map(b=><span key={b.id}>{b.name} · {b.is_active?"ใช้งาน":"ปิด"}</span>)}</div>
-      <div><strong>{T("อุปกรณ์")}</strong>{snapshot.devices.slice(0,5).map(d=><span key={d.id}>{d.device_name||d.device_code||"POS"} · {d.status||"—"}</span>)}</div>
-      <div><strong>{T("บัญชีรับชำระของร้าน")}</strong>{snapshot.payment_accounts.slice(0,5).map(a=><span key={a.id}>{a.bank_name||"บัญชี"} · ••••{String(a.account_number||"").slice(-4)}</span>)}</div>
-    </div></article>:null}
-      </>}
-    ]}/>
+      {id:"store",title:T("ข้อมูลร้านและผู้ใช้งาน"),description:T("ข้อมูลบริษัท สาขา และสิทธิ์พนักงาน"),kinds:["branding","store","branches"]},
+      {id:"billing",title:T("การชำระเงินและภาษี"),description:T("บัญชีรับเงิน INET QR ภาษีและการแจ้งเตือน"),kinds:["payments","inet","taxes","notifications"]},
+      {id:"hardware",title:T("เครื่องและอุปกรณ์"),description:T("เครื่องแคชเชียร์ เครื่องพิมพ์ และจอลูกค้า"),kinds:["devices","printers","display"]},
+      {id:"operations",title:T("การดำเนินงานและการแสดงผล"),description:T("Audit ครัว QR โต๊ะ ภาษา และแถบเมนู"),kinds:["activity","orderKitchen","tableQr","language","currency","placement"]}
+    ].filter(group=>visibleSettingsGroup(group.kinds).length>0).map(group=>({
+      id:group.id,title:group.title,description:group.description,
+      count:`${visibleSettingsGroup(group.kinds).length} ${T("หัวข้อ")}`,
+      content:renderSettingsGroup(group.kinds)
+    })).concat(visibleSettingsGroup(connectedKinds).length>0?[{
+      id:"connected",title:T("ข้อมูลร้านที่เชื่อมอยู่"),
+      description:T("ดูสาขา เครื่อง และบัญชีรับเงินที่เชื่อมกับ POS"),
+      count:`${visibleSettingsGroup(connectedKinds).length} ${T("หัวข้อ")}`,
+      content: <>{snapshot?<article className="panel settingsDataPanel">
+        <div className="panelHeader"><div><p className="eyebrow">CONNECTED POS SETTINGS</p><h3>{T("ข้อมูลที่เชื่อมอยู่")}</h3></div></div>
+        <div className="settingsDataGrid">
+          {canSeeSettingsKind("store")?<div><strong>{T("ข้อมูลร้าน")}</strong><span>{snapshot.store?.company_address||T("ยังไม่ได้ระบุที่อยู่")}</span><span>{snapshot.store?.contact_phone||snapshot.store?.owner_phone||"—"}</span></div>:null}
+          {canSeeSettingsKind("branches")?<div><strong>{T("สาขา")}</strong>{snapshot.branches.slice(0,5).map(b=><span key={b.id}>{b.name} · {b.is_active?"ใช้งาน":"ปิด"}</span>)}</div>:null}
+          {canSeeSettingsKind("devices")?<div><strong>{T("อุปกรณ์")}</strong>{snapshot.devices.slice(0,5).map(d=><span key={d.id}>{d.device_name||d.device_code||"POS"} · {d.status||"—"}</span>)}</div>:null}
+          {canSeeSettingsKind("payments")?<div><strong>{T("บัญชีรับชำระของร้าน")}</strong>{snapshot.payment_accounts.slice(0,5).map(a=><span key={a.id}>{a.bank_name||"บัญชี"} · ••••{String(a.account_number||"").slice(-4)}</span>)}</div>:null}
+        </div>
+      </article>:null}</>
+    }]:[])}/>
 
     <div className="auditNote">{T("เครื่องแคชเชียร์ เครื่องพิมพ์ และ Customer Display pairing จัดการจาก Customer Portal ได้แล้ว; การค้นหา USB/Bluetooth จริงและค่า local เช่นภาษา/ตำแหน่งเมนูยังทำที่เครื่อง POS/Print Agent")}</div>
     {editor&&snapshot&&POS_SETTINGS_MENU_ITEMS.some(item=>item.editorKind===editor&&isCrmMenuEnabled(menuPolicy,CRM_SETTINGS_MENU_KEYS[item.key]))?<SettingEditorModal kind={editor} context={context} branchId={branchId} snapshot={snapshot} language={language} onClose={()=>setEditor(null)} onSaved={refresh} onContextChanged={onContextChanged}/>:null}

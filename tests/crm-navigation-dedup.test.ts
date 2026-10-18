@@ -17,10 +17,10 @@ describe("CRM three-language navigation without duplicate shortcuts",()=>{
     const settings=read("views/SettingsView.tsx");
     expect(more).not.toContain('renderMenuGroup(["more.sales_summary"');
     expect(more).not.toContain('renderMenuGroup(["more.stock"');
-    expect(more).toContain('renderMenuGroup(["more.receipts","more.tax_invoices","more.product_sales"])');
-    expect(more).toContain('renderMenuGroup(["more.members"])');
+    expect(more).toContain('keys:["more.receipts","more.tax_invoices","more.product_sales"]');
+    expect(more).toContain('keys:["more.members"]');
     expect(settings).not.toContain('renderSettingsGroup(["store","branches","users"])');
-    expect(settings).toContain('renderSettingsGroup(["branding","store","branches"])');
+    expect(settings).toContain('kinds:["branding","store","branches"]');
     expect(settings).toContain('item.kind==="language"');
   });
   it("requires separate CUSTOM IT branding menu consent without altering store settings",()=>{
@@ -29,6 +29,6 @@ describe("CRM three-language navigation without duplicate shortcuts",()=>{
     expect(policy).toContain('"settings.branding"');
     expect(settings).toContain('isCustomMenuVisible(features,"settings.branding")');
     expect(settings).toContain('item.kind==="branding"');
-    expect(settings).toContain('isCustomMenuVisible(features,item.key)');
+    expect(read("lib/crm-topic-visibility.ts")).toContain('isCustomMenuVisible(state,item.key)');
   });
 });

@@ -26,10 +26,12 @@ describe("CRM independent IT menu control",()=>{
  it("does not let forbidden CRM submenu entries render in More or Settings",()=>{
   const more=read("views/MoreView.tsx");
   const settings=read("views/SettingsView.tsx");
-  expect(more).toContain("isCrmMenuEnabled(menuPolicy,CRM_MORE_MENU_KEYS[item.key])");
-  expect(settings).toContain("isCrmMenuEnabled(menuPolicy,CRM_SETTINGS_MENU_KEYS[item.key])");
+  expect(more).toContain("visibleGroup(group.keys).length>0");
+  expect(read("lib/crm-topic-visibility.ts")).toContain("isCrmMenuEnabled(policy,CRM_MORE_MENU_KEYS[item.key])");
+  expect(settings).toContain("visibleSettingsGroup(group.kinds).length>0");
+  expect(read("lib/crm-topic-visibility.ts")).toContain("isCrmMenuEnabled(policy,CRM_SETTINGS_MENU_KEYS[item.key])");
   expect(settings).toContain('isCustomMenuVisible(features,"settings.branding")');
-  expect(more).toContain("isCustomMenuVisible(state,item.key)");
-  expect(settings).toContain("isCustomMenuVisible(features,item.key)");
+  expect(read("lib/crm-topic-visibility.ts")).toContain("isCustomMenuVisible(state,item.key)");
+  expect(settings).toContain("visibleCrmSettingsItems(menuPolicy,features,kinds)");
  });
 });
