@@ -51,7 +51,7 @@ export function StaffCrmPermissionsModal({context,staff,onClose}:{
       for(const permission of entries){
         const {error}=await supabase.rpc("customer_portal_set_staff_crm_permission_v1",{
           p_tenant_id:context.tenantId,p_branch_id:staff.branch_id,p_user_id:staff.user_id,
-          p_menu_key:permission.menu_key,p_can_view:permission.can_view,p_can_edit:false
+          p_menu_key:permission.menu_key,p_can_view:permission.can_view,p_can_edit:permission.can_edit
         });
         if(error)throw error;
       }
@@ -62,7 +62,7 @@ export function StaffCrmPermissionsModal({context,staff,onClose}:{
   return <Modal title={`สิทธิ์ CRM · ${staff.full_name}`}
     subtitle="เจ้าของร้านกำหนดสิทธิ์รายพนักงาน · IT เปิดเพียงสิทธิ์ระดับแพ็กเกจ" onClose={onClose}>
     <div className="space-y-4">
-      <p className="text-sm text-slate-600">สาขา: {staff.branch_name}. การแก้ไขข้อมูลลูกค้าและออกใบงานยังรอการทดสอบ API ฝั่งเซิร์ฟเวอร์ จึงไม่เปิดปุ่มแก้ไขก่อนปลอดภัย</p>
+      <p className="text-sm text-slate-600">สาขา: {staff.branch_name}. สิทธิ์ดูและแก้ไขกำหนดแยกตามเมนู · การเขียนข้อมูลจะถูกตรวจโดย Backend ซ้ำทุกครั้ง และยังไม่เปิดจนทดสอบผ่าน</p>
       {loading?<p role="status">กำลังตรวจสิทธิ์พนักงาน...</p>:null}
       {error?<p role="alert" className="rounded-lg bg-red-50 p-3 text-red-700">{error}</p>:null}
       {notice?<p role="status" className="rounded-lg bg-emerald-50 p-3 text-emerald-800">{notice}</p>:null}
@@ -75,7 +75,11 @@ export function StaffCrmPermissionsModal({context,staff,onClose}:{
               onChange={event=>setEntries(old=>old.map(row=>row.menu_key===item.menu_key?{
                 ...row,can_view:event.target.checked,can_edit:false
               }:row))}/>ดูเมนู</label>
-            <label className="flex items-center gap-2 text-sm text-slate-500"><input type="checkbox" checked={false} disabled/>แก้ไข (รอเปิด)</label>
+            <label className="flex items-center gap-2 text-sm"><input type="checkbox"
+              checked={item.can_edit} disabled={loading||saving||Boolean(error)||!item.can_view}
+              onChange={event=>setEntries(old=>old.map(row=>row.menu_key===item.menu_key?{
+                ...row,can_edit:event.target.checked
+              }:row))}/>แก้ไข</label>
           </div>
         </div>)}
       </div>
