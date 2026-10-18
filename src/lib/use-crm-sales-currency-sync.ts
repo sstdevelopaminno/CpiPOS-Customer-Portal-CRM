@@ -1,30 +1,63 @@
 import { useEffect } from "react";
 import { supabase } from "./supabase";
+import type {PortalRole} from "../types/portal";
 
-/** Follow IT-approved contract currency. Real-time when published; refresh on focus and
- * a slow visible-tab fallback when the table is not published to Realtime.
- * Never converts, rewrites or relabels historical orders. */
-export function useCrmSalesCurrencySync(tenantId:string|null,reloadContext:()=>Promise<void>){
+/** Lightweight visible-tab reconciliation, plus Realtime if the contract table
+ * is ever published. Historical receipts always retain their recorded currency.
+ * Staff look up only their authorized scoped RPC, never the billing contract. */
+export function useCrmSalesCurrencySync(
+  tenantId:string|null,role:PortalRole|null,branchId:string|null,
+  currentCurrency:string|null,reloadContext:()=>Promise<void>
+){
   useEffect(()=>{
-    if(!tenantId)return;
-    let last=Date.now();
+    if(!tenantId||!role)return;
     let active=true;
-    const refresh=()=>{
-      if(!active||document.visibilityState==="hidden"||Date.now()-last<5000)return;
-      last=Date.now();
+    let busy=false;
+    let lastRefresh=0;
+    const refreshContext=()=>{
+      if(!active||document.visibilityState==="hidden"||
+         Date.now()-lastRefresh<5000)return;
+      lastRefresh=Date.now();
       void reloadContext();
     };
-    const onFocus=()=>refresh();
-    const onVisible=()=>{if(document.visibilityState==="visible")refresh();};
+    const check=async()=>{
+      if(!active||busy||document.visibilityState==="hidden")return;
+      busy=true;
+      try{
+        let code:string|null=null;
+        if(role==="staff"){
+          if(!branchId)return;
+          const {data,error}=await supabase.rpc("customer_portal_staff_feature_state_v1",{
+            p_tenant_id:tenantId,p_branch_id:branchId
+          });
+          if(error){refreshContext();return;}
+          const value=(data??{}) as Record<string,unknown>;
+          const candidate=value.sales_currency_code;
+          if(candidate==="LAK"||candidate==="THB"||candidate==="USD")code=candidate;
+        }else{
+          const {data,error}=await supabase.from("tenant_subscription_contracts")
+            .select("metadata").eq("tenant_id",tenantId).eq("status","active")
+            .order("created_at",{ascending:false}).limit(1).maybeSingle();
+          if(error)return;
+          const candidate=(data?.metadata as Record<string,unknown>|null)?.pos_currency_code;
+          if(candidate==="LAK"||candidate==="THB"||candidate==="USD")code=candidate;
+        }
+        if(active&&code!==null&&code!==currentCurrency)refreshContext();
+      }catch{ /* Existing permissions and currency remain unchanged on outage. */ }
+      finally{busy=false;}
+    };
+    const onFocus=()=>{refreshContext();};
+    const onVisible=()=>{if(document.visibilityState==="visible")refreshContext();};
     window.addEventListener("focus",onFocus);
     document.addEventListener("visibilitychange",onVisible);
-    const timer=window.setInterval(refresh,30_000);
+    // Supabase live publication currently excludes this contract table.
+    // Poll only one small scoped read per visible tab, rather than a full context.
+    const timer=window.setInterval(()=>{void check();},10_000);
     const channel=supabase.channel("crm-contract-currency-"+tenantId)
       .on("postgres_changes",{
         event:"UPDATE",schema:"public",table:"tenant_subscription_contracts",
         filter:"tenant_id=eq."+tenantId
-      },()=>{last=0;refresh();})
-      .subscribe();
+      },refreshContext).subscribe();
     return()=>{
       active=false;
       window.removeEventListener("focus",onFocus);
@@ -32,5 +65,5 @@ export function useCrmSalesCurrencySync(tenantId:string|null,reloadContext:()=>P
       window.clearInterval(timer);
       void supabase.removeChannel(channel);
     };
-  },[tenantId,reloadContext]);
+  },[tenantId,role,branchId,currentCurrency,reloadContext]);
 }
