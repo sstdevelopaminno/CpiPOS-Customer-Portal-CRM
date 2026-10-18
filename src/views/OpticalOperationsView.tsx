@@ -50,8 +50,8 @@ const statusName:Record<string,string>={
 };
 
 export function OpticalOperationsView({
-  context,branchId,page
-}:{context:PortalContext;branchId:string|null;page:Page}) {
+  context,branchId,page,reloadToken=0
+}:{context:PortalContext;branchId:string|null;page:Page;reloadToken?:number}) {
   const branch=context.branches.find(x=>x.id===branchId)?.id??context.branches[0]?.id;
   const language=useCrmLanguage();
   const T=(value:string)=>opticalText(language,value);
@@ -117,7 +117,7 @@ export function OpticalOperationsView({
     };
     void load();
     return()=>{cancelled=true;};
-  },[context.tenantId,context.salesCurrencyCode,branch,page,range,language]);
+  },[context.tenantId,context.salesCurrencyCode,branch,page,range,language,reloadToken]);
 
 
   // Financial history is read-only, tenant/branch-scoped and protected by RLS.
