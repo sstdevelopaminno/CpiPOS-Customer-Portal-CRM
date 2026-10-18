@@ -107,6 +107,14 @@ const dictionary: Record<string, readonly [string, string]> = {
   "ก่อนหน้า": ["Previous", "ກ່ອນໜ້າ"],
   "หน้า": ["Page", "ໜ້າ"],
   "ถัดไป": ["Next", "ຖັດໄປ"],
+  "ข้อมูลที่อยู่ลูกค้า Optical": ["Optical customer address", "ທີ່ຢູ່ລູກຄ້າຮ້ານແວ່ນ"],
+  "ข้อมูลเดียวกับประวัติลูกค้าเดิม แยกประวัติแก้ไข ไม่ลบผลตรวจย้อนหลัง": ["Uses the existing customer record. Address changes are audited; eye exams are preserved.", "ໃຊ້ຂໍ້ມູນລູກຄ້າເກົ່າ ບັນທຶກປະຫວັດການແກ້ທີ່ຢູ່ ບໍ່ລຶບຜົນກວດສາຍຕາ"],
+  "ยังไม่เปิดใช้งานข้อมูลที่อยู่ลูกค้าในสาขานี้": ["Customer address data is not available for this branch.", "ຂໍ້ມູນທີ່ຢູ່ລູກຄ້າຍັງບໍ່ພ້ອມໃນສາຂານີ້"],
+  "ไม่สามารถบันทึกที่อยู่ได้ กรุณาตรวจสอบสิทธิ์หรือสถานะโมดูล Optical": ["Cannot save address. Check your permissions and Optical module status.", "ບັນທຶກທີ່ຢູ່ບໍ່ໄດ້ ກວດສິດ ແລະ ສະຖານະໂມດູນ Optical"],
+  "บันทึกที่อยู่พร้อมประวัติการแก้ไขแล้ว โดยไม่เขียนทับผลตรวจสายตา": ["Address saved and audited without overwriting eye exams.", "ບັນທຶກທີ່ຢູ່ ແລະ ປະຫວັດແກ້ໄຂແລ້ວ ບໍ່ທັບຂໍ້ມູນກວດສາຍຕາ"],
+  "เลือกลูกค้า": ["Select customer", "ເລືອກລູກຄ້າ"],
+  "ที่อยู่": ["Address", "ທີ່ຢູ່"],
+  "บันทึกที่อยู่": ["Save address", "ບັນທຶກທີ່ຢູ່"],
   "ปิด": ["Close", "ປິດ"]
 };
 
