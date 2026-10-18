@@ -208,7 +208,7 @@ export default function App() {
         <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
           <span>{settingsText(language,"เปลี่ยนภาษา")}</span>
           <select aria-label={settingsText(language,"เลือกระบบภาษา")} value={language} onChange={event=>changeLanguage(event.target.value as CrmSettingsLanguage)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800">
-            {languageOptions.map(option=><option key={option.code} value={option.code}>{option.label}</option>}
+            {languageOptions.map(option=><option key={option.code} value={option.code}>{option.label}</option>)}
           </select>
         </label>
         <span role="status" data-testid="crm-authorized-sales-currency" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
