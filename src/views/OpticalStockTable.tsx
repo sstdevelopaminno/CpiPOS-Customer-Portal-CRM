@@ -1,6 +1,7 @@
 import {useMemo,useState} from "react";
 import {formatCurrency} from "../lib/formatters";
-import { opticalText, readOpticalLanguage } from "../lib/optical-locale";
+import { opticalText } from "../lib/optical-locale";
+import { useCrmLanguage } from "../lib/use-crm-language";
 import "../styles/custom-inventory.css";
 
 export type OpticalTableEntry={
@@ -13,7 +14,7 @@ type Tab="frame"|"lens"|"accessory";
 const show=(v:unknown)=>v===undefined||v===null||String(v).trim()===""?"—":String(v);
 
 export function OpticalStockTable({rows,currency}:{rows:OpticalTableEntry[];currency:string}){
-  const [language]=useState(readOpticalLanguage);
+  const language=useCrmLanguage();
   const T=(value:string)=>opticalText(language,value);
   const [tab,setTab]=useState<Tab>("frame");
   const [q,setQ]=useState("");
