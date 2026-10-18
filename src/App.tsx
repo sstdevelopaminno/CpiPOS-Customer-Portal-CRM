@@ -212,7 +212,7 @@ export default function App() {
           </select>
         </label>
         <span role="status" data-testid="crm-authorized-sales-currency" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
-          {language==="en"?"New sales currency":language==="lo"?"ສະກຸນເງິນຂາຍໃໝ່":"สกุลเงินขายใหม่"}: <strong>{context.salesCurrencyCode??"—"}</strong>
+          {language==="en"?"New sales currency":language==="lo"?"ສະກຸນເງິນຂາຍໃໝ່":"สกุลเงินขายใหม่"}{" : "}<strong>{context.salesCurrencyCode??"—"}</strong>
         </span>
         <button type="button" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" onClick={()=>void Promise.all([refreshContextAfterMutation(),reloadMenuAccess()])}>
           {settingsText(language,"รีเฟรช")}
