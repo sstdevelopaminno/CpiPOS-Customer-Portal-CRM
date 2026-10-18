@@ -16,19 +16,42 @@ type Props={
 /** Print-only job sheet; no payment QR, cashier action or customer medical record. */
 export function OpticalJobSheet({order,customer,lines,tenantName,language}:Props){
   const T=(s:string)=>opticalText(language,s);
+  const printLabel=language==="en"?"Made-to-order eyewear · A5 landscape":language==="lo"?"ໃບງານສັ່ງຕັດແວ່ນ · A5 ແນວນອນ":"งานสั่งตัดแว่นตามค่าสายตา · A5 แนวนอน";
   return <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4" id="optical-job-print-sheet">
-    <style>{`@media print {
-      body * { visibility: hidden !important; }
-      #optical-job-print-sheet, #optical-job-print-sheet * { visibility: visible !important; }
-      #optical-job-print-sheet { position: absolute; left: 0; top: 0; width: 100%; padding: 18px; border: 0; color: #000; background: #fff; }
-      #optical-job-print-sheet .no-print { display: none !important; }
-    }`}</style>
+    <style>{`
+      /* Customer-approved Optical workshop job: ISO A5 LANDSCAPE (210 × 148 mm).
+         Do not reuse thermal POS receipts (58/80 mm), which have separate templates. */
+      @page { size: A5 landscape; margin: 7mm; }
+      @media print {
+        html, body { margin: 0 !important; padding: 0 !important; width: 210mm !important;
+          background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        body * { visibility: hidden !important; }
+        #optical-job-print-sheet, #optical-job-print-sheet * { visibility: visible !important; }
+        #optical-job-print-sheet {
+          position: absolute; left: 0; top: 0; box-sizing: border-box;
+          width: 196mm; max-width: 196mm; min-height: 134mm;
+          padding: 0; margin: 0; border: 0; border-radius: 0;
+          box-shadow: none; color: #000; background: #fff;
+          font-family: "Noto Sans Lao","Noto Sans Thai",Tahoma,sans-serif;
+          font-size: 10px; line-height: 1.25;
+          overflow-wrap: anywhere;
+        }
+        #optical-job-print-sheet h3 { font-size: 16px; }
+        #optical-job-print-sheet svg[role="img"] { display: block; max-height: 22mm; }
+        #optical-job-print-sheet table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 9px; }
+        #optical-job-print-sheet td, #optical-job-print-sheet th { padding: 2mm; }
+        #optical-job-print-sheet tr { break-inside: avoid; page-break-inside: avoid; }
+        #optical-job-print-sheet .no-print { display: none !important; }
+      }
+    `}</style>
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div><h3 className="text-lg font-bold">{T("ใบสั่งงานแว่นตา")} · {tenantName}</h3>
-        <p className="text-xs text-slate-600">{customer.full_name} · {customer.customer_code}</p></div>
+        <p className="text-xs text-slate-600">{customer.full_name} · {customer.customer_code}</p>
+        <p className="text-xs text-slate-600">{printLabel}</p></div>
       <button type="button" className="no-print rounded-lg border border-emerald-700 px-4 py-2 font-bold text-emerald-800"
         onClick={()=>window.print()}>{language==="en"?"Print work order":language==="lo"?"ພິມໃບງານ":"พิมพ์ใบงาน"}</button>
     </div>
+    <p className="text-xs font-semibold">{language==="en"?"Job number":language==="lo"?"ເລກໃບງານ":"เลขใบงาน"}: {order.id}</p>
     <OpticalWorkOrderBarcode id={order.id}/>
     <div className="flex flex-wrap gap-3 text-sm">
       <span>{T("สถานะ")}: {T(order.status)}</span>
