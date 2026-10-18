@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Boxes, ChevronRight, Download, Glasses, LayoutDashboard, LoaderCircle, LogOut, Menu, MoreHorizontal, PackageCheck, PanelLeftClose, PanelLeftOpen, ReceiptText, Settings, ShieldCheck, Store, UsersRound, Warehouse, WifiOff } from "lucide-react";
+import { Boxes, ChevronRight, ClipboardList, Download, Glasses, LayoutDashboard, LoaderCircle, LogOut, Menu, MoreHorizontal, PackageCheck, PanelLeftClose, PanelLeftOpen, ReceiptText, Settings, ShieldCheck, Store, UsersRound, Warehouse, WifiOff } from "lucide-react";
 import { loadPortalContext, logoutPortal, todayInputValue, type PortalContext, type PortalView, type ReportRange } from "./lib/portal";
 import { supabase } from "./lib/supabase";
 import { isCustomMenuVisible } from "./lib/custom-menu-access";
@@ -17,6 +17,7 @@ import { PackageView } from "./views/PackageView";
 import { MoreView } from "./views/MoreView";
 import { OpticalCustomersView } from "./views/OpticalCustomersView";
 import { OpticalOperationsView } from "./views/OpticalOperationsView";
+import {opticalText} from "./lib/optical-locale";
 import { OpticalCustomerAddressEditor } from "./views/OpticalCustomerAddressEditor";
 import { SettingsView } from "./views/SettingsView";
 import {useCustomBranding} from "./lib/use-custom-branding";
@@ -37,13 +38,14 @@ const nav: Array<{ id: PortalView; label: string; icon: React.ReactNode }> = [
   { id:"package",label:"แพ็กเกจ",icon:<PackageCheck size={21}/> },
   { id:"more",label:"เพิ่มเติม",icon:<MoreHorizontal size={21}/> },
   { id:"optical",label:"ลูกค้าแว่นตา",icon:<Glasses size={21}/> },
+  { id:"work_orders",label:"ใบสั่งงาน",icon:<ClipboardList size={21}/> },
   { id:"settings",label:"ตั้งค่า",icon:<Settings size={21}/> }
 ];
 
 const PORTAL_VIEW_MENU: Record<PortalView,string> = {
   dashboard:"more.sales_summary", sales:"main.sales_list", products:"more.stock",
   stock:"more.stock", staff:"settings.users", package:"main.package_payment",
-  more:"main.more", settings:"main.settings", optical:"main.optical_customers"
+  more:"main.more", settings:"main.settings", optical:"main.optical_customers",work_orders:"main.optical_orders"
 };
 
 export default function App() {
@@ -151,7 +153,8 @@ export default function App() {
   const crmPolicy=menuAccess?.menu_policy??{};
   const opticalTabsAllowed=(["customers","orders","stock","reports"] as const).filter(tab=>isCrmMenuEnabled(crmPolicy,CRM_OPTICAL_MENU_KEYS[tab])&&(tab!=="reports"||context?.role==="owner")&&(tab!=="stock"||isCrmMenuEnabled(crmPolicy,CRM_MAIN_MENU_KEYS.stock)));
   const canSeeOptical=Boolean(menuAccess?.optical_retail_enabled&&(menuAccess.is_custom||menuAccess.is_internal_test_full)&&menuAccess.menu_policy["main.optical_customers"]!==false&&opticalTabsAllowed.length>0&&(import.meta.env.VITE_OPTICAL_OPS_V1_ENABLED==="true"||opticalTabsAllowed.includes("customers")));
-  const canSeeView=(id:PortalView)=>isCrmMenuEnabled(crmPolicy,CRM_MAIN_MENU_KEYS[id])&&(id==="optical"?canSeeOptical:!(menuAccess?.is_custom||menuAccess?.is_internal_test_full)||isCustomMenuVisible(menuAccess,PORTAL_VIEW_MENU[id]));
+  const canSeeWorkOrders=Boolean(menuAccess?.optical_retail_enabled&&(menuAccess.is_custom||menuAccess.is_internal_test_full)&&isCrmMenuEnabled(crmPolicy,CRM_OPTICAL_MENU_KEYS.orders));
+  const canSeeView=(id:PortalView)=>isCrmMenuEnabled(crmPolicy,CRM_MAIN_MENU_KEYS[id])&&(id==="work_orders"?canSeeWorkOrders:id==="optical"?canSeeOptical:!(menuAccess?.is_custom||menuAccess?.is_internal_test_full)||isCustomMenuVisible(menuAccess,PORTAL_VIEW_MENU[id]));
   const chooseView=(next:PortalView)=>{
     if(!canSeeView(next))return;
     setView(next);setMobileOpen(false);
@@ -162,7 +165,7 @@ export default function App() {
 
   // Keep navigation hidden until IT entitlement resolves; never flash unauthorized CUSTOM menus.
   const availableNav = !menuAccess ? [] : nav.filter(item=>canSeeView(item.id))
-    .map(item=>({...item,label:settingsText(language,item.id==="stock" ? (stockBusinessMode==="optical"?"สต๊อกกรอบ/เลนส์":
+    .map(item=>({...item,label:item.id==="work_orders"?opticalText(language,"ใบสั่งงาน"):settingsText(language,item.id==="stock" ? (stockBusinessMode==="optical"?"สต๊อกกรอบ/เลนส์":
       stockBusinessMode==="retail"?"สต๊อกสินค้า":stockBusinessMode==="mixed"?"สต๊อกตามโหมด":"วัตถุดิบ") : item.label)}));
   const activeView = !menuAccess ? null : !canSeeView(view) ? availableNav[0]?.id ?? null : view;
   const activeOpticalTab=opticalTabsAllowed.includes(opticalTab)?opticalTab:opticalTabsAllowed[0]??null;
@@ -239,6 +242,10 @@ export default function App() {
           {opticalTabsAllowed.includes("customers")?<OpticalCustomersView context={context} branchId={branchId||null}/>:null}
         </div>
       ) : null}
+      {activeView==="work_orders"&&canSeeWorkOrders?<section className="space-y-3" aria-label={opticalText(language,"ใบสั่งงานแว่นตา")}>
+        <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">ใบสั่งงาน: ดูรายการและสถานะได้ · การสร้าง แก้ไข และรับชำระเงินจริงจะเปิดหลังผ่านการทดสอบฐานข้อมูลและสิทธิ์</p>
+        <OpticalOperationsView context={context} branchId={branchId||null} page="orders"/>
+      </section>:null}
       {activeView==="settings"?<SettingsView context={context} branchId={branchId||null} onNavigate={chooseView} onContextChanged={refreshContextAfterMutation} menuPolicy={crmPolicy}/>:null}
 
       <footer>ข้อมูลและสิทธิ์ถูกจำกัดตามบัญชี {context.role==="owner"?"Owner":"Manager"} · {context.branches.length} สาขาที่เข้าถึงได้</footer>
