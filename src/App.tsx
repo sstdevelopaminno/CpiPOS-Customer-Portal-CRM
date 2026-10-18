@@ -20,6 +20,7 @@ import {CRM_SETTINGS_LANGUAGE_STORAGE,languageOptions,settingsText,type CrmSetti
 import {OpticalWorkspace} from "./views/OpticalWorkspace";
 import {useCrmLanguage} from "./lib/use-crm-language";
 import {usePortalMenuAccess} from "./lib/use-portal-menu-access";
+import {useCrmSalesCurrencySync} from "./lib/use-crm-sales-currency-sync";
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
@@ -87,6 +88,8 @@ export default function App() {
       setFatal("บันทึกสำเร็จแล้ว แต่ไม่สามารถโหลดข้อมูลร้านล่าสุดได้ กรุณากดรีเฟรชอีกครั้ง");
     }
   },[]);
+
+  useCrmSalesCurrencySync(context?.tenantId??null,refreshContextAfterMutation);
 
   useEffect(()=>{
     void restore();
