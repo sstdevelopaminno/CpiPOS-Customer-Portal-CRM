@@ -33,7 +33,11 @@ describe("CUSTOM Optical Owner-issued CRM staff access stays fail-closed",()=>{
     expect(permissions).toContain('context.role!=="owner"');
     expect(permissions).toContain("customer_portal_staff_crm_permissions_v1");
     expect(permissions).toContain("customer_portal_set_staff_crm_permission_v1");
-    expect(permissions).toContain("p_can_edit:false");
-    expect(permissions).toContain('checked={false} disabled');
+    expect(permissions).toContain("p_can_edit:permission.can_edit");
+    expect(permissions).toContain("can_edit:event.target.checked");
+    expect(optical).toContain("useOpticalStaffRights");
+    expect(optical).toContain("rights.customerEdit");
+    expect(optical).toContain("rights.ordersEdit");
+    expect(customer).toContain("!canArchive||!window.confirm(");
   });
 });
