@@ -20,7 +20,8 @@ import { OpticalOperationsView } from "./views/OpticalOperationsView";
 import { OpticalCustomerAddressEditor } from "./views/OpticalCustomerAddressEditor";
 import { SettingsView } from "./views/SettingsView";
 import {useCustomBranding} from "./lib/use-custom-branding";
-import {settingsText} from "./lib/settings-language";
+import {CRM_SETTINGS_LANGUAGE_STORAGE,languageOptions,settingsText,type CrmSettingsLanguage} from "./lib/settings-language";
+import {opticalText} from "./lib/optical-locale";
 import {useCrmLanguage} from "./lib/use-crm-language";
 import {usePortalMenuAccess} from "./lib/use-portal-menu-access";
 type InstallPromptEvent = Event & {
@@ -49,6 +50,10 @@ const PORTAL_VIEW_MENU: Record<PortalView,string> = {
 export default function App() {
   const [context,setContext]=useState<PortalContext|null>(null);
   const language=useCrmLanguage();
+  const changeLanguage=useCallback((next:CrmSettingsLanguage)=>{
+    localStorage.setItem(CRM_SETTINGS_LANGUAGE_STORAGE,next);
+    window.dispatchEvent(new CustomEvent("cpipos-crm-language-changed",{detail:next}));
+  },[]);
   const [checking,setChecking]=useState(true);
   const [view,setView]=useState<PortalView>("dashboard");
   const [branchId,setBranchId]=useState(()=>localStorage.getItem("cpipos-customer-portal-branch")??"");
@@ -150,7 +155,8 @@ export default function App() {
   const stockBusinessMode = menuAccess ? resolveCustomInventoryMode(menuAccess) : "legacy";
   const crmPolicy=menuAccess?.menu_policy??{};
   const opticalTabsAllowed=(["customers","orders","stock","reports"] as const).filter(tab=>isCrmMenuEnabled(crmPolicy,CRM_OPTICAL_MENU_KEYS[tab])&&(tab!=="reports"||context?.role==="owner")&&(tab!=="stock"||isCrmMenuEnabled(crmPolicy,CRM_MAIN_MENU_KEYS.stock)));
-  const canSeeOptical=Boolean(menuAccess?.optical_retail_enabled&&(menuAccess.is_custom||menuAccess.is_internal_test_full)&&menuAccess.menu_policy["main.optical_customers"]!==false&&opticalTabsAllowed.length>0&&(import.meta.env.VITE_OPTICAL_OPS_V1_ENABLED==="true"||opticalTabsAllowed.includes("customers")));
+  // IT-approved CUSTOM Optical screens can list work orders before financial writes are released.
+  const canSeeOptical=Boolean(menuAccess?.optical_retail_enabled&&(menuAccess.is_custom||menuAccess.is_internal_test_full)&&opticalTabsAllowed.length>0);
   const canSeeView=(id:PortalView)=>isCrmMenuEnabled(crmPolicy,CRM_MAIN_MENU_KEYS[id])&&(id==="optical"?canSeeOptical:!(menuAccess?.is_custom||menuAccess?.is_internal_test_full)||isCustomMenuVisible(menuAccess,PORTAL_VIEW_MENU[id]));
   const chooseView=(next:PortalView)=>{
     if(!canSeeView(next))return;
@@ -167,6 +173,7 @@ export default function App() {
   const activeView = !menuAccess ? null : !canSeeView(view) ? availableNav[0]?.id ?? null : view;
   const activeOpticalTab=opticalTabsAllowed.includes(opticalTab)?opticalTab:opticalTabsAllowed[0]??null;
   const showFilters=activeView!=="package";
+  const opticalFinanceUiEnabled=import.meta.env.VITE_OPTICAL_OPS_V1_ENABLED==="true";
   const showPeriod=activeView==="dashboard"||activeView==="sales";
   const canInstall=Boolean(installPrompt)&&!standalone;
 
@@ -197,6 +204,20 @@ export default function App() {
       {!online?<div className="offlineBanner"><WifiOff size={18}/><span>ออฟไลน์ — หน้าแอปยังเปิดได้ แต่ข้อมูลร้านและการบันทึกจะทำงานอีกครั้งเมื่อเชื่อมต่ออินเทอร์เน็ต</span></div>:null}
       {fatal?<div className="errorBox">{fatal}</div>:null}
 
+      <div className="flex flex-wrap items-center justify-end gap-3 px-1 pt-3" data-testid="crm-language-currency-controls">
+        <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+          <span>{settingsText(language,"เปลี่ยนภาษา")}</span>
+          <select aria-label={settingsText(language,"เลือกระบบภาษา")} value={language} onChange={event=>changeLanguage(event.target.value as CrmSettingsLanguage)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800">
+            {languageOptions.map(option=><option key={option.code} value={option.code}>{option.label}</option>}
+          </select>
+        </label>
+        <span role="status" data-testid="crm-authorized-sales-currency" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+          {language==="en"?"New sales currency":language==="lo"?"ສະກຸນເງິນຂາຍໃໝ່":"สกุลเงินขายใหม่"}: <strong>{context.salesCurrencyCode??"—"}</strong>
+        </span>
+        <button type="button" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" onClick={()=>void Promise.all([refreshContextAfterMutation(),reloadMenuAccess()])}>
+          {settingsText(language,"รีเฟรช")}
+        </button>
+      </div>
       {showFilters?<FilterBar context={context} branchId={branchId} onBranchChange={changeBranch} range={range} onRangeChange={setRange} anchor={anchor} onAnchorChange={setAnchor} showPeriod={showPeriod}/>:null}
 
       {!menuAccess ? <div role="status" className="emptyState">
@@ -212,31 +233,36 @@ export default function App() {
       {activeView==="package"?<PackageView context={context}/>:null}
       {activeView==="more"?<MoreView context={context} branchId={branchId||null} onNavigate={chooseView} language={language} menuPolicy={crmPolicy}/>:null}
       {activeView==="optical" && canSeeOptical ? (
-        import.meta.env.VITE_OPTICAL_OPS_V1_ENABLED === "true" ? (
-          <div className="space-y-4">
-            <div className="flex flex-wrap gap-2" role="tablist" aria-label="โมดูล Optical">
-              {([["customers","ประวัติลูกค้า"],["orders","ใบสั่งงาน"],
-                ["stock","สต๊อกกรอบ/เลนส์"],["reports","รายงานเจ้าของร้าน"]] as const)
-                .filter(([id])=>opticalTabsAllowed.includes(id)).map(([id,label])=><button type="button" role="tab"
+        <div className="space-y-4">
+          <div className="flex flex-wrap gap-2" role="tablist" aria-label={opticalText(language,"ใบสั่งงานแว่นตา")}>
+            {([["customers","ประวัติลูกค้า"],["orders","ใบสั่งงานแว่นตา"],
+              ["stock","สต๊อกกรอบแว่นและเลนส์"],["reports","รายงานเจ้าของร้าน"]] as const)
+              .filter(([id])=>opticalTabsAllowed.includes(id))
+              .filter(([id])=>id!=="reports"||opticalFinanceUiEnabled)
+              .map(([id,label])=><button type="button" role="tab"
                 aria-selected={activeOpticalTab===id} key={id} onClick={()=>setOpticalTab(id)}
-                className={`rounded-xl border px-4 py-2 text-sm font-bold ${activeOpticalTab===id?"border-emerald-700 bg-emerald-700 text-white":"border-emerald-100 bg-white text-emerald-800"}`}>{label}</button>)}
-            </div>
-            {activeOpticalTab==="stock" && canSeeView("stock") ? (
-              <BusinessStockOverview context={context} branchId={branchId||null} business="optical" strictOpticalCategory={stockBusinessMode==="mixed"}/>
-            ) : activeOpticalTab==="stock" ? (
-              <p role="alert">เมนูสต๊อกยังไม่ได้รับอนุมัติจาก IT Admin</p>
-            ) : activeOpticalTab==="customers"?<div className="space-y-4">
-              <OpticalCustomersView context={context} branchId={branchId||null}/>
-              <OpticalCustomerAddressEditor context={context} branchId={branchId||null}/>
-            </div>:(
-              activeOpticalTab==="reports"&&context.role!=="owner"
-                ? <p role="alert">เฉพาะเจ้าของร้านเท่านั้นที่สามารถดูรายงาน Optical</p>
-                : <OpticalOperationsView context={context} branchId={branchId||null} page={activeOpticalTab==="reports"?"reports":"orders"}/>
-            )}
+                className={`rounded-xl border px-4 py-2 text-sm font-bold ${activeOpticalTab===id?"border-emerald-700 bg-emerald-700 text-white":"border-emerald-100 bg-white text-emerald-800"}`}>{opticalText(language,label)}</button>)}
           </div>
-        ) : <div className="space-y-4">
-          {canSeeView("stock")?<div className="custom-stock-shortcut"><span>IMDC OPTICAL · สต๊อกกรอบแว่น/เลนส์</span><button type="button" onClick={()=>chooseView("stock")}>เปิดเมนูสต๊อก</button></div>:null}
-          {opticalTabsAllowed.includes("customers")?<OpticalCustomersView context={context} branchId={branchId||null}/>:null}
+          {activeOpticalTab==="stock" && canSeeView("stock") ? (
+            <BusinessStockOverview context={context} branchId={branchId||null} business="optical" strictOpticalCategory={stockBusinessMode==="mixed"}/>
+          ) : activeOpticalTab==="stock" ? (
+            <p role="alert">{opticalText(language,"สต๊อกกรอบแว่นและเลนส์")} — {settingsText(language,"ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด")}</p>
+          ) : activeOpticalTab==="customers"?<div className="space-y-4">
+            <OpticalCustomersView context={context} branchId={branchId||null}/>
+            <OpticalCustomerAddressEditor context={context} branchId={branchId||null}/>
+          </div> : activeOpticalTab==="reports"&&!opticalFinanceUiEnabled ? (
+            <p role="alert">{opticalText(language,"รายงานเจ้าของร้าน")} — {settingsText(language,"ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด")}</p>
+          ) : activeOpticalTab==="reports"&&context.role!=="owner" ? (
+            <p role="alert">{opticalText(language,"รายงานเจ้าของร้าน")} — Owner</p>
+          ) : (
+            <div className="space-y-3">
+              {activeOpticalTab==="orders"&&!opticalFinanceUiEnabled?
+                <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                  {language==="en"?"Work-order list only. Creating, editing and checkout are locked until the Optical finance rollout is approved.":language==="lo"?"ສະແດງລາຍການໃບງານເທົ່ານັ້ນ; ການສ້າງ ແກ້ໄຂ ແລະ ຊຳລະເງິນ ຍັງບໍ່ເປີດໃຊ້":"เปิดดูรายการใบงานเท่านั้น การสร้าง แก้ไข และชำระเงินจริงยังปิดไว้จนผ่านการทดสอบและอนุมัติเปิดโมดูล"}
+                </p>:null}
+              <OpticalOperationsView context={context} branchId={branchId||null} page={activeOpticalTab==="reports"?"reports":"orders"}/>
+            </div>
+          )}
         </div>
       ) : null}
       {activeView==="settings"?<SettingsView context={context} branchId={branchId||null} onNavigate={chooseView} onContextChanged={refreshContextAfterMutation} menuPolicy={crmPolicy}/>:null}
