@@ -160,20 +160,14 @@ export default function App() {
   const stockBusinessMode = menuAccess ? resolveCustomInventoryMode(menuAccess) : "legacy";
   const crmPolicy=menuAccess?.menu_policy??{};
   const opticalTabsAllowed=(["customers","orders","stock","reports"] as const).filter(tab=>isCrmMenuEnabled(crmPolicy,CRM_OPTICAL_MENU_KEYS[tab])&&(tab!=="reports"||context?.role==="owner")&&(tab!=="stock"||isCrmMenuEnabled(crmPolicy,CRM_MAIN_MENU_KEYS.stock)));
-  // Only approved CUSTOM Optical tenants may see either Optical business screen.
-  // Work orders have their own primary menu (not an Optical Customers sub-tab).
+  // CUSTOM Optical work orders are a primary route; IT and tenant scopes remain enforced.
   const customerOpticalTabsAllowed=opticalTabsAllowed.filter(tab=>tab!=="orders");
-  const customOpticalEnabled=Boolean(menuAccess?.optical_retail_enabled
-    &&(menuAccess.is_custom||menuAccess.is_internal_test_full));
+  const customOpticalEnabled=Boolean(menuAccess?.optical_retail_enabled&&(menuAccess.is_custom||menuAccess.is_internal_test_full));
   const canSeeOptical=Boolean(customOpticalEnabled&&opticalTabsAllowed.length>0&&customerOpticalTabsAllowed.length>0);
-  const canSeeWorkOrders=Boolean(customOpticalEnabled
-    &&isCrmMenuEnabled(crmPolicy,CRM_OPTICAL_MENU_KEYS.orders));
-  const canSeeView=(id:PortalView)=>isCrmMenuEnabled(crmPolicy,CRM_MAIN_MENU_KEYS[id])
-    &&(id==="work_orders"?canSeeWorkOrders
-      :id==="optical"?canSeeOptical
-      :context?.role==="staff"?false
-      :!(menuAccess?.is_custom||menuAccess?.is_internal_test_full)
-        ||isCustomMenuVisible(menuAccess,PORTAL_VIEW_MENU[id]));
+  const canSeeWorkOrders=Boolean(customOpticalEnabled&&isCrmMenuEnabled(crmPolicy,CRM_OPTICAL_MENU_KEYS.orders));
+  const canSeeView=(id:PortalView)=>isCrmMenuEnabled(crmPolicy,CRM_MAIN_MENU_KEYS[id])&&(id==="work_orders"?canSeeWorkOrders
+    :id==="optical"?canSeeOptical:context?.role==="staff"?false
+    :!(menuAccess?.is_custom||menuAccess?.is_internal_test_full)||isCustomMenuVisible(menuAccess,PORTAL_VIEW_MENU[id]));
   const chooseView=(next:PortalView)=>{
     if(!canSeeView(next))return;
     setView(next);setMobileOpen(false);
@@ -255,8 +249,7 @@ export default function App() {
         stockBusinessMode={stockBusinessMode} activeOpticalTab={activeOpticalTab}
         opticalTabsAllowed={customerOpticalTabsAllowed} opticalFinanceUiEnabled={opticalFinanceUiEnabled}
         canSeeStock={canSeeView("stock")} setOpticalTab={setOpticalTab}/> : null}
-      {activeView==="work_orders"&&canSeeWorkOrders?<OpticalWorkOrdersPage
-        context={context} branchId={branchId} language={language}/>:null}
+      {activeView==="work_orders"&&canSeeWorkOrders?<OpticalWorkOrdersPage context={context} branchId={branchId} language={language}/>:null}
       {activeView==="settings"?<SettingsView context={context} branchId={branchId||null} onNavigate={chooseView} onContextChanged={refreshContextAfterMutation} menuPolicy={crmPolicy}/>:null}
 
       <footer>ข้อมูลและสิทธิ์ถูกจำกัดตามบัญชี {context.role==="owner"?"Owner":context.role==="manager"?"Manager":"Staff"} · {context.branches.length} สาขาที่เข้าถึงได้</footer>
