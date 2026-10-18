@@ -7,7 +7,7 @@ import type {PortalView} from "../types/portal";
 export const CRM_MAIN_MENU_KEYS:Record<PortalView,string>={
   dashboard:"main.crm_overview",sales:"main.crm_sales",products:"main.crm_products",
   stock:"main.crm_stock",staff:"main.crm_staff",package:"main.crm_package",
-  more:"main.crm_more",optical:"main.crm_optical",settings:"main.crm_settings"
+  more:"main.crm_more",optical:"main.crm_optical",work_orders:"main.crm_optical_orders",settings:"main.crm_settings"
 };
 export const CRM_MORE_MENU_KEYS:Readonly<Record<string,string>>={
   "more.receipts":"more.crm_receipts",
