@@ -22,8 +22,8 @@ const errorLabel=(language:string)=>language==="en"?"Draft save failed. Check Ow
   "ບັນທຶກໃບງານບໍ່ສຳເລັດ ກວດສິດ ແລະ ສະຕັອກ":"บันทึกใบงานไม่สำเร็จ กรุณาตรวจสิทธิ์ Owner/IT และสต๊อก";
 
 /** Staged CRUD only. No direct payment or inventory writes from the browser. */
-export function OpticalWorkOrderDrafts({context,branchId,onIssued}:{
-  context:PortalContext;branchId:string;onIssued:()=>void
+export function OpticalWorkOrderDrafts({context,branchId,onIssued,staffEditAllowed=false}:{
+  context:PortalContext;branchId:string;onIssued:()=>void;staffEditAllowed?:boolean
 }){
   const language=useCrmLanguage();
   const T=(value:string)=>opticalText(language,value);
@@ -38,7 +38,7 @@ export function OpticalWorkOrderDrafts({context,branchId,onIssued}:{
   const [notice,setNotice]=useState("");
   const requestId=useRef<string>(crypto.randomUUID());
   const allowed=import.meta.env.VITE_OPTICAL_WORK_ORDER_DRAFTS_V1_ENABLED==="true" &&
-    context.role==="owner"&&context.salesCurrencyCode==="LAK";
+    (context.role==="owner"||context.role==="staff"&&staffEditAllowed)&&context.salesCurrencyCode==="LAK";
   const reload=useCallback(async()=>{
     if(!allowed||!branchId)return;
     setLoading(true);setError("");
