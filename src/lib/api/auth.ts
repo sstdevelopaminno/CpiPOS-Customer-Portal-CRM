@@ -1,5 +1,6 @@
 import { supabase, supabaseKey, supabaseUrl } from "../supabase";
 import type { BranchSummary, PortalContext, PortalRole } from "../../types/portal";
+import {readITApprovedSalesCurrency} from "../it-approved-sales-currency";
 
 export async function loginWithStoreEmployeeCode(storeCode: string, employeeCode: string) {
   const response = await fetch(`${supabaseUrl}/functions/v1/customer-portal-login`, {
@@ -81,21 +82,11 @@ export async function loadPortalContext(): Promise<PortalContext> {
   if (tenantError) throw tenantError;
   if (branchError) throw branchError;
 
-  // Read the sales (not subscription billing) currency of this authenticated tenant.
-  // Tenant RLS applies to the contract read; do not trust a browser-provided tenant ID.
-  const { data: approvedContract, error: currencyError } = await supabase
-    .from("tenant_subscription_contracts")
-    .select("metadata")
-    .eq("tenant_id", tenantId)
-    .eq("status", "active")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  // A currency read outage must not lock the customer out of CRM or relabel a
-  // currency that we have not verified. Individual receipts use their snapshots.
-  const approvedCurrency = !currencyError ? (approvedContract?.metadata as Record<string, unknown> | null)?.pos_currency_code : null;
-  const salesCurrencyCode = currencyError ? null :
-    approvedCurrency === "LAK" || approvedCurrency === "USD" ? approvedCurrency : "THB";
+  // The same latest-active-contract source IT Admin updates. If RLS fails, show
+  // unknown rather than silently claiming THB; never infer currency from old bills.
+  let salesCurrencyCode:PortalContext["salesCurrencyCode"]=null;
+  try{salesCurrencyCode=await readITApprovedSalesCurrency(tenantId);}
+  catch{salesCurrencyCode=null;}
 
   const allBranches = (branches ?? []) as BranchSummary[];
   const visibleBranches = role === "owner" ? allBranches : allBranches.filter((branch) => allowedBranchIds.includes(branch.id));
