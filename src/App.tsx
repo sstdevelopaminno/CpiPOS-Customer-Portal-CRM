@@ -89,7 +89,9 @@ export default function App() {
     }
   },[]);
 
-  useCrmSalesCurrencySync(context?.tenantId??null,refreshContextAfterMutation);
+  useCrmSalesCurrencySync(context?.tenantId??null,context?.role??null,
+    context?.role==="staff"?(branchId||context.branches[0]?.id||""):branchId,
+    context?.salesCurrencyCode??null,refreshContextAfterMutation);
 
   useEffect(()=>{
     void restore();
