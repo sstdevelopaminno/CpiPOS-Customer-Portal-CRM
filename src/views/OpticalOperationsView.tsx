@@ -5,6 +5,7 @@ import {loadProducts} from "../lib/portal";
 import {OpticalStockTable,type OpticalTableEntry} from "./OpticalStockTable";
 import { formatCurrency } from "../lib/formatters";
 import { opticalText, opticalDateLocale } from "../lib/optical-locale";
+import { OpticalJobSheet,type OpticalJobLine,type OpticalJobCustomer } from "../components/OpticalJobSheet";
 import { useCrmLanguage } from "../lib/use-crm-language";
 
 type Page = "orders" | "stock" | "reports";
@@ -60,6 +61,10 @@ export function OpticalOperationsView({
   const [payments,setPayments]=useState<OpticalPayment[]>([]);
   const [paymentsLoading,setPaymentsLoading]=useState(false);
   const [paymentsError,setPaymentsError]=useState("");
+  const [jobLines,setJobLines]=useState<OpticalJobLine[]>([]);
+  const [jobCustomer,setJobCustomer]=useState<OpticalJobCustomer|null>(null);
+  const [jobError,setJobError]=useState("");
+  const [jobLoading,setJobLoading]=useState(false);
   const [bins,setBins]=useState<Stock[]>([]);
   const [metrics,setMetrics]=useState<Metric[]>([]);
   const [range,setRange]=useState<Range>("day");
@@ -136,6 +141,35 @@ export function OpticalOperationsView({
     return()=>{cancelled=true;};
   },[context.tenantId,branch,page,selectedOrderId,language]);
 
+  useEffect(()=>{
+    if(page!=="orders"||!branch||!selectedOrderId){setJobLines([]);setJobCustomer(null);setJobError("");return;}
+    const order=orders.find(row=>row.id===selectedOrderId);
+    if(!order){setJobLines([]);setJobCustomer(null);return;}
+    let cancelled=false;
+    setJobLines([]);setJobCustomer(null);setJobError("");setJobLoading(true);
+    void (async()=>{
+      try{
+        const [lines,customer]=await Promise.all([
+          supabase.from("optical_work_order_lines")
+            .select("id,description_snapshot,sku_snapshot,quantity,unit_price,line_total")
+            .eq("tenant_id",context.tenantId).eq("branch_id",branch)
+            .eq("work_order_id",order.id).order("id"),
+          supabase.from("optical_customers")
+            .select("full_name,customer_code")
+            .eq("tenant_id",context.tenantId).eq("branch_id",branch)
+            .eq("id",order.customer_id).maybeSingle()
+        ]);
+        if(cancelled)return;
+        if(lines.error||customer.error||!customer.data||!lines.data?.length)
+          throw new Error("job_sheet_unavailable");
+        setJobLines(lines.data as OpticalJobLine[]);
+        setJobCustomer(customer.data as OpticalJobCustomer);
+      }catch{if(!cancelled)setJobError(language==="en"?"Cannot load verified job-sheet details.":language==="lo"?"ບໍ່ສາມາດໂຫຼດລາຍລະອຽດໃບງານ":"ไม่สามารถอ่านรายละเอียดใบงานที่ยืนยันได้");}
+      finally{if(!cancelled)setJobLoading(false);}
+    })();
+    return()=>{cancelled=true;};
+  },[context.tenantId,branch,page,selectedOrderId,orders,language]);
+
   const selectedOrder=orders.find(o=>o.id===selectedOrderId)??null;
   const opticalEntries:OpticalTableEntry[]=bins.filter(bin=>bin.currency_code===(context.salesCurrencyCode??"LAK")).map(bin=>({
     id:bin.id,sku:skuMap[bin.product_id]??null,
@@ -177,6 +211,11 @@ export function OpticalOperationsView({
       </tr>)}</tbody></table>
       {orders.length===0&&!loading&&!error?<p className="p-4 text-sm text-slate-500">{T("ยังไม่มีใบสั่งงานในสาขานี้")}</p>:null}
       {selectedOrder?<section className="border-t border-emerald-200 p-4" data-testid="optical-crm-deposit-history">
+        {jobLoading?<p role="status">{T("กำลังโหลดข้อมูล...")}</p>:null}
+        {jobError?<p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">{jobError}</p>:null}
+        {jobCustomer&&jobLines.length>0&&!jobLoading&&!jobError?
+          <OpticalJobSheet order={selectedOrder} customer={jobCustomer} lines={jobLines}
+            tenantName={context.tenantName} language={language}/>:null}
         <h3 className="font-bold text-emerald-950">{T("ประวัติเงินมัดจำและยอดค้างชำระ")} · {selectedOrder.id.slice(0,8)}</h3>
         <div className="mt-3 grid gap-2 sm:grid-cols-3">
           {[
