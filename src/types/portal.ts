@@ -1,5 +1,5 @@
 export type PortalRole = "owner" | "manager";
-export type PortalView = "dashboard" | "sales" | "products" | "stock" | "staff" | "package" | "more" | "settings" | "optical";
+export type PortalView = "dashboard" | "sales" | "products" | "stock" | "staff" | "package" | "more" | "settings" | "optical" | "work_orders";
 export type ReportRange = "day" | "month" | "year";
 
 export interface BranchSummary {
