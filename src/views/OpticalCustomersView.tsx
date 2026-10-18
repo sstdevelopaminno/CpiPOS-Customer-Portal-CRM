@@ -29,7 +29,7 @@ const blank=():Form=>({
 const val=(s:string)=>s.trim()===""?null:Number(s);
 const numericKeys: Array<keyof Form>=["age","pd_mm","right_sph","right_cyl","right_axis","right_add","left_sph","left_cyl","left_axis","left_add"];
 
-export function OpticalCustomersView({context,branchId}:{context:PortalContext;branchId:string|null}) {
+export function OpticalCustomersView({context,branchId,readOnly=false}:{context:PortalContext;branchId:string|null;readOnly?:boolean}) {
   const activeBranch=branchId && context.branches.some(x=>x.id===branchId) ? branchId : context.branches[0]?.id;
   const [customers,setCustomers]=useState<Customer[]>([]);
   const [loading,setLoading]=useState(false);
@@ -67,7 +67,7 @@ export function OpticalCustomersView({context,branchId}:{context:PortalContext;b
   };
   const save=async(event:FormEvent<HTMLFormElement>)=>{
     event.preventDefault();
-    if(!activeBranch||saving)return;
+    if(!activeBranch||saving||readOnly)return;
     const age=val(form.age),pd=val(form.pd_mm);
     if((age!==null&&(age<0||age>130))||(pd!==null&&(pd<30||pd>90))) {setError("อายุหรือ PD ไม่ถูกต้อง");return;}
     setSaving(true);setError("");setNotice("");
@@ -87,7 +87,7 @@ export function OpticalCustomersView({context,branchId}:{context:PortalContext;b
     await load();
   };
   const archive=async(row:Customer)=>{
-    if(!activeBranch||!window.confirm(`ยืนยันย้ายลูกค้า ${row.customer_code} ไปยังสถานะเก็บถาวร? ข้อมูลประวัติจะยังคงอยู่ในฐานข้อมูล`))return;
+    if(!activeBranch||readOnly||!window.confirm(`ยืนยันย้ายลูกค้า ${row.customer_code} ไปยังสถานะเก็บถาวร? ข้อมูลประวัติจะยังคงอยู่ในฐานข้อมูล`))return;
     setError("");setNotice("");
     const {error:archiveError}=await supabase.from("optical_customers")
       .update({deleted_at:new Date().toISOString(),updated_by:context.userId,updated_at:new Date().toISOString()})
@@ -116,7 +116,7 @@ export function OpticalCustomersView({context,branchId}:{context:PortalContext;b
     <header className="flex flex-wrap items-center justify-between gap-3">
       <div><p className="text-xs font-bold text-emerald-700">IMDC OPTICAL</p><h2>ประวัติลูกค้าและค่าสายตา</h2>
         <p>เฉพาะร้านและสาขาที่ IT เปิดสิทธิ์ Optical · ข้อมูลการตรวจเก่าจะไม่ถูกเขียนทับ</p></div>
-      <button className="rounded-xl bg-emerald-700 px-5 py-3 font-bold text-white" disabled={!activeBranch} onClick={startNew}>+ เพิ่มลูกค้า</button>
+      {!readOnly?<button className="rounded-xl bg-emerald-700 px-5 py-3 font-bold text-white" disabled={!activeBranch} onClick={startNew}>+ เพิ่มลูกค้า</button>:null}
     </header>
     {error?<div role="alert" className="rounded-lg bg-red-50 p-3 text-red-700">{error}</div>:null}
     {notice?<div role="status" className="rounded-lg bg-emerald-50 p-3 text-emerald-800">{notice}</div>:null}
@@ -129,8 +129,8 @@ export function OpticalCustomersView({context,branchId}:{context:PortalContext;b
         <tbody>{filtered.map(row=><tr key={row.id} className="border-t border-slate-100">
           <td className="p-3 font-bold">{row.customer_code}</td><td className="p-3">{row.full_name}</td><td className="p-3">{row.phone||"-"}</td><td className="p-3">{row.last_exam_date||"-"}</td>
           <td className="flex flex-wrap gap-2 p-3"><button className="rounded border px-3 py-1" onClick={()=>void openHistory(row)}>ประวัติ</button>
-            <button className="rounded border px-3 py-1" onClick={()=>startEdit(row)}>แก้ไข/ตรวจใหม่</button>
-            <button className="rounded border border-rose-200 px-3 py-1 text-rose-700" onClick={()=>void archive(row)}>เก็บถาวร</button></td>
+            {!readOnly?<button className="rounded border px-3 py-1" onClick={()=>startEdit(row)}>แก้ไข/ตรวจใหม่</button>:null}
+            {!readOnly?<button className="rounded border border-rose-200 px-3 py-1 text-rose-700" onClick={()=>void archive(row)}>เก็บถาวร</button>:null}</td>
         </tr>)}</tbody>
       </table>{filtered.length===0?<p className="p-4 text-sm text-slate-500">ไม่พบลูกค้า</p>:null}</div>}
     {historyFor?<div className="rounded-xl border border-emerald-200 bg-white p-4"><h3>ประวัติค่าสายตา: {historyFor}</h3>
@@ -141,7 +141,7 @@ export function OpticalCustomersView({context,branchId}:{context:PortalContext;b
           <td>{[e.left_sph,e.left_cyl,e.left_axis,e.left_add].map(x=>x??"-").join(" / ")}</td>
           <td>{e.pd_mm??"-"}</td><td>{e.examiner_name??"-"}</td></tr>)}</tbody>
       </table></div>}</div>:null}
-    {editing?<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4" role="presentation" onClick={()=>{if(!saving)setEditing(false);}}>
+    {editing&&!readOnly?<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4" role="presentation" onClick={()=>{if(!saving)setEditing(false);}}>
       <div role="dialog" aria-modal="true" aria-label="ข้อมูลลูกค้า Optical" onClick={e=>e.stopPropagation()} className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
         <h3 className="mb-3 text-xl font-bold">{editor?"แก้ไขข้อมูลและเพิ่มผลตรวจใหม่":"เพิ่มประวัติลูกค้า"}</h3>
         <form className="grid gap-4" onSubmit={e=>void save(e)}>
