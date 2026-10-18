@@ -4,7 +4,8 @@ import type { PortalContext } from "../types/portal";
 import {loadProducts} from "../lib/portal";
 import {OpticalStockTable,type OpticalTableEntry} from "./OpticalStockTable";
 import { formatCurrency } from "../lib/formatters";
-import { opticalText, opticalDateLocale, readOpticalLanguage } from "../lib/optical-locale";
+import { opticalText, opticalDateLocale } from "../lib/optical-locale";
+import { useCrmLanguage } from "../lib/use-crm-language";
 
 type Page = "orders" | "stock" | "reports";
 type Order = {
@@ -51,7 +52,7 @@ export function OpticalOperationsView({
   context,branchId,page
 }:{context:PortalContext;branchId:string|null;page:Page}) {
   const branch=context.branches.find(x=>x.id===branchId)?.id??context.branches[0]?.id;
-  const [language]=useState(readOpticalLanguage);
+  const language=useCrmLanguage();
   const T=(value:string)=>opticalText(language,value);
   const dateLocale=opticalDateLocale(language);
   const [orders,setOrders]=useState<Order[]>([]);
