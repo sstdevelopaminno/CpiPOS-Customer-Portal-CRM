@@ -122,7 +122,7 @@ export function OpticalOperationsView({
 
   // Financial history is read-only, tenant/branch-scoped and protected by RLS.
   useEffect(()=>{
-    if(page!=="orders"||!branch||!selectedOrderId){setPayments([]);setPaymentsError("");return;}
+    if(context.role==="staff"||page!=="orders"||!branch||!selectedOrderId){setPayments([]);setPaymentsError("");return;}
     let cancelled=false;
     setPayments([]);setPaymentsError("");setPaymentsLoading(true);
     void (async()=>{
@@ -139,7 +139,7 @@ export function OpticalOperationsView({
       }finally{if(!cancelled)setPaymentsLoading(false);}
     })();
     return()=>{cancelled=true;};
-  },[context.tenantId,branch,page,selectedOrderId,language]);
+  },[context.tenantId,context.role,branch,page,selectedOrderId,language]);
 
   useEffect(()=>{
     if(page!=="orders"||!branch||!selectedOrderId){setJobLines([]);setJobCustomer(null);setJobError("");return;}
@@ -216,6 +216,7 @@ export function OpticalOperationsView({
         {jobCustomer&&jobLines.length>0&&!jobLoading&&!jobError?
           <OpticalJobSheet order={selectedOrder} customer={jobCustomer} lines={jobLines}
             tenantName={context.tenantName} language={language}/>:null}
+        {context.role!=="staff"?<>
         <h3 className="font-bold text-emerald-950">{T("ประวัติเงินมัดจำและยอดค้างชำระ")} · {selectedOrder.id.slice(0,8)}</h3>
         <div className="mt-3 grid gap-2 sm:grid-cols-3">
           {[
@@ -245,6 +246,7 @@ export function OpticalOperationsView({
             <p className="p-3 text-sm text-slate-500">{T("ยังไม่มีรายการรับเงินมัดจำสำหรับงานนี้")}</p>:null}
         </div>
         <p className="mt-2 text-xs text-amber-700">{T("รายการเงินโอนต้องผ่านการตรวจสอบหลักฐานจริงก่อนบันทึก ไม่ใช่การอนุมัติอัตโนมัติจาก CRM")}</p>
+        </>:null}
       </section>:null}
     </div>:null}
     {page==="stock"?<div className="space-y-2">
