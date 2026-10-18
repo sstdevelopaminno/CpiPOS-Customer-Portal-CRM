@@ -21,10 +21,10 @@ describe("CUSTOM Optical Owner-issued CRM staff access stays fail-closed",()=>{
   });
   it("does not give staff any other CRM menu or financial ledger read",()=>{
     expect(main).toContain('context?.role==="staff"?false');
-    expect(optical).toContain('readOnly={context.role==="staff"}');
+    expect(optical).toContain('readOnly={context.role==="staff"&&!rights.customerEdit}');
     expect(optical).toContain('context.role!=="staff"?<OpticalCustomerAddressEditor');
     expect(customer).toContain("if(!activeBranch||saving||readOnly)return;");
-    expect(customer).toContain("if(!activeBranch||readOnly||!window.confirm(");
+    expect(customer).toContain("if(!activeBranch||readOnly||!canArchive||!window.confirm(");
     expect(operations).toContain('if(context.role==="staff"||page!=="orders"');
     expect(operations).toContain('{context.role!=="staff"?<>');
   });
