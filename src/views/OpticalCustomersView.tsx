@@ -33,7 +33,7 @@ const blank=():Form=>({
 const val=(s:string)=>s.trim()===""?null:Number(s);
 const numericKeys: Array<keyof Form>=["age","pd_mm","right_sph","right_cyl","right_axis","right_add","left_sph","left_cyl","left_axis","left_add"];
 
-export function OpticalCustomersView({context,branchId,readOnly=false}:{context:PortalContext;branchId:string|null;readOnly?:boolean}) {
+export function OpticalCustomersView({context,branchId,readOnly=false,canArchive=true}:{context:PortalContext;branchId:string|null;readOnly?:boolean;canArchive?:boolean}) {
   const language=useCrmLanguage();
   const T=(text:string)=>opticalText(language,text);
   const language=useCrmLanguage();
@@ -95,7 +95,7 @@ export function OpticalCustomersView({context,branchId,readOnly=false}:{context:
     await load();
   };
   const archive=async(row:Customer)=>{
-    if(!activeBranch||readOnly||!window.confirm(`ยืนยันย้ายลูกค้า ${row.customer_code} ไปยังสถานะเก็บถาวร? ข้อมูลประวัติจะยังคงอยู่ในฐานข้อมูล`))return;
+    if(!activeBranch||readOnly||!canArchive||!window.confirm(`ยืนยันย้ายลูกค้า ${row.customer_code} ไปยังสถานะเก็บถาวร? ข้อมูลประวัติจะยังคงอยู่ในฐานข้อมูล`))return;
     setError("");setNotice("");
     const {error:archiveError}=await supabase.from("optical_customers")
       .update({deleted_at:new Date().toISOString(),updated_by:context.userId,updated_at:new Date().toISOString()})
@@ -138,7 +138,7 @@ export function OpticalCustomersView({context,branchId,readOnly=false}:{context:
           <td className="p-3 font-bold">{row.customer_code}</td><td className="p-3">{row.full_name}</td><td className="p-3">{row.phone||"-"}</td><td className="p-3">{row.last_exam_date||"-"}</td>
           <td className="flex flex-wrap gap-2 p-3"><button className="rounded border px-3 py-1" onClick={()=>void openHistory(row)}>{T("ประวัติ")}</button>
             {!readOnly?<button className="rounded border px-3 py-1" onClick={()=>startEdit(row)}>{T("แก้ไข/ตรวจใหม่")}</button>:null}
-            {!readOnly?<button className="rounded border border-rose-200 px-3 py-1 text-rose-700" onClick={()=>void archive(row)}>{T("เก็บถาวร")}</button>:null}</td>
+            {!readOnly&&canArchive?<button className="rounded border border-rose-200 px-3 py-1 text-rose-700" onClick={()=>void archive(row)}>{T("เก็บถาวร")}</button>:null}</td>
         </tr>)}</tbody>
       </table>{filtered.length===0?<p className="p-4 text-sm text-slate-500">{T("ไม่พบลูกค้า")}</p>:null}</div>}
     {historyFor?<div className="rounded-xl border border-emerald-200 bg-white p-4"><h3>{T("ประวัติค่าสายตา")}: {historyFor}</h3>
