@@ -10,18 +10,14 @@ import { DashboardView } from "./views/DashboardView";
 import { SalesView } from "./views/SalesView";
 import { ProductsView } from "./views/ProductsView";
 import { CustomStockRouter } from "./views/CustomStockRouter";
-import { BusinessStockOverview } from "./views/BusinessStockOverview";
 import { resolveCustomInventoryMode } from "./lib/custom-inventory-mode";
 import { StaffView } from "./views/StaffView";
 import { PackageView } from "./views/PackageView";
 import { MoreView } from "./views/MoreView";
-import { OpticalCustomersView } from "./views/OpticalCustomersView";
-import { OpticalOperationsView } from "./views/OpticalOperationsView";
-import { OpticalCustomerAddressEditor } from "./views/OpticalCustomerAddressEditor";
 import { SettingsView } from "./views/SettingsView";
 import {useCustomBranding} from "./lib/use-custom-branding";
 import {CRM_SETTINGS_LANGUAGE_STORAGE,languageOptions,settingsText,type CrmSettingsLanguage} from "./lib/settings-language";
-import {opticalText} from "./lib/optical-locale";
+import {OpticalWorkspace} from "./views/OpticalWorkspace";
 import {useCrmLanguage} from "./lib/use-crm-language";
 import {usePortalMenuAccess} from "./lib/use-portal-menu-access";
 type InstallPromptEvent = Event & {
@@ -232,39 +228,11 @@ export default function App() {
       {activeView==="staff"?<StaffView context={context} branchId={branchId||null}/>:null}
       {activeView==="package"?<PackageView context={context}/>:null}
       {activeView==="more"?<MoreView context={context} branchId={branchId||null} onNavigate={chooseView} language={language} menuPolicy={crmPolicy}/>:null}
-      {activeView==="optical" && canSeeOptical ? (
-        <div className="space-y-4">
-          <div className="flex flex-wrap gap-2" role="tablist" aria-label={opticalText(language,"ใบสั่งงานแว่นตา")}>
-            {([["customers","ประวัติลูกค้า"],["orders","ใบสั่งงานแว่นตา"],
-              ["stock","สต๊อกกรอบแว่นและเลนส์"],["reports","รายงานเจ้าของร้าน"]] as const)
-              .filter(([id])=>opticalTabsAllowed.includes(id))
-              .filter(([id])=>id!=="reports"||opticalFinanceUiEnabled)
-              .map(([id,label])=><button type="button" role="tab"
-                aria-selected={activeOpticalTab===id} key={id} onClick={()=>setOpticalTab(id)}
-                className={`rounded-xl border px-4 py-2 text-sm font-bold ${activeOpticalTab===id?"border-emerald-700 bg-emerald-700 text-white":"border-emerald-100 bg-white text-emerald-800"}`}>{opticalText(language,label)}</button>)}
-          </div>
-          {activeOpticalTab==="stock" && canSeeView("stock") ? (
-            <BusinessStockOverview context={context} branchId={branchId||null} business="optical" strictOpticalCategory={stockBusinessMode==="mixed"}/>
-          ) : activeOpticalTab==="stock" ? (
-            <p role="alert">{opticalText(language,"สต๊อกกรอบแว่นและเลนส์")} — {settingsText(language,"ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด")}</p>
-          ) : activeOpticalTab==="customers"?<div className="space-y-4">
-            <OpticalCustomersView context={context} branchId={branchId||null}/>
-            <OpticalCustomerAddressEditor context={context} branchId={branchId||null}/>
-          </div> : activeOpticalTab==="reports"&&!opticalFinanceUiEnabled ? (
-            <p role="alert">{opticalText(language,"รายงานเจ้าของร้าน")} — {settingsText(language,"ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด")}</p>
-          ) : activeOpticalTab==="reports"&&context.role!=="owner" ? (
-            <p role="alert">{opticalText(language,"รายงานเจ้าของร้าน")} — Owner</p>
-          ) : (
-            <div className="space-y-3">
-              {activeOpticalTab==="orders"&&!opticalFinanceUiEnabled?
-                <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                  {language==="en"?"Work-order list only. Creating, editing and checkout are locked until the Optical finance rollout is approved.":language==="lo"?"ສະແດງລາຍການໃບງານເທົ່ານັ້ນ; ການສ້າງ ແກ້ໄຂ ແລະ ຊຳລະເງິນ ຍັງບໍ່ເປີດໃຊ້":"เปิดดูรายการใบงานเท่านั้น การสร้าง แก้ไข และชำระเงินจริงยังปิดไว้จนผ่านการทดสอบและอนุมัติเปิดโมดูล"}
-                </p>:null}
-              <OpticalOperationsView context={context} branchId={branchId||null} page={activeOpticalTab==="reports"?"reports":"orders"}/>
-            </div>
-          )}
-        </div>
-      ) : null}
+      {activeView==="optical" && canSeeOptical ? <OpticalWorkspace
+        context={context} branchId={branchId} language={language}
+        stockBusinessMode={stockBusinessMode} activeOpticalTab={activeOpticalTab}
+        opticalTabsAllowed={opticalTabsAllowed} opticalFinanceUiEnabled={opticalFinanceUiEnabled}
+        canSeeStock={canSeeView("stock")} setOpticalTab={setOpticalTab}/> : null}
       {activeView==="settings"?<SettingsView context={context} branchId={branchId||null} onNavigate={chooseView} onContextChanged={refreshContextAfterMutation} menuPolicy={crmPolicy}/>:null}
 
       <footer>ข้อมูลและสิทธิ์ถูกจำกัดตามบัญชี {context.role==="owner"?"Owner":"Manager"} · {context.branches.length} สาขาที่เข้าถึงได้</footer>
