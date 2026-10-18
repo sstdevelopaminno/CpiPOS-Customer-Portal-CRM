@@ -1,4 +1,4 @@
-export type PortalRole = "owner" | "manager";
+export type PortalRole = "owner" | "manager" | "staff";
 export type PortalView = "dashboard" | "sales" | "products" | "stock" | "staff" | "package" | "more" | "settings" | "optical";
 export type ReportRange = "day" | "month" | "year";
 
