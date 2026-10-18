@@ -47,7 +47,7 @@ export function OpticalWorkspace({context,branchId,language,stockBusinessMode,ac
           ) : activeOpticalTab==="stock" ? (
             <p role="alert">{opticalText(language,"สต๊อกกรอบแว่นและเลนส์")} — {settingsText(language,"ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด")}</p>
           ) : activeOpticalTab==="customers"?<div className="space-y-4">
-            <OpticalCustomersView context={context} branchId={branchId||null} readOnly={context.role==="staff"&&!rights.customerEdit}/>
+            <OpticalCustomersView context={context} branchId={branchId||null} readOnly={context.role==="staff"&&!rights.customerEdit} canArchive={context.role!=="staff"}/>
             {context.role!=="staff"?<OpticalCustomerAddressEditor context={context} branchId={branchId||null}/>:null}
           </div> : activeOpticalTab==="reports"&&!opticalFinanceUiEnabled ? (
             <p role="alert">{opticalText(language,"รายงานเจ้าของร้าน")} — {settingsText(language,"ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด")}</p>
