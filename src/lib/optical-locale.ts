@@ -115,7 +115,7 @@ const dictionary: Record<string, readonly [string, string]> = {
   "เลือกลูกค้า": ["Select customer", "ເລືອກລູກຄ້າ"],
   "ที่อยู่": ["Address", "ທີ່ຢູ່"],
   "บันทึกที่อยู่": ["Save address", "ບັນທຶກທີ່ຢູ່"],
-  "ปิด": ["Close", "ປິດ"]
+  "ปิด": ["Close", "ປິດ"],
   "ประวัติลูกค้าและค่าสายตา": ["Optical customers and prescriptions", "ລູກຄ້າ ແລະ ປະຫວັດຄ່າສາຍຕາ"],
   "เฉพาะร้านและสาขาที่ IT เปิดสิทธิ์ Optical · ข้อมูลการตรวจเก่าจะไม่ถูกเขียนทับ": ["Available to IT-approved Optical branches; earlier examinations remain preserved.", "ສຳລັບສາຂາ Optical ທີ່ເປີດສິດ · ຜົນກວດເກົ່າຍັງຄົງຢູ່"],
   "+ เพิ่มลูกค้า": ["+ Add customer", "+ ເພີ່ມລູກຄ້າ"],
