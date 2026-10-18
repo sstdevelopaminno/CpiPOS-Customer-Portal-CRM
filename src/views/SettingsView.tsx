@@ -303,6 +303,7 @@ export function SettingsView({context,branchId,onNavigate,onContextChanged,menuP
     })).concat(visibleSettingsGroup(connectedKinds).length>0?[{
       id:"connected",title:T("ข้อมูลร้านที่เชื่อมอยู่"),
       description:T("ดูสาขา เครื่อง และบัญชีรับเงินที่เชื่อมกับ POS"),
+      count:`${visibleSettingsGroup(connectedKinds).length} ${T("หัวข้อ")}`,
       content: <>{snapshot?<article className="panel settingsDataPanel">
         <div className="panelHeader"><div><p className="eyebrow">CONNECTED POS SETTINGS</p><h3>{T("ข้อมูลที่เชื่อมอยู่")}</h3></div></div>
         <div className="settingsDataGrid">
