@@ -8,6 +8,7 @@ import { OpticalCustomersView } from "./OpticalCustomersView";
 import { OpticalCustomerAddressEditor } from "./OpticalCustomerAddressEditor";
 import { OpticalOperationsView } from "./OpticalOperationsView";
 import { OpticalWorkOrderDrafts } from "./OpticalWorkOrderDrafts";
+import {useOpticalStaffRights} from "../lib/use-optical-staff-rights";
 
 export type OpticalTab = "customers" | "orders" | "stock" | "reports";
 type Props = {
@@ -26,7 +27,10 @@ type Props = {
 export function OpticalWorkspace({context,branchId,language,stockBusinessMode,activeOpticalTab,
   opticalTabsAllowed,opticalFinanceUiEnabled,canSeeStock,setOpticalTab}:Props){
   const [orderReloadToken,setOrderReloadToken]=useState(0);
-  const draftsEnabled=context.role==="owner"&&import.meta.env.VITE_OPTICAL_WORK_ORDER_DRAFTS_V1_ENABLED==="true";
+  const effectiveBranch=branchId||context.branches[0]?.id||"";
+  const rights=useOpticalStaffRights(context.role,context.tenantId,effectiveBranch,context.userId);
+  const draftsEnabled=(context.role==="owner"||context.role==="staff"&&rights.ordersEdit)
+    &&import.meta.env.VITE_OPTICAL_WORK_ORDER_DRAFTS_V1_ENABLED==="true";
   return (
     <div className="space-y-4">
           <div className="flex flex-wrap gap-2" role="tablist" aria-label={opticalText(language,"ใบสั่งงานแว่นตา")}>
@@ -43,7 +47,7 @@ export function OpticalWorkspace({context,branchId,language,stockBusinessMode,ac
           ) : activeOpticalTab==="stock" ? (
             <p role="alert">{opticalText(language,"สต๊อกกรอบแว่นและเลนส์")} — {settingsText(language,"ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด")}</p>
           ) : activeOpticalTab==="customers"?<div className="space-y-4">
-            <OpticalCustomersView context={context} branchId={branchId||null} readOnly={context.role==="staff"}/>
+            <OpticalCustomersView context={context} branchId={branchId||null} readOnly={context.role==="staff"&&!rights.customerEdit}/>
             {context.role!=="staff"?<OpticalCustomerAddressEditor context={context} branchId={branchId||null}/>:null}
           </div> : activeOpticalTab==="reports"&&!opticalFinanceUiEnabled ? (
             <p role="alert">{opticalText(language,"รายงานเจ้าของร้าน")} — {settingsText(language,"ไม่ได้เปิดในแพ็กเกจ/ถูก IT ปิด")}</p>
