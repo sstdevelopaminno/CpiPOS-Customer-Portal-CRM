@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import type { PortalContext } from "../types/portal";
-import { opticalText,readOpticalLanguage } from "../lib/optical-locale";
+import { opticalText } from "../lib/optical-locale";
+import { useCrmLanguage } from "../lib/use-crm-language";
 
 type Customer={id:string;customer_code:string;full_name:string;address:string|null};
 export function OpticalCustomerAddressEditor({context,branchId}:{
   context:PortalContext;branchId:string|null
 }){
   const branch=context.branches.find(x=>x.id===branchId)?.id??context.branches[0]?.id;
-  const [language]=useState(readOpticalLanguage);
+  const language=useCrmLanguage();
   const T=(text:string)=>opticalText(language,text);
   const retry=useRef<{signature:string;id:string}|null>(null);
   const [customers,setCustomers]=useState<Customer[]>([]);
