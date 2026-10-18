@@ -54,7 +54,7 @@ export default function App() {
   const [checking,setChecking]=useState(true);
   const [view,setView]=useState<PortalView>("dashboard");
   const [branchId,setBranchId]=useState(()=>localStorage.getItem("cpipos-customer-portal-branch")??"");
-  const {menuAccess,menuAccessError,reloadMenuAccess}=usePortalMenuAccess(context?.tenantId??null,branchId,context?.role??null);
+  const {menuAccess,menuAccessError,reloadMenuAccess}=usePortalMenuAccess(context?.tenantId??null,context?.role==="staff"?(branchId||context.branches[0]?.id||""):branchId,context?.role??null);
   const [range,setRange]=useState<ReportRange>("day");
   const [anchor,setAnchor]=useState(todayInputValue());
   const [fatal,setFatal]=useState("");
