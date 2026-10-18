@@ -2,6 +2,7 @@ import { CRM_SETTINGS_LANGUAGE_STORAGE, normalizeCrmSettingsLanguage, type CrmSe
 
 /** Optical-specific UI strings; does not change global CRM or restaurant labels. */
 const dictionary: Record<string, readonly [string, string]> = {
+  "ใบสั่งงาน": ["Work orders", "ໃບສັ່ງງານ"],
   "ใบสั่งงานแว่นตา": ["Optical work orders", "ໃບສັ່ງງານແວ່ນຕາ"],
   "สต๊อกกรอบแว่นและเลนส์": ["Frames and lenses stock", "ສະຕັອກຂອບແວ່ນ ແລະ ເລນ"],
   "รายงานเจ้าของร้าน": ["Owner report", "ລາຍງານເຈົ້າຂອງຮ້ານ"],
