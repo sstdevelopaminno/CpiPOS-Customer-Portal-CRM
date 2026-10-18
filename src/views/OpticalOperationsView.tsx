@@ -158,7 +158,7 @@ export function OpticalOperationsView({
     {loading?<p role="status">{T("กำลังโหลดข้อมูล...")}</p>:null}
     {error?<p role="alert" className="rounded-lg bg-rose-50 p-3 text-rose-700">{error}</p>:null}
     {page==="orders"?<div className="overflow-x-auto rounded-xl bg-white shadow-sm">
-      <table className="w-full text-left text-sm"><thead><tr className="bg-emerald-50">
+      <table className="w-full min-w-[820px] text-left text-sm"><thead><tr className="bg-emerald-50">
         <th className="p-3">{T("งาน / วันที่")}</th><th className="p-3">{T("สถานะ")}</th>
         <th className="p-3">{T("ยอดเต็ม")}</th><th className="p-3">{T("รับแล้ว")}</th>
         <th className="p-3">{T("ค้างชำระ")}</th><th className="p-3">{T("นัดรับ")}</th><th className="p-3">{T("บัญชีมัดจำ")}</th>
@@ -167,14 +167,14 @@ export function OpticalOperationsView({
         <td className="p-3">{T(statusName[o.status]??o.status)}</td>
         <td className="p-3">{money(o.total_amount,o.currency_code)}</td>
         <td className="p-3">{money(o.paid_total,o.currency_code)}</td>
-        <td className="p-3 font-semibold">{money(o.total_amount-o.paid_total,o.currency_code)}</td>
+        <td className="p-3 whitespace-nowrap font-semibold">{money(o.total_amount-o.paid_total,o.currency_code)}</td>
         <td className="p-3">{o.due_at?new Date(o.due_at).toLocaleDateString(dateLocale):"—"}</td>
-        <td className="p-3"><button type="button" className="rounded-lg border border-emerald-300 px-3 py-2 font-semibold text-emerald-800 hover:bg-emerald-50"
+        <td className="p-3"><button type="button" className="whitespace-nowrap rounded-lg border border-emerald-300 px-3 py-2 font-semibold text-emerald-800 hover:bg-emerald-50"
           aria-expanded={selectedOrderId===o.id} onClick={()=>setSelectedOrderId(current=>current===o.id?null:o.id)}>
           {T(selectedOrderId===o.id?"ปิดรายละเอียดมัดจำ":"ดูประวัติมัดจำ")}
         </button></td>
       </tr>)}</tbody></table>
-      {orders.length===0&&!loading?<p className="p-4 text-sm text-slate-500">{T("ยังไม่มีใบสั่งงานในสาขานี้")}</p>:null}
+      {orders.length===0&&!loading&&!error?<p className="p-4 text-sm text-slate-500">{T("ยังไม่มีใบสั่งงานในสาขานี้")}</p>:null}
       {selectedOrder?<section className="border-t border-emerald-200 p-4" data-testid="optical-crm-deposit-history">
         <h3 className="font-bold text-emerald-950">{T("ประวัติเงินมัดจำและยอดค้างชำระ")} · {selectedOrder.id.slice(0,8)}</h3>
         <div className="mt-3 grid gap-2 sm:grid-cols-3">
@@ -209,10 +209,10 @@ export function OpticalOperationsView({
     </div>:null}
     {page==="stock"?<div className="space-y-2">
       <OpticalStockTable rows={opticalEntries} currency={context.salesCurrencyCode??"LAK"}/>
-      {bins.length===0&&!loading?<p className="p-4 text-sm text-slate-500">{T("ยังไม่มี Optical Stock Bin ที่ผ่านการตรวจนับ")}</p>:null}
+      {bins.length===0&&!loading&&!error?<p className="p-4 text-sm text-slate-500">{T("ยังไม่มี Optical Stock Bin ที่ผ่านการตรวจนับ")}</p>:null}
     </div>:null}
     {page==="reports"&&context.salesCurrencyCode!=="LAK"?<p role="status" className="rounded-xl bg-amber-50 p-4 text-sm">{T("รายงาน Optical สำหรับ THB/USD ยังไม่เปิดใช้งาน เพื่อป้องกันการแสดงยอด LAK ผิดสกุลเงิน")}</p>:null}
-    {page==="reports"&&context.salesCurrencyCode==="LAK"?<div className="space-y-3">
+    {page==="reports"&&context.salesCurrencyCode==="LAK"&&!error&&!loading?<div className="space-y-3">
       <div className="flex flex-wrap gap-2">{(["day","month","year"] as const).map(k=><button key={k}
         type="button" onClick={()=>setRange(k)}
         className={`rounded-lg px-4 py-2 text-sm ${range===k?"bg-emerald-700 text-white":"bg-white text-emerald-800"}`}>
