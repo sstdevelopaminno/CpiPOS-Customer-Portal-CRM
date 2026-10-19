@@ -31,4 +31,19 @@ describe("CRM Optical receive/issue shared atomic balance",()=>{
   expect(view).toContain("quantity:quantity,");
   expect(view).not.toContain("row.available_quantity??null");
  });
+ it("supports identical product kinds and proposed quantity validation on single and batch CRM forms",()=>{
+  const single=txt("views/OpticalCreateProduct.tsx");
+  const bulk=txt("views/OpticalBulkCreateProduct.tsx");
+  const view=txt("views/BusinessStockOverview.tsx");
+  expect(single).toContain('<option value="accessory">อุปกรณ์เสริม</option>');
+  expect(single).toContain("จำนวนรับเข้าเริ่มต้นต้องเป็นจำนวนเต็มบวก");
+  expect(bulk).toContain("initial_quantity");
+  expect(bulk).toContain('p_product:product,p_currency:currency');
+  expect(bulk).toContain('onCreated(target,rows.filter');
+  expect(bulk).toContain("setSaved([...already])");
+  expect(view).toContain("<OpticalBulkCreateProduct");
+  expect(view).toContain("pendingReceipts");
+  expect(view).toContain("nextReceiptOrFinish");
+  expect(view).toContain("queueLabel={receiptTotal>0?");
+ });
 });
