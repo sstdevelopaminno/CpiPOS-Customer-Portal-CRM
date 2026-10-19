@@ -13,8 +13,10 @@ describe("CRM Optical receive/issue shared atomic balance",()=>{
  it("barcode scanner selects SKU and opens confirm dialog",()=>{
   const view=txt("views/BusinessStockOverview.tsx");
   const modal=txt("views/OpticalStockAdjustPopup.tsx");
-  expect(view).toContain("handleScan()");
-  expect(view).toContain("openAdjust(found.sku,activeBranch)");
+  expect(view).toContain('onClick={()=>openAdjust("",activeBranch!)}');
+  expect(view).toContain('onClick={()=>setSummaryOpen(true)}');
+  expect(view).not.toContain('barcodeError');
+  expect(modal).toContain('autoFocus autoComplete="off"');
   expect(modal).toContain('p_source:"crm"');
   expect(modal).toContain('rpc("optical_adjust_stock_tx"');
   expect(modal).toContain("supabase.auth.getUser()");
@@ -45,5 +47,18 @@ describe("CRM Optical receive/issue shared atomic balance",()=>{
   expect(view).toContain("pendingReceipts");
   expect(view).toContain("nextReceiptOrFinish");
   expect(view).toContain("queueLabel={receiptTotal>0?");
+ });
+ it("validates amount and reason separately; CRM/Optical summary stays out of the main view",()=>{
+  const modal=txt("views/OpticalStockAdjustPopup.tsx");
+  const view=txt("views/BusinessStockOverview.tsx");
+  expect(modal).toContain("จำนวนต้องเป็นจำนวนเต็มบวกตั้งแต่ 1 ถึง 100,000 ชิ้น");
+  expect(modal).toContain("กรุณาระบุเหตุผลในการปรับสต๊อก");
+  expect(modal).toContain("เหตุผลในการปรับสต๊อกต้องมีอย่างน้อย 3 ตัวอักษร");
+  expect(modal).toContain("noValidate");
+  expect(modal).toContain("รับสินค้าตามใบส่งของ");
+  expect(view).toContain("opticalSummary");
+  expect(view).toContain("summaryOpen");
+  expect(view).toContain("!optical?<div className=\"business-stock__metrics\">");
+  expect(view).toContain("opticalEntries.filter(x=>x.remaining===null).length");
  });
 });
