@@ -12,7 +12,7 @@ export type OpticalTableEntry={
 type Tab="frame"|"lens"|"accessory";
 const show=(v:unknown)=>v===undefined||v===null||String(v).trim()===""?"—":String(v);
 
-export function OpticalStockTable({rows,currency}:{rows:OpticalTableEntry[];currency:string}){
+export function OpticalStockTable({rows,currency,onAdjust}:{rows:OpticalTableEntry[];currency:string;onAdjust?:(row:OpticalTableEntry)=>void}){
   const [language]=useState(readOpticalLanguage);
   const T=(value:string)=>opticalText(language,value);
   const [tab,setTab]=useState<Tab>("frame");
@@ -51,7 +51,7 @@ export function OpticalStockTable({rows,currency}:{rows:OpticalTableEntry[];curr
           ?["แบรนด์","รุ่น","สี","ขนาด"]:tab==="lens"
           ?["ยี่ห้อ","ชื่อเลนส์","Index","ค่าสายตา"]
           :["ชื่อสินค้า","ประเภท","รายละเอียด","หน่วย"]),
-          "ราคา","จำนวน","จำนวนคงเหลือ"].map(name=><th key={name}>{T(name)}{name==="ราคา"?" ("+currency+")":""}</th>)}
+          "ราคา","จำนวน","จำนวนคงเหลือ",...(onAdjust?["จัดการสต๊อก"]:[])].map(name=><th key={name}>{T(name)}{name==="ราคา"?" ("+currency+")":""}</th>)}
       </tr></thead>
       <tbody>{current.map(item=><tr key={item.id}>
         <td><button type="button" className="optical-stock-tables__sku"
@@ -71,7 +71,10 @@ export function OpticalStockTable({rows,currency}:{rows:OpticalTableEntry[];curr
         </>}
         <td className="optical-stock-tables__num">{formatCurrency(Number(item.price),currency)}</td>
         <td className="optical-stock-tables__num">{item.quantity??"—"}</td>
-        <td className="optical-stock-tables__num">{item.remaining??T("รอยืนยัน")}</td>
+        <td className="optical-stock-tables__num">{item.remaining??"—"}
+          {item.remaining===null?<small style={{display:"block",color:"#b45309"}}>{T("ยังไม่มีรายการรับเข้าสต๊อก")}</small>:null}</td>
+        {onAdjust?<td><button className="business-stock__refresh" type="button"
+          onClick={()=>onAdjust(item)}>{T("+/- ปรับจำนวน")}</button></td>:null}
       </tr>)}</tbody></table>
       {current.length===0?<p className="business-stock__empty">{T("ไม่พบสินค้าประเภทนี้")}</p>:null}
     </div>
