@@ -4,15 +4,15 @@ import {opticalText,readOpticalLanguage} from "../lib/optical-locale";
 import "../styles/custom-inventory.css";
 
 const skuPattern=/^[^\s,;()]{1,90}$/;
-export function OpticalStockAdjustPopup({tenantId,branchId,initialSku="",currency,onClose,onSaved}:{
- tenantId:string;branchId:string;initialSku?:string;currency:string;
+export function OpticalStockAdjustPopup({tenantId,branchId,initialSku="",initialQuantity="",currency,onClose,onSaved}:{
+ tenantId:string;branchId:string;initialSku?:string;initialQuantity?:string;currency:string;
  onClose:()=>void;onSaved:()=>void
 }){
  const [language]=useState(readOpticalLanguage);
  const T=(t:string)=>opticalText(language,t);
  const [sku,setSku]=useState(initialSku);
  const [direction,setDirection]=useState<"receive"|"issue">("receive");
- const [quantity,setQuantity]=useState("");
+ const [quantity,setQuantity]=useState(initialQuantity);
  const [note,setNote]=useState("");
  const [error,setError]=useState("");
  const [busy,setBusy]=useState(false);
