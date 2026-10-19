@@ -51,11 +51,10 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
   const [adjustOpen,setAdjustOpen]=useState(false),[adjustSku,setAdjustSku]=useState("");
   const [adjustBranch,setAdjustBranch]=useState<string|null>(null);
   const [adjustInitialQuantity,setAdjustInitialQuantity]=useState("");
-  const [barcode,setBarcode]=useState("");
-  const [barcodeError,setBarcodeError]=useState("");
+  const [summaryOpen,setSummaryOpen]=useState(false);
   function openAdjust(sku: string, branch: string, initialQuantity="") {
     setAdjustBranch(branch);setAdjustSku(sku);setAdjustInitialQuantity(initialQuantity);
-    setAdjustOpen(true);setBarcodeError("");
+    setAdjustOpen(true);
   }
   function startBulkReceipts(target:string,receipts:{sku:string;quantity:string}[]) {
     setBulkOpen(false);setStockBranch(target);
@@ -77,12 +76,6 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
     setAdjustOpen(false);setReceiptTotal(0);
     if(adjustBranch===activeBranch)void refresh();
     else if(adjustBranch)setStockBranch(adjustBranch);
-  }
-  function handleScan() {
-    const code=barcode.trim();if(!code||!activeBranch)return;
-    const found=rows.find(r=>r.sku?.toLowerCase()===code.toLowerCase());
-    if(!found){setBarcodeError("ไม่พบ SKU / บาร์โค้ดในสาขานี้");return;}
-    setBarcode("");openAdjust(found.sku,activeBranch);
   }
   const [filter,setFilter]=useState<InventoryFilter>("all");
   const optical=business==="optical";
@@ -178,6 +171,12 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
       quantity:quantity,
       remaining:quantity===null||reserved===null?null:Math.max(0,quantity-reserved)};
   });
+  const opticalSummary:[string,number][]=[
+    ["สินค้า",opticalEntries.length],
+    ["เหลือ 1",opticalEntries.filter(x=>x.remaining===1).length],
+    ["หมด",opticalEntries.filter(x=>x.remaining===0).length],
+    ["ยังไม่มีรายการรับเข้าสต๊อก",opticalEntries.filter(x=>x.remaining===null).length]
+  ];
   if(!activeBranch)return <section className="business-stock" role="alert">{T("ไม่พบสาขาที่ได้รับอนุญาตให้เข้าถึง")}</section>;
   return <section className={`business-stock ${optical?"business-stock--optical":"business-stock--retail"}`}>
     <header className="business-stock__heading">
@@ -197,7 +196,10 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
         {["owner","manager"].includes(context.role)?<button type="button" className="business-stock__refresh" onClick={()=>setAddOpen(true)}>{T("+ เพิ่มสินค้า")}</button>:null}
         {["owner","manager"].includes(context.role)?<button type="button" className="business-stock__refresh" onClick={()=>setBulkOpen(true)}>{T("+ สร้างสินค้าหลายรายการ")}</button>:null}
         {["owner","manager"].includes(context.role)?<button type="button" className="business-stock__refresh"
-           onClick={()=>openAdjust("",activeBranch!)}>{T("+ รับ/จ่ายสต๊อก")}</button>:null}
+           onClick={()=>openAdjust("",activeBranch!)}>{T("สแกนเพิ่ม/ลดสต๊อก")}</button>:null}
+        <button type="button" className="business-stock__refresh" onClick={()=>setSummaryOpen(true)}>
+          {T("ดูสรุปสต๊อก")}
+        </button>
         <button type="button" className="business-stock__refresh" onClick={()=>setBestOpen(true)}>{T("★ สินค้าขายดี")}</button>
       </div>:null}
       <button type="button" onClick={()=>void refresh()} disabled={loading} className="business-stock__refresh"><RefreshCw size={16}/>{T(loading?"กำลังโหลด...":"รีเฟรช")}</button>
@@ -207,22 +209,12 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
         ?T("สต๊อกที่มี Optical Stock Bin จะแสดงยอดคงเหลือหลังหักยอดจอง ส่วนสินค้าที่ยังไม่ตรวจนับจะแสดงรอยืนยัน")
         :"จำนวนพร้อมขายมาจากระบบ POS เดิม การแก้ไขสต๊อกต้องใช้ขั้นตอนที่ได้รับอนุญาตตามโหมดธุรกิจ"}
     </p>
-    {optical&&["owner","manager"].includes(context.role)?<div className="business-stock__toolbar">
-      <label className="business-stock__search">{T("สแกนบาร์โค้ดเพื่อเพิ่ม/ลดจำนวน")}
-        <input value={barcode} autoComplete="off" spellCheck={false}
-          placeholder={T("สแกนบาร์โค้ดแล้วกด Enter")}
-          onChange={e=>setBarcode(e.target.value)}
-          onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();handleScan();}}}/>
-      </label>
-      <button className="business-stock__refresh" type="button" onClick={handleScan}>{T("ค้นหา SKU")}</button>
-      {barcodeError?<p role="alert">{barcodeError}</p>:null}
-    </div>:null}
-    <div className="business-stock__metrics">
+    {!optical?<div className="business-stock__metrics">
       <article><span>{T("รายการสินค้า")}</span><strong>{rows.length}</strong></article>
       <article><span>{T("เหลือ 1 หน่วย")}</span><strong>{low}</strong></article>
       <article><span>{T("หมดสต๊อก")}</span><strong>{out}</strong></article>
-      <article><span>{optical?T("ยังผูกสต๊อกสูตรเดิม"):"สินค้าผูกสูตร"}</span><strong>{legacy}</strong></article>
-    </div>
+      <article><span>{T("สินค้าผูกสูตร")}</span><strong>{legacy}</strong></article>
+    </div>:null}
     <div className="business-stock__toolbar">
       <label className="business-stock__search"><Search size={18}/>
         <input aria-label={T("ค้นหาสินค้าจาก SKU หรือชื่อ")} value={search} onChange={e=>setSearch(e.target.value)}
@@ -237,6 +229,24 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
         </select>
       </label>
     </div>
+    {optical&&summaryOpen?<div className="optical-stock-tables__overlay">
+      <section role="dialog" aria-modal="true" aria-labelledby="crm-optical-summary-title"
+        className="optical-stock-tables__dialog" style={{width:"min(680px,95vw)",maxHeight:"90vh",overflowY:"auto"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12}}>
+          <h3 id="crm-optical-summary-title">{T("สรุปจำนวนสินค้าในสต๊อก")}</h3>
+          <button type="button" aria-label={T("ปิด")} onClick={()=>setSummaryOpen(false)}>×</button>
+        </div>
+        <p style={{fontSize:12,color:"#64748b"}}>{T("แสดงเฉพาะยอดรับเข้าสต๊อกที่ยืนยันแล้ว สินค้ารอยืนยันไม่ถือว่าเป็นศูนย์")}</p>
+        <div className="business-stock__metrics" style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12}}>
+          {opticalSummary.map(([label,value])=><article key={label}>
+            <span>{T(label)}</span><strong>{value}</strong>
+          </article>)}
+        </div>
+        <div style={{display:"flex",justifyContent:"flex-end",marginTop:16}}>
+          <button type="button" className="secondaryButton" onClick={()=>setSummaryOpen(false)}>{T("ปิด")}</button>
+        </div>
+      </section>
+    </div>:null}
     {addOpen&&activeBranch?<OpticalCreateProduct tenantId={context.tenantId}
       branchId={activeBranch} currency={currency} branches={context.branches}
       onClose={()=>setAddOpen(false)} onCreated={(nextBranch,sku,initialQuantity)=>{
