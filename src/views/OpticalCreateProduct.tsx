@@ -1,7 +1,7 @@
 import {useState} from "react";
 import {supabase} from "../lib/supabase";
 type Branch={id:string;name:string};
-type Form={name:string;sku:string;kind:"frame"|"lens";brand:string;model:string;color:string;
+type Form={name:string;sku:string;kind:"frame"|"lens"|"accessory";brand:string;model:string;color:string;
  frame_size:string;lens_name:string;lens_index:string;lens_sph:string;lens_cyl:string;price:string};
 const initial:Form={name:"",sku:"",kind:"frame",brand:"",model:"",color:"",
  frame_size:"",lens_name:"",lens_index:"",lens_sph:"",lens_cyl:"",price:""};
@@ -17,7 +17,14 @@ export function OpticalCreateProduct({tenantId,branchId,branches,currency,onClos
  async function save(){
   if(busy)return;
   setError("");
-  if(!form.name.trim()||!form.sku.trim()||!form.price)return setError("ชื่อสินค้า SKU/บาร์โค้ด และราคา จำเป็นต้องกรอก");
+  if(!form.name.trim()||!/^[^\\s,;()]{1,90}$/.test(form.sku.trim())||!form.price.trim())
+   return setError("ชื่อสินค้า SKU/บาร์โค้ด และราคา จำเป็นต้องกรอก");
+  const price=Number(form.price),qty=initialQuantity.trim();
+  if(!Number.isFinite(price)||price<0||price>999999999||
+     (currency==="LAK"&&!Number.isInteger(price))||Math.round(price*100)/100!==price)
+   return setError("ราคาสินค้าไม่ถูกต้อง");
+  if(qty&&(!/^[1-9][0-9]*$/.test(qty)||Number(qty)>100000))
+   return setError("จำนวนรับเข้าเริ่มต้นต้องเป็นจำนวนเต็มบวก 1–100000 หรือเว้นว่างหากยังไม่รับสต๊อก");
   if(!branches.some(b=>b.id===target))return setError("ไม่มีสิทธิ์สาขาที่เลือก");
   setBusy(true);
   try{
@@ -44,12 +51,13 @@ export function OpticalCreateProduct({tenantId,branchId,branches,currency,onClos
       onChange={e=>setTarget(e.target.value)}>{branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></label>
     {input("name","ชื่อสินค้า *")}
     {input("sku","SKU / บาร์โค้ด (กรอกหรือสแกน) *")}
-    <label><span>ประเภท</span><select value={form.kind}
+    <label><span>ประเภท *</span><select value={form.kind}
       onChange={e=>change("kind",e.target.value)}>
       <option value="frame">กรอบแว่น</option><option value="lens">เลนส์</option>
+      <option value="accessory">อุปกรณ์เสริม</option>
     </select></label>
     {input("brand","แบรนด์ / ยี่ห้อ")}
-    {form.kind==="frame"?<>
+    {form.kind!=="lens"?<>
       {input("model","รุ่น")}
       {input("color","สี")}
       {input("frame_size","ขนาด")}
@@ -59,7 +67,7 @@ export function OpticalCreateProduct({tenantId,branchId,branches,currency,onClos
       {input("lens_sph","ค่าสายตา SPH")}
       {input("lens_cyl","ค่าสายตา CYL")}
     </>}
-    <label><span>จำนวนรับเข้าเริ่มต้น (ยืนยันสต๊อกใน Pop-up อีกครั้ง)</span>
+    <label><span>จำนวนรับเข้าเริ่มต้น (เว้นว่างหากยังไม่รับสต๊อก)</span>
       <input type="number" min="1" max="100000" step="1" value={initialQuantity}
        onChange={e=>setInitialQuantity(e.target.value)}/></label>
     <label><span>ราคา ({currency}) *</span><input type="number" min="0"
