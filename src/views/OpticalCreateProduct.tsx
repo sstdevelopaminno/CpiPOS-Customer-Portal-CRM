@@ -17,7 +17,7 @@ export function OpticalCreateProduct({tenantId,branchId,branches,currency,onClos
  async function save(){
   if(busy)return;
   setError("");
-  if(!form.name.trim()||!/^[^\\s,;()]{1,90}$/.test(form.sku.trim())||!form.price.trim())
+  if(!form.name.trim()||!/^[^\s,;()]{1,90}$/.test(form.sku.trim())||!form.price.trim())
    return setError("ชื่อสินค้า SKU/บาร์โค้ด และราคา จำเป็นต้องกรอก");
   const price=Number(form.price),qty=initialQuantity.trim();
   if(!Number.isFinite(price)||price<0||price>999999999||
