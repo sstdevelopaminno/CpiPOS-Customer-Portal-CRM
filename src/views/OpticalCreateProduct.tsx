@@ -7,10 +7,11 @@ const initial:Form={name:"",sku:"",kind:"frame",brand:"",model:"",color:"",
  frame_size:"",lens_name:"",lens_index:"",lens_sph:"",lens_cyl:"",price:""};
 export function OpticalCreateProduct({tenantId,branchId,branches,currency,onClose,onCreated}:{
  tenantId:string;branchId:string;branches:Branch[];currency:string;
- onClose:()=>void;onCreated:(branchId:string,sku:string)=>void
+ onClose:()=>void;onCreated:(branchId:string,sku:string,initialQuantity:string)=>void
 }){
  const [target,setTarget]=useState(branchId);
  const [form,setForm]=useState<Form>(initial);
+ const [initialQuantity,setInitialQuantity]=useState("");
  const [busy,setBusy]=useState(false),[error,setError]=useState("");
  const change=(key:keyof Form,value:string)=>setForm(f=>({...f,[key]:value}));
  async function save(){
@@ -24,7 +25,7 @@ export function OpticalCreateProduct({tenantId,branchId,branches,currency,onClos
     p_tenant_id:tenantId,p_branch_id:target,p_product:form,p_currency:currency
    });
    if(e)throw e;
-   onCreated(target,form.sku.trim());
+   onCreated(target,form.sku.trim(),initialQuantity);
   }catch(e){setError(e instanceof Error?e.message:"เพิ่มสินค้าไม่สำเร็จ กรุณาตรวจสอบสิทธิ์");}
   finally{setBusy(false);}
  }
@@ -58,6 +59,9 @@ export function OpticalCreateProduct({tenantId,branchId,branches,currency,onClos
       {input("lens_sph","ค่าสายตา SPH")}
       {input("lens_cyl","ค่าสายตา CYL")}
     </>}
+    <label><span>จำนวนรับเข้าเริ่มต้น (ยืนยันสต๊อกใน Pop-up อีกครั้ง)</span>
+      <input type="number" min="1" max="100000" step="1" value={initialQuantity}
+       onChange={e=>setInitialQuantity(e.target.value)}/></label>
     <label><span>ราคา ({currency}) *</span><input type="number" min="0"
       step={currency==="LAK"?"1":"0.01"} value={form.price}
       onChange={e=>change("price",e.target.value)}/></label>
