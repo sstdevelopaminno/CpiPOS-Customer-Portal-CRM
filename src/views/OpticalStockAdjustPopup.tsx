@@ -63,7 +63,7 @@ export function OpticalStockAdjustPopup({tenantId,branchId,initialSku="",initial
     {queueLabel?<p role="status" style={{padding:"10px 12px",borderRadius:8,background:"#fffbeb",color:"#92400e"}}>
       {queueLabel}
     </p>:null}
-    <form className="entityForm" onSubmit={e=>void submit(e)}>
+    <form className="entityForm" noValidate onSubmit={e=>void submit(e)}>
       <div className="formGrid">
         <label className="span2"><span>{T("SKU / บาร์โค้ด")}</span>
           <input value={sku} autoFocus autoComplete="off" spellCheck={false}
