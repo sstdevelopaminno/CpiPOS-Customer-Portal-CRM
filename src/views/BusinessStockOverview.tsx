@@ -7,6 +7,7 @@ import {supabase} from "../lib/supabase";
 import {OpticalStockTable,type OpticalTableEntry} from "./OpticalStockTable";
 import {OpticalBestSellers} from "./OpticalBestSellers";
 import {OpticalCreateProduct} from "./OpticalCreateProduct";
+import {OpticalBulkCreateProduct} from "./OpticalBulkCreateProduct";
 import {OpticalStockAdjustPopup} from "./OpticalStockAdjustPopup";
 import { opticalText, readOpticalLanguage } from "../lib/optical-locale";
 
@@ -44,6 +45,9 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
   const [error,setError]=useState("");
   const [search,setSearch]=useState("");
   const [bestOpen,setBestOpen]=useState(false),[addOpen,setAddOpen]=useState(false);
+  const [bulkOpen,setBulkOpen]=useState(false);
+  const [pendingReceipts,setPendingReceipts]=useState<{sku:string;quantity:string;branch:string}[]>([]);
+  const [receiptTotal,setReceiptTotal]=useState(0);
   const [adjustOpen,setAdjustOpen]=useState(false),[adjustSku,setAdjustSku]=useState("");
   const [adjustBranch,setAdjustBranch]=useState<string|null>(null);
   const [adjustInitialQuantity,setAdjustInitialQuantity]=useState("");
@@ -52,6 +56,27 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
   function openAdjust(sku: string, branch: string, initialQuantity="") {
     setAdjustBranch(branch);setAdjustSku(sku);setAdjustInitialQuantity(initialQuantity);
     setAdjustOpen(true);setBarcodeError("");
+  }
+  function startBulkReceipts(target:string,receipts:{sku:string;quantity:string}[]) {
+    setBulkOpen(false);setStockBranch(target);
+    if(!receipts.length) {
+      if(target===activeBranch)void refresh();
+      return;
+    }
+    setReceiptTotal(receipts.length);
+    setPendingReceipts(receipts.slice(1).map(r=>({...r,branch:target})));
+    openAdjust(receipts[0].sku,target,receipts[0].quantity);
+  }
+  function nextReceiptOrFinish() {
+    if(pendingReceipts.length){
+      const [next,...rest]=pendingReceipts;
+      setPendingReceipts(rest);
+      openAdjust(next.sku,next.branch,next.quantity);
+      return;
+    }
+    setAdjustOpen(false);setReceiptTotal(0);
+    if(adjustBranch===activeBranch)void refresh();
+    else if(adjustBranch)setStockBranch(adjustBranch);
   }
   function handleScan() {
     const code=barcode.trim();if(!code||!activeBranch)return;
@@ -170,6 +195,7 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
           </select>
         </label>
         {["owner","manager"].includes(context.role)?<button type="button" className="business-stock__refresh" onClick={()=>setAddOpen(true)}>{T("+ เพิ่มสินค้า")}</button>:null}
+        {["owner","manager"].includes(context.role)?<button type="button" className="business-stock__refresh" onClick={()=>setBulkOpen(true)}>{T("+ สร้างสินค้าหลายรายการ")}</button>:null}
         {["owner","manager"].includes(context.role)?<button type="button" className="business-stock__refresh"
            onClick={()=>openAdjust("",activeBranch!)}>{T("+ รับ/จ่ายสต๊อก")}</button>:null}
         <button type="button" className="business-stock__refresh" onClick={()=>setBestOpen(true)}>{T("★ สินค้าขายดี")}</button>
@@ -218,10 +244,15 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
         if(nextBranch===activeBranch)void refresh();
         openAdjust(sku,nextBranch,initialQuantity);
       }}/>:null}
+    {bulkOpen&&activeBranch?<OpticalBulkCreateProduct tenantId={context.tenantId}
+      branchId={activeBranch} currency={currency} branches={context.branches}
+      onClose={()=>setBulkOpen(false)} onCreated={startBulkReceipts}/>:null}
     {adjustOpen&&adjustBranch?<OpticalStockAdjustPopup
       key={adjustBranch+":"+adjustSku} tenantId={context.tenantId} branchId={adjustBranch}
-      initialSku={adjustSku} initialQuantity={adjustInitialQuantity} currency={currency} onClose={()=>setAdjustOpen(false)}
-      onSaved={()=>{setAdjustOpen(false);if(adjustBranch===activeBranch)void refresh();else setStockBranch(adjustBranch);}}/>:null}
+      initialSku={adjustSku} initialQuantity={adjustInitialQuantity} currency={currency}
+      queueLabel={receiptTotal>0?"ยืนยันรับสต๊อก "+(receiptTotal-pendingReceipts.length)+"/"+receiptTotal+
+        " รายการ · กดยกเลิกเพื่อข้ามการรับเข้าของสินค้านี้":undefined}
+      onClose={nextReceiptOrFinish} onSaved={nextReceiptOrFinish}/>:null}
     {bestOpen&&activeBranch?<OpticalBestSellers tenantId={context.tenantId}
       branchId={activeBranch} branchName={context.branches.find(b=>b.id===activeBranch)?.name??"สาขา"}
       currency={currency} products={opticalEntries.map(r=>({id:r.id,name:r.lensName??r.model??r.id,sku:r.sku}))}
