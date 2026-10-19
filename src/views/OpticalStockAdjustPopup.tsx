@@ -4,8 +4,8 @@ import {opticalText,readOpticalLanguage} from "../lib/optical-locale";
 import "../styles/custom-inventory.css";
 
 const skuPattern=/^[^\s,;()]{1,90}$/;
-export function OpticalStockAdjustPopup({tenantId,branchId,initialSku="",initialQuantity="",currency,queueLabel,onClose,onSaved}:{
- tenantId:string;branchId:string;initialSku?:string;initialQuantity?:string;currency:string;queueLabel?:string;
+export function OpticalStockAdjustPopup({tenantId,branchId,initialSku="",initialQuantity="",currency,queueLabel,products=[],onClose,onSaved}:{
+ tenantId:string;branchId:string;initialSku?:string;initialQuantity?:string;currency:string;queueLabel?:string;products?:{sku:string;label:string}[];
  onClose:()=>void;onSaved:()=>void
 }){
  const [language]=useState(readOpticalLanguage);
@@ -17,6 +17,9 @@ export function OpticalStockAdjustPopup({tenantId,branchId,initialSku="",initial
  const [error,setError]=useState("");
  const [busy,setBusy]=useState(false);
  const requestId=useRef(crypto.randomUUID());
+ const term=sku.trim().toLowerCase();
+ const matches=products.filter(p=>!term||p.sku.toLowerCase().includes(term)||
+   p.label.toLowerCase().includes(term)).slice(0,8);
  async function submit(e:React.FormEvent){
   e.preventDefault();
   if(busy)return;
@@ -53,6 +56,14 @@ export function OpticalStockAdjustPopup({tenantId,branchId,initialSku="",initial
           <input value={sku} autoFocus autoComplete="off" spellCheck={false}
            onKeyDown={e=>{if(e.key==="Enter")e.preventDefault();}}
            onChange={e=>setSku(e.target.value)} required/></label>
+        {matches.length?<div className="span2" style={{display:"grid",gap:5,maxHeight:175,overflowY:"auto"}}>
+          <strong style={{fontSize:12}}>เลือกสินค้าจากรายการ</strong>
+          {matches.map(p=><button key={p.sku} type="button"
+            onClick={()=>setSku(p.sku)} style={{padding:"6px 10px",textAlign:"left",
+              border:"1px solid #d1d5db",borderRadius:8,background:"#f8fafc"}}>
+            {p.label} · {p.sku}
+          </button>)}
+        </div>:null}
         <fieldset className="span2" style={{display:"flex",flexWrap:"wrap",gap:18}}>
           <legend>{T("ประเภทการปรับจำนวน")}</legend>
           <label><input type="radio" checked={direction==="receive"}
