@@ -250,6 +250,7 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
     {adjustOpen&&adjustBranch?<OpticalStockAdjustPopup
       key={adjustBranch+":"+adjustSku} tenantId={context.tenantId} branchId={adjustBranch}
       initialSku={adjustSku} initialQuantity={adjustInitialQuantity} currency={currency}
+      products={rows.filter(r=>r.sku).map(r=>({sku:r.sku,label:r.name}))}
       queueLabel={receiptTotal>0?"ยืนยันรับสต๊อก "+(receiptTotal-pendingReceipts.length)+"/"+receiptTotal+
         " รายการ · กดยกเลิกเพื่อข้ามการรับเข้าของสินค้านี้":undefined}
       onClose={nextReceiptOrFinish} onSaved={nextReceiptOrFinish}/>:null}
