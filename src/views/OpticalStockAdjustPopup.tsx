@@ -4,8 +4,8 @@ import {opticalText,readOpticalLanguage} from "../lib/optical-locale";
 import "../styles/custom-inventory.css";
 
 const skuPattern=/^[^\s,;()]{1,90}$/;
-export function OpticalStockAdjustPopup({tenantId,branchId,initialSku="",initialQuantity="",currency,onClose,onSaved}:{
- tenantId:string;branchId:string;initialSku?:string;initialQuantity?:string;currency:string;
+export function OpticalStockAdjustPopup({tenantId,branchId,initialSku="",initialQuantity="",currency,queueLabel,onClose,onSaved}:{
+ tenantId:string;branchId:string;initialSku?:string;initialQuantity?:string;currency:string;queueLabel?:string;
  onClose:()=>void;onSaved:()=>void
 }){
  const [language]=useState(readOpticalLanguage);
@@ -44,6 +44,9 @@ export function OpticalStockAdjustPopup({tenantId,branchId,initialSku="",initial
     className="optical-stock-tables__dialog" style={{width:"min(680px,100%)",maxHeight:"90vh",overflowY:"auto"}}>
     <h3>{T("รับเข้า / เบิกออกสต๊อก Optical")}</h3>
     <p>{T("สแกน SKU และยืนยันจำนวน · ไม่ใช่การรับชำระหรือเปลี่ยนราคาขาย")}</p>
+    {queueLabel?<p role="status" style={{padding:"10px 12px",borderRadius:8,background:"#fffbeb",color:"#92400e"}}>
+      {queueLabel}
+    </p>:null}
     <form className="entityForm" onSubmit={e=>void submit(e)}>
       <div className="formGrid">
         <label className="span2"><span>{T("SKU / บาร์โค้ด")}</span>
