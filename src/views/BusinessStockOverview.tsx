@@ -46,10 +46,12 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
   const [bestOpen,setBestOpen]=useState(false),[addOpen,setAddOpen]=useState(false);
   const [adjustOpen,setAdjustOpen]=useState(false),[adjustSku,setAdjustSku]=useState("");
   const [adjustBranch,setAdjustBranch]=useState<string|null>(null);
+  const [adjustInitialQuantity,setAdjustInitialQuantity]=useState("");
   const [barcode,setBarcode]=useState("");
   const [barcodeError,setBarcodeError]=useState("");
-  function openAdjust(sku: string, branch: string) {
-    setAdjustBranch(branch);setAdjustSku(sku);setAdjustOpen(true);setBarcodeError("");
+  function openAdjust(sku: string, branch: string, initialQuantity="") {
+    setAdjustBranch(branch);setAdjustSku(sku);setAdjustInitialQuantity(initialQuantity);
+    setAdjustOpen(true);setBarcodeError("");
   }
   function handleScan() {
     const code=barcode.trim();if(!code||!activeBranch)return;
@@ -211,14 +213,14 @@ export function BusinessStockOverview({context,branchId,business,strictOpticalCa
     </div>
     {addOpen&&activeBranch?<OpticalCreateProduct tenantId={context.tenantId}
       branchId={activeBranch} currency={currency} branches={context.branches}
-      onClose={()=>setAddOpen(false)} onCreated={(nextBranch,sku)=>{
+      onClose={()=>setAddOpen(false)} onCreated={(nextBranch,sku,initialQuantity)=>{
         setAddOpen(false);setStockBranch(nextBranch);
         if(nextBranch===activeBranch)void refresh();
-        openAdjust(sku,nextBranch);
+        openAdjust(sku,nextBranch,initialQuantity);
       }}/>:null}
     {adjustOpen&&adjustBranch?<OpticalStockAdjustPopup
       key={adjustBranch+":"+adjustSku} tenantId={context.tenantId} branchId={adjustBranch}
-      initialSku={adjustSku} currency={currency} onClose={()=>setAdjustOpen(false)}
+      initialSku={adjustSku} initialQuantity={adjustInitialQuantity} currency={currency} onClose={()=>setAdjustOpen(false)}
       onSaved={()=>{setAdjustOpen(false);if(adjustBranch===activeBranch)void refresh();else setStockBranch(adjustBranch);}}/>:null}
     {bestOpen&&activeBranch?<OpticalBestSellers tenantId={context.tenantId}
       branchId={activeBranch} branchName={context.branches.find(b=>b.id===activeBranch)?.name??"สาขา"}
