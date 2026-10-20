@@ -39,6 +39,8 @@ export function OpticalCustomersView({context,branchId}:{context:PortalContext;b
   const [notice,setNotice]=useState("");
   const [search,setSearch]=useState("");
   const [editor,setEditor]=useState<Customer|null>(null);
+  const [detailFor,setDetailFor]=useState<Customer|null>(null);
+  const [editingProfile,setEditingProfile]=useState(false);
   const [editing,setEditing]=useState(false);
   const [form,setForm]=useState<Form>(blank);
   const [saving,setSaving]=useState(false);
@@ -57,15 +59,23 @@ export function OpticalCustomersView({context,branchId}:{context:PortalContext;b
     setLoading(false);
   },[activeBranch,context.tenantId]);
   useEffect(()=>{void load();},[load]);
-  useEffect(()=>{setEditing(false);setEditor(null);setHistoryFor("");setExams([]);},[activeBranch]);
+  useEffect(()=>{setEditing(false);setEditor(null);setDetailFor(null);setHistoryFor("");setExams([]);},[activeBranch]);
   const change=(k:keyof Form,v:string)=>{setForm(curr=>({...curr,[k]:v}));setError("");if(fieldError===k)setFieldError(null);requestId.current=crypto.randomUUID();};
-  const startNew=()=>{setEditor(null);setForm(blank());setEditing(true);setError("");setFieldError(null);setNotice("");requestId.current=crypto.randomUUID();};
+  const startNew=()=>{setEditingProfile(false);setDetailFor(null);setEditor(null);setForm(blank());setEditing(true);setError("");setFieldError(null);setNotice("");requestId.current=crypto.randomUUID();};
   const startEdit=(row:Customer)=>{
+    setEditingProfile(false);setDetailFor(null);
     setEditor(row);
     setForm({...blank(),customer_code:row.customer_code,full_name:row.full_name,phone:row.phone??"",
       age:row.age===null?"":String(row.age),exam_date:row.last_exam_date??new Date().toISOString().slice(0,10),
       previous_prescription:row.previous_prescription??"",examiner_name:row.examiner_name??"",notes:row.notes??""});
     setEditing(true);setError("");setFieldError(null);setNotice("");requestId.current=crypto.randomUUID();
+  };
+  const startProfileEdit=(row:Customer)=>{
+    setEditingProfile(true);setDetailFor(null);setEditor(row);
+    setForm({...blank(),customer_code:row.customer_code,full_name:row.full_name,phone:row.phone??"",
+      age:row.age===null?"":String(row.age),exam_date:row.last_exam_date??new Date().toISOString().slice(0,10),
+      previous_prescription:row.previous_prescription??"",examiner_name:row.examiner_name??"",notes:row.notes??""});
+    setEditing(true);setError("");setFieldError(null);setNotice("");
   };
   const save=async(event:FormEvent<HTMLFormElement>)=>{
     event.preventDefault();
@@ -74,6 +84,21 @@ export function OpticalCustomersView({context,branchId}:{context:PortalContext;b
     if(invalid){setFieldError(invalid.field);setError(invalid.message);return;}
     setFieldError(null);
     setSaving(true);setError("");setNotice("");
+    if(editingProfile&&editor){
+      if(!form.full_name.trim()||form.full_name.length>240||form.phone.length>48){
+        setSaving(false);setError("กรุณาตรวจสอบชื่อและเบอร์โทรศัพท์");return;
+      }
+      const {data:updated,error:profileError}=await supabase.from("optical_customers")
+        .update({full_name:form.full_name.trim(),phone:form.phone.trim()||null,age:val(form.age),
+          previous_prescription:form.previous_prescription||null,notes:form.notes||null,
+          updated_by:context.userId,updated_at:new Date().toISOString()})
+        .eq("tenant_id",context.tenantId).eq("branch_id",activeBranch)
+        .eq("id",editor.id).is("deleted_at",null).select("id").maybeSingle();
+      setSaving(false);
+      if(profileError||!updated){setError(profileError?.message||"ไม่พบลูกค้าที่ต้องการแก้ไข");return;}
+      setEditing(false);setEditingProfile(false);setEditor(null);
+      setNotice("แก้ไขข้อมูลลูกค้าแล้ว โดยไม่เพิ่มผลตรวจใหม่");await load();return;
+    }
     const fields:Record<string,unknown>={
       p_tenant_id:context.tenantId,p_branch_id:activeBranch,
       p_customer_code:form.customer_code,p_full_name:form.full_name,p_phone:form.phone||null,
@@ -90,8 +115,14 @@ export function OpticalCustomersView({context,branchId}:{context:PortalContext;b
     await load();
   };
   const archive=async(row:Customer)=>{
+    if(!["owner","manager"].includes(context.role))return setError("ต้องเป็น Owner หรือ Manager จึงเก็บถาวรได้");
     if(!activeBranch||!window.confirm(`ยืนยันย้ายลูกค้า ${row.customer_code} ไปยังสถานะเก็บถาวร? ข้อมูลประวัติจะยังคงอยู่ในฐานข้อมูล`))return;
     setError("");setNotice("");
+    const {data:linked,error:checkError}=await supabase.from("optical_work_orders")
+      .select("id").eq("tenant_id",context.tenantId).eq("branch_id",activeBranch)
+      .eq("customer_id",row.id).neq("status","cancelled").limit(1);
+    if(checkError){setError("ไม่สามารถตรวจใบงานที่เกี่ยวข้องได้ กรุณาให้ IT ตรวจสอบก่อนเก็บถาวร");return;}
+    if(linked?.length){setError("ลูกค้ามีใบสั่งงานค้างอยู่ ไม่สามารถเก็บถาวรได้");return;}
     const {error:archiveError}=await supabase.from("optical_customers")
       .update({deleted_at:new Date().toISOString(),updated_by:context.userId,updated_at:new Date().toISOString()})
       .eq("id",row.id).eq("tenant_id",context.tenantId).eq("branch_id",activeBranch);
@@ -100,7 +131,7 @@ export function OpticalCustomersView({context,branchId}:{context:PortalContext;b
   };
   const openHistory=async(row:Customer)=>{
     if(!activeBranch)return;
-    setHistoryFor(row.customer_code);setExams([]);
+    setDetailFor(row);setHistoryFor(row.customer_code);setExams([]);
     const {data,error:examError}=await supabase.from("optical_eye_exams")
       .select("id,examined_at,right_sph,right_cyl,right_axis,right_add,left_sph,left_cyl,left_axis,left_add,pd_mm,examiner_name")
       .eq("tenant_id",context.tenantId).eq("branch_id",activeBranch).eq("customer_id",row.id)
@@ -132,28 +163,52 @@ export function OpticalCustomersView({context,branchId}:{context:PortalContext;b
     {loading?<p>กำลังโหลดข้อมูลลูกค้า...</p>:
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white"><table className="w-full text-left text-sm">
         <thead><tr className="bg-slate-50"><th className="p-3">รหัสลูกค้า</th><th className="p-3">ชื่อ–นามสกุล</th><th className="p-3">โทรศัพท์</th><th className="p-3">ตรวจล่าสุด</th><th className="p-3">จัดการ</th></tr></thead>
-        <tbody>{filtered.map(row=><tr key={row.id} className="border-t border-slate-100">
+        <tbody>{filtered.map(row=><tr key={row.id} className="cursor-pointer border-t border-slate-100 hover:bg-emerald-50" onClick={()=>void openHistory(row)} tabIndex={0} onKeyDown={e=>{if(e.key==="Enter")void openHistory(row);}}>
           <td className="p-3 font-bold">{row.customer_code}</td><td className="p-3">{row.full_name}</td><td className="p-3">{row.phone||"-"}</td><td className="p-3">{row.last_exam_date||"-"}</td>
-          <td className="flex flex-wrap gap-2 p-3"><button className="rounded border px-3 py-1" onClick={()=>void openHistory(row)}>ประวัติ</button>
-            <button className="rounded border px-3 py-1" onClick={()=>startEdit(row)}>แก้ไข/ตรวจใหม่</button>
-            <button className="rounded border border-rose-200 px-3 py-1 text-rose-700" onClick={()=>void archive(row)}>เก็บถาวร</button></td>
+          <td className="p-3"><div className="flex flex-wrap gap-2">
+            <button type="button" className="rounded border px-3 py-1" onClick={e=>{e.stopPropagation();void openHistory(row);}}>ดูรายละเอียด</button>
+            <button type="button" className="rounded border px-3 py-1" onClick={e=>{e.stopPropagation();startProfileEdit(row);}}>แก้ไข</button>
+            {["owner","manager"].includes(context.role)?<button type="button" className="rounded border border-rose-200 px-3 py-1 text-rose-700"
+              onClick={e=>{e.stopPropagation();void archive(row);}}>ลบ (เก็บถาวร)</button>:null}
+            </div></td>
         </tr>)}</tbody>
       </table>{filtered.length===0?<p className="p-4 text-sm text-slate-500">ไม่พบลูกค้า</p>:null}</div>}
-    {historyFor?<div className="rounded-xl border border-emerald-200 bg-white p-4"><h3>ประวัติค่าสายตา: {historyFor}</h3>
-      {exams.length===0?<p>ยังไม่มีผลตรวจย้อนหลัง</p>:<div className="overflow-x-auto"><table className="w-full text-left text-xs">
-        <thead><tr><th>วันที่</th><th>R SPH/CYL/AX/ADD</th><th>L SPH/CYL/AX/ADD</th><th>PD</th><th>ผู้ตรวจ</th></tr></thead>
-        <tbody>{exams.map(e=><tr key={e.id} className="border-t"><td className="p-2">{e.examined_at}</td>
-          <td>{[e.right_sph,e.right_cyl,e.right_axis,e.right_add].map(x=>x??"-").join(" / ")}</td>
-          <td>{[e.left_sph,e.left_cyl,e.left_axis,e.left_add].map(x=>x??"-").join(" / ")}</td>
-          <td>{e.pd_mm??"-"}</td><td>{e.examiner_name??"-"}</td></tr>)}</tbody>
-      </table></div>}</div>:null}
+    {detailFor?<div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/55 p-3"
+       role="presentation" onClick={()=>setDetailFor(null)}>
+       <section role="dialog" aria-modal="true" aria-label="รายละเอียดลูกค้าแว่นตา"
+         onClick={e=>e.stopPropagation()} className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
+        <div className="flex items-center justify-between gap-3"><h3 className="text-xl font-bold">รายละเอียดลูกค้า: {detailFor.customer_code}</h3>
+          <button type="button" className="rounded border px-3 py-2" onClick={()=>setDetailFor(null)}>ปิด</button></div>
+        <div className="mt-4 grid gap-3 rounded-xl border p-3 sm:grid-cols-3">
+          {([["ชื่อ–นามสกุล",detailFor.full_name],["เบอร์โทรศัพท์",detailFor.phone],["อายุ",detailFor.age],
+             ["ตรวจล่าสุด",detailFor.last_exam_date],["ผู้ตรวจ",detailFor.examiner_name],
+             ["ค่าสายตาเดิม",detailFor.previous_prescription]] as const).map(([k,v])=>
+               <p key={k} className="rounded-lg bg-slate-50 p-3 text-sm"><span className="block text-xs text-slate-500">{k}</span>
+                 <strong>{v??"—"}</strong></p>)}
+        </div>
+        <div className="my-4 flex flex-wrap gap-2">
+          <button type="button" className="rounded-lg border border-blue-300 px-3 py-2" onClick={()=>startProfileEdit(detailFor)}>แก้ไขข้อมูลลูกค้า</button>
+          <button type="button" className="rounded-lg border border-emerald-300 px-3 py-2" onClick={()=>startEdit(detailFor)}>เพิ่มผลตรวจใหม่</button>
+          {["owner","manager"].includes(context.role)?<button type="button" className="rounded-lg border border-rose-300 px-3 py-2 text-rose-700"
+            onClick={()=>{void archive(detailFor).then(()=>setDetailFor(null));}}>ลบ (เก็บถาวร)</button>:null}
+        </div>
+        <h4 className="mb-2 font-bold">ประวัติค่าสายตา: {historyFor}</h4>
+        {exams.length===0?<p className="text-sm text-slate-500">ยังไม่มีผลตรวจย้อนหลัง</p>:<div className="overflow-x-auto"><table className="w-full min-w-[600px] text-left text-xs">
+         <thead><tr className="bg-emerald-50"><th className="p-2">วันที่</th><th>R SPH/CYL/AX/ADD</th><th>L SPH/CYL/AX/ADD</th><th>PD</th><th>ผู้ตรวจ</th></tr></thead>
+         <tbody>{exams.map(e=><tr key={e.id} className="border-t"><td className="p-2">{e.examined_at}</td>
+           <td>{[e.right_sph,e.right_cyl,e.right_axis,e.right_add].map(x=>x??"—").join(" / ")}</td>
+           <td>{[e.left_sph,e.left_cyl,e.left_axis,e.left_add].map(x=>x??"—").join(" / ")}</td>
+           <td>{e.pd_mm??"—"}</td><td>{e.examiner_name??"—"}</td></tr>)}</tbody></table></div>}
+       </section>
+     </div>:null}
     {editing?<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4" role="presentation" onClick={()=>{if(!saving)setEditing(false);}}>
       <div role="dialog" aria-modal="true" aria-label="ข้อมูลลูกค้า Optical" onClick={e=>e.stopPropagation()} className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
-        <h3 className="mb-3 text-xl font-bold">{editor?"แก้ไขข้อมูลและเพิ่มผลตรวจใหม่":"เพิ่มประวัติลูกค้า"}</h3>
+        <h3 className="mb-3 text-xl font-bold">{editingProfile?"แก้ไขข้อมูลลูกค้า":editor?"เพิ่มผลตรวจใหม่":"เพิ่มประวัติลูกค้า"}</h3>
         <form className="grid gap-4" onSubmit={e=>void save(e)}>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{field("customer_code","รหัสลูกค้า")}{field("full_name","ชื่อ–นามสกุล")}{field("phone","เบอร์โทร","tel")}{field("age","อายุ","number")}{field("exam_date","วันที่ตรวจล่าสุด","date")}{field("examiner_name","ผู้ตรวจ")}</div>
-          <h4 className="font-bold">ค่าสายตาใหม่ R / L</h4>
+          {!editingProfile?<><h4 className="font-bold">ค่าสายตาใหม่ R / L</h4>
           <div className="grid gap-3 sm:grid-cols-4">{(["right_sph","right_cyl","right_axis","right_add","left_sph","left_cyl","left_axis","left_add","pd_mm"] as const).map(k=>field(k,k.replace("right_","R ").replace("left_","L "),"number"))}</div>
+          </>:null}
           {field("previous_prescription","ค่าสายตาเดิม")}
           <label className="grid gap-1">หมายเหตุ<textarea className="rounded-lg border p-3" rows={2} value={form.notes} onChange={e=>change("notes",e.target.value)}/></label>
           {error&&!fieldError?<p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</p>:null}
