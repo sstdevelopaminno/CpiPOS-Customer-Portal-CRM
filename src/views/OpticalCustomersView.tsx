@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { supabase } from "../lib/supabase";
+import {validateOpticalExamNumbers} from "../lib/optical-eye-exam-validation";
 import "../styles/optical-customers.css";
 import type { PortalContext } from "../types/portal";
 
@@ -34,6 +35,7 @@ export function OpticalCustomersView({context,branchId}:{context:PortalContext;b
   const [customers,setCustomers]=useState<Customer[]>([]);
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState("");
+  const [fieldError,setFieldError]=useState<keyof Form|null>(null);
   const [notice,setNotice]=useState("");
   const [search,setSearch]=useState("");
   const [editor,setEditor]=useState<Customer|null>(null);
@@ -56,20 +58,21 @@ export function OpticalCustomersView({context,branchId}:{context:PortalContext;b
   },[activeBranch,context.tenantId]);
   useEffect(()=>{void load();},[load]);
   useEffect(()=>{setEditing(false);setEditor(null);setHistoryFor("");setExams([]);},[activeBranch]);
-  const change=(k:keyof Form,v:string)=>{setForm(curr=>({...curr,[k]:v}));setError("");requestId.current=crypto.randomUUID();};
-  const startNew=()=>{setEditor(null);setForm(blank());setEditing(true);setError("");setNotice("");requestId.current=crypto.randomUUID();};
+  const change=(k:keyof Form,v:string)=>{setForm(curr=>({...curr,[k]:v}));setError("");if(fieldError===k)setFieldError(null);requestId.current=crypto.randomUUID();};
+  const startNew=()=>{setEditor(null);setForm(blank());setEditing(true);setError("");setFieldError(null);setNotice("");requestId.current=crypto.randomUUID();};
   const startEdit=(row:Customer)=>{
     setEditor(row);
     setForm({...blank(),customer_code:row.customer_code,full_name:row.full_name,phone:row.phone??"",
       age:row.age===null?"":String(row.age),exam_date:row.last_exam_date??new Date().toISOString().slice(0,10),
       previous_prescription:row.previous_prescription??"",examiner_name:row.examiner_name??"",notes:row.notes??""});
-    setEditing(true);setError("");setNotice("");requestId.current=crypto.randomUUID();
+    setEditing(true);setError("");setFieldError(null);setNotice("");requestId.current=crypto.randomUUID();
   };
   const save=async(event:FormEvent<HTMLFormElement>)=>{
     event.preventDefault();
     if(!activeBranch||saving)return;
-    const age=val(form.age),pd=val(form.pd_mm);
-    if((age!==null&&(age<0||age>130))||(pd!==null&&(pd<30||pd>90))) {setError("อายุหรือ PD ไม่ถูกต้อง");return;}
+    const invalid=validateOpticalExamNumbers(form);
+    if(invalid){setFieldError(invalid.field);setError(invalid.message);return;}
+    setFieldError(null);
     setSaving(true);setError("");setNotice("");
     const fields:Record<string,unknown>={
       p_tenant_id:context.tenantId,p_branch_id:activeBranch,
@@ -107,8 +110,11 @@ export function OpticalCustomersView({context,branchId}:{context:PortalContext;b
   const field=(k:keyof Form,label:string,type="text")=>(
     <label key={k} className="flex flex-col gap-1"><span>{label}</span>
       <input type={type} step={type==="number"?"any":undefined} value={form[k]}
+        aria-invalid={fieldError===k}
         disabled={saving||(k==="customer_code"&&Boolean(editor))} required={k==="customer_code"||k==="full_name"||k==="exam_date"}
-        onChange={e=>change(k,e.target.value)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm"/>
+        onChange={e=>change(k,e.target.value)}
+        className={"rounded-lg border px-3 py-2 text-sm "+(fieldError===k?"border-rose-500 ring-2 ring-rose-100":"border-slate-300")}/>
+      {fieldError===k&&error?<span role="alert" className="text-xs font-semibold text-rose-700">{error}</span>:null}
     </label>
   );
   const filtered=customers.filter(row=>(row.customer_code+" "+row.full_name+" "+(row.phone??"")).toLowerCase().includes(search.toLowerCase()));
@@ -150,6 +156,7 @@ export function OpticalCustomersView({context,branchId}:{context:PortalContext;b
           <div className="grid gap-3 sm:grid-cols-4">{(["right_sph","right_cyl","right_axis","right_add","left_sph","left_cyl","left_axis","left_add","pd_mm"] as const).map(k=>field(k,k.replace("right_","R ").replace("left_","L "),"number"))}</div>
           {field("previous_prescription","ค่าสายตาเดิม")}
           <label className="grid gap-1">หมายเหตุ<textarea className="rounded-lg border p-3" rows={2} value={form.notes} onChange={e=>change("notes",e.target.value)}/></label>
+          {error&&!fieldError?<p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</p>:null}
           <div className="flex justify-end gap-3"><button className="rounded border px-5 py-3" type="button" onClick={()=>setEditing(false)} disabled={saving}>ยกเลิก</button><button className="rounded bg-emerald-700 px-5 py-3 font-bold text-white" type="submit" disabled={saving}>{saving?"กำลังบันทึก":"บันทึกข้อมูล"}</button></div>
         </form>
       </div>
