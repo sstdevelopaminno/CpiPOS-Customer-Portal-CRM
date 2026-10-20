@@ -12,6 +12,7 @@ export function OpticalWorkOrderDetailDialog({order,context,branch,onClose,onCha
  const [loading,setLoading]=useState(true),[err,setErr]=useState("");
  const [edit,setEdit]=useState(false),[busy,setBusy]=useState(false);
  const [note,setNote]=useState(order.note??""),[due,setDue]=useState(order.due_at?.slice(0,10)??"");
+ const [pin,setPin]=useState("");
  useEffect(()=>{
   let active=true;setLoading(true);setErr("");setLines([]);setPayments([]);
   void (async()=>{
@@ -31,16 +32,20 @@ export function OpticalWorkOrderDetailDialog({order,context,branch,onClose,onCha
   })();
   return()=>{active=false;};
  },[context.tenantId,branch,order.id]);
- const permitted=["owner","manager"].includes(context.role);
+ const permitted=["owner","manager","staff"].includes(context.role);
  const manage=async(action:"update"|"cancel")=>{
   if(busy||!permitted)return;
+  if(pin.trim().length<4){setErr("กรุณาระบุ PIN ผู้จัดการหรือเจ้าของร้านก่อนดำเนินการ");return;}
+  if(action==="cancel"&&order.paid_total>0){
+    setErr("ใบงานรับมัดจำแล้ว ต้องทำรายการคืนเงินอย่างเป็นทางการก่อนจึงจะยกเลิกใบงานได้");return;
+  }
   if(action==="cancel"&&!window.confirm("ยืนยันยกเลิกใบงาน? ไม่สามารถยกเลิกงานที่รับเงินแล้ว"))return;
   setBusy(true);setErr("");
   try{
    const dueAt=due?new Date(due+"T12:00:00+07:00").toISOString():null;
-   const {error}=await supabase.rpc("optical_manage_work_order_v1",{
+   const {error}=await supabase.rpc("optical_manage_work_order_pin_v2",{
     p_tenant_id:context.tenantId,p_branch_id:branch,p_work_order_id:order.id,
-    p_actor:context.userId,p_action:action,p_request_id:crypto.randomUUID(),
+    p_actor:context.userId,p_action:action,p_request_id:crypto.randomUUID(),p_manager_pin:pin,
     p_note:note,p_due_at:dueAt
    });
    if(error)throw error;
@@ -66,27 +71,41 @@ export function OpticalWorkOrderDetailDialog({order,context,branch,onClose,onCha
           <strong>{value}</strong></p>)}
     </div>
     {loading?<p className="p-3 text-sm">กำลังโหลดรายละเอียด...</p>:null}
-    <h4 className="mt-4 font-bold">รายการสินค้า</h4>
+    <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
+      <section className="min-w-0 rounded-xl border p-3">
+    <h4 className="mb-2 font-bold">รายการสินค้า</h4>
     {lines.map(l=><p key={l.id} className="border-b p-2 text-sm">{l.description_snapshot||l.sku_snapshot||"สินค้า"} × {l.quantity} · {fmt(l.line_total,order.currency_code)}</p>)}
     {!loading&&!lines.length?<p className="text-sm text-slate-500">ไม่พบรายการสินค้า</p>:null}
-    <h4 className="mt-4 font-bold">ประวัติเงินมัดจำ / ชำระเงิน</h4>
+    <p className="mt-2 text-xs text-amber-700">รายการสินค้าในใบงานที่รับเงินแล้วต้องแก้ผ่านเอกสารปรับปรุง ไม่ลบราคาหรือสต๊อกเดิม</p>
+      </section>
+      <section className="min-w-0 rounded-xl border p-3">
+    <h4 className="mb-2 font-bold">ประวัติเงินมัดจำ / ชำระเงิน</h4>
     {payments.map(p=><p key={p.id} className="border-b p-2 text-sm">{new Date(p.received_at).toLocaleString("th-TH")} · {p.method} · {fmt(p.amount,order.currency_code)}</p>)}
     {!loading&&!payments.length?<p className="text-sm text-slate-500">ยังไม่มีรายการเงินมัดจำ</p>:null}
+    <p className="mt-2 text-xs text-amber-700">การยกเลิกรายการเงินที่รับแล้วต้องทำบัญชีคืนเงินแยก ไม่ลบรายการรับเงินจริง</p>
+      </section>
+    </div>
     {edit?<div className="mt-4 grid gap-3 rounded-xl border p-3">
       <label className="grid gap-1 text-sm">วันนัดรับ<input type="date" value={due} className="rounded-lg border p-2" onChange={e=>setDue(e.target.value)}/></label>
       <label className="grid gap-1 text-sm">หมายเหตุ<textarea value={note} maxLength={1000}
        className="rounded-lg border p-3" onChange={e=>setNote(e.target.value)}/></label>
       <p className="text-xs text-slate-500">แก้ไขได้เฉพาะงานที่เพิ่งรับและยังไม่มีการรับเงิน ไม่แก้ยอดขายหรือรายการสินค้า</p>
     </div>:null}
+    {permitted?<label className="mt-3 grid max-w-sm gap-1 text-sm font-semibold">
+      PIN ผู้จัดการหรือเจ้าของร้าน
+      <input type="password" inputMode="numeric" autoComplete="off" maxLength={32} value={pin}
+        onChange={e=>setPin(e.target.value)} className="rounded-lg border px-3 py-2"/>
+    </label>:null}
     {err?<p role="alert" className="mt-3 rounded-lg bg-rose-50 p-3 text-rose-700">{err}</p>:null}
     <div className="mt-4 flex flex-wrap gap-2">
-      {permitted&&order.status==="received"&&order.paid_total===0?
+      {permitted&&!["cancelled","collected"].includes(order.status)?
         <button type="button" disabled={busy||loading||Boolean(err)} className="rounded-lg border border-blue-300 px-4 py-2 text-blue-800"
          onClick={()=>edit?void manage("update"):setEdit(true)}>{edit?"บันทึกการแก้ไข":"แก้ไข"}</button>:null}
       {permitted&&!["collected","cancelled"].includes(order.status)&&order.paid_total===0?
         <button type="button" disabled={busy||loading||Boolean(err)} className="rounded-lg border border-rose-300 px-4 py-2 text-rose-800"
          onClick={()=>void manage("cancel")}>ลบ (ยกเลิกใบงาน)</button>:null}
-      {!permitted?<p className="text-xs text-amber-800">การแก้ไขหรือยกเลิกต้องใช้สิทธิ์ Owner/Manager และผ่าน IT Optical finance approval</p>:null}
+      {order.paid_total>0?<p className="text-xs text-amber-700">รับเงินแล้ว การยกเลิกต้องคืนเงินผ่านขั้นตอนตรวจสอบก่อน ไม่ลบประวัติเงินรับ</p>:null}
+      {!permitted?<p className="text-xs text-amber-800">ต้องได้รับสิทธิ์สาขา และใช้ PIN Owner/Manager ก่อนแก้ไข</p>:null}
     </div>
    </section>
  </div>;
