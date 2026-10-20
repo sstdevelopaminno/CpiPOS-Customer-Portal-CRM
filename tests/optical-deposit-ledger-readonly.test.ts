@@ -21,7 +21,7 @@ describe("Optical CRM finance read-only history",()=>{
  it("shows original transaction currency and never treats a pending transfer as verified",()=>{
   expect(detail).toContain("fmt(p.amount,order.currency_code)");
   expect(detail).toContain("order.total_amount-order.paid_total");
-  expect(detail).toContain("optical_manage_work_order_v1");
+  expect(detail).toContain("optical_manage_work_order_pin_v2");
   expect(detail).not.toContain('from("optical_payment_ledger").insert');
  });
  it("localizes all ledger controls in Thai, Lao and English",()=>{

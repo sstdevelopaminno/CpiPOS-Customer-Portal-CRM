@@ -17,7 +17,7 @@ describe("CRM Optical popups and preservation rules",()=>{
   const modal=src("../src/views/OpticalWorkOrderDetailDialog.tsx");
   expect(x).toContain("OpticalWorkOrderDetailDialog");
   expect(x).toContain("setSelectedOrderId(o.id)");
-  expect(modal).toContain("optical_manage_work_order_v1");
+  expect(modal).toContain("optical_manage_work_order_pin_v2");
   expect(modal).toContain('action==="cancel"');
   expect(modal).toContain("ยืนยันยกเลิกใบงาน");
   expect(modal).not.toContain('.delete()');
